@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Damages a stream in known ways (tools/tsmangle.py) and runs tb-ts-verify and TSDuck's
-# nearest equivalents on each result: the table of notes/ts-verify-log.md.
+# nearest equivalents on each result, as a comparison table.
 #
 # usage: validate.sh STREAM RATE OUTDIR
 #   STREAM  a clean-ish stream with PIDs 0x0101 (video, PCR) and 0x0104 (AC-3), such as

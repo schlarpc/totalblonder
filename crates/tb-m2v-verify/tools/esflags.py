@@ -6,7 +6,7 @@ encoder. Three uses:
 
 - `list`: the pictures in display order with top_field_first, repeat_first_field and
   progressive_frame, and whether the output fields alternate (7.12). The gate uses it to check
-  the cadence a stream asks a decoder for (gate/film_check.py).
+  the cadence a stream asks a decoder for (tools/gate/film_check.py).
 - `telecine`: set the flags of another encoder's stream to a pulldown pattern (what DGPulldown
   does to a 23.976 Hz stream): the coded data stay that encoder's, the flags become a legal
   soft telecine. Gives the verifier repeat_first_field streams it has not seen, including

@@ -1,5 +1,5 @@
 //! GPS time and the STT's daylight-saving field (A/65 §6.1 and Annex A, p.24–25, p.84–85;
-//! `notes/standards-digest.md` §3.1).
+//! `docs/notes/standards-digest.md` §3.1).
 
 /// Unix time of the GPS epoch, 1980-01-06 00:00:00 UTC.
 pub const GPS_EPOCH_UNIX: i64 = 315_964_800;
@@ -10,7 +10,7 @@ pub const GPS_EPOCH_UNIX: i64 = 315_964_800;
 pub struct GpsSeconds(pub u32);
 
 /// The GPS–UTC offset in whole seconds: 18 since 2017-01-01. Configured, never assumed
-/// silently (`notes/standards-digest.md` §3.1).
+/// silently (`docs/notes/standards-digest.md` §3.1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LeapSeconds(pub u8);
 

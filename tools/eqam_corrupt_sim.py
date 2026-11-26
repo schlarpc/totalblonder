@@ -6,7 +6,7 @@ Routines emulated (addresses are in the bflt.py images, base 0x10000000):
   qam      qamconfig.cgi  0x100002a8..0x10000344  QAM Config "Save" RF-channel fan-out
   csv      update_config  0x100000ec (main)       boot-time CSV reconcile (Automatic mode)
   kv       config.cgi     0x10004fcc              Key=Value upload parser (string fields)
-  patch    writes a patched copy of qamconfig.cgi (11 words), see notes/corruption-48.md
+  patch    writes a patched copy of qamconfig.cgi (11 words), see docs/notes/corruption-48.md
 
 Examples:
   eqam_corrupt_sim.py qam --mode spts --slot 4 --channel 140

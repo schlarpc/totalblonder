@@ -2,7 +2,7 @@
 //!
 //! Executes device plans on the host: the two arenas are ordinary memory, copies are `memcpy`,
 //! and a launch calls the kernel compiled from the same source as the device image
-//! (`kernels/tb_kernels_ref.cc` with `kernels/shim/cuda_runtime.h`), block after block, thread
+//! (`crates/tb-kernel-abi/kernels/tb_kernels_ref.cc` with `crates/tb-kernel-abi/kernels/shim/cuda_runtime.h`), block after block, thread
 //! after thread. Everything is synchronous: `submit` runs the plan, `wait` returns its result.
 //!
 //! It exists so that the whole encoder runs in the Nix sandbox, without a GPU, on the kernels'
@@ -23,7 +23,7 @@ use tb_device::{ArenaSizes, Completion, Device, DeviceError, Kernel, Nanos, Tick
 
 mod ffi {
     use super::{c_char, c_int, c_uint, c_void};
-    // Declared in kernels/tb_kernels_ref.h.
+    // Declared in crates/tb-kernel-abi/kernels/tb_kernels_ref.h.
     unsafe extern "C" {
         pub safe fn tbk_kernel_count() -> c_int;
         pub fn tbk_kernel_name(kernel: c_int) -> *const c_char;
@@ -98,7 +98,7 @@ pub fn library_param_sizes(index: usize) -> Vec<usize> {
     sizes[..n].iter().map(|s| *s as usize).collect()
 }
 
-/// The host launcher's own test kernels (`tbk_test_launch` in `kernels/tb_kernels_ref.cc`):
+/// The host launcher's own test kernels (`tbk_test_launch` in `crates/tb-kernel-abi/kernels/tb_kernels_ref.cc`):
 /// small kernels with barriers that check the fibers and shuffles every kernel with barriers
 /// runs on, and misuses the launcher must report. Each writes one word per thread.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

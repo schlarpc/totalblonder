@@ -57,7 +57,7 @@ pub fn pat(c: &Carrier, version: Version) -> Result<Section, Error> {
 }
 
 /// The PMT of one program (Rec. Table 2-33, p.50) with the descriptors of
-/// `notes/standards-digest.md` §4.2: `GA94` and the rating in the program loop; for video the
+/// `docs/notes/standards-digest.md` §4.2: `GA94` and the rating in the program loop; for video the
 /// alignment descriptor, the caption service descriptor when captions are carried, and the AVC
 /// descriptor for H.264; for each AC-3 stream the AC-3 descriptor, the `AC-3` registration, an
 /// ISO 639 descriptor and the component name when one is set. The PCR PID is the video PID.

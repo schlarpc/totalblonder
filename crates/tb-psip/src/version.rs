@@ -1,5 +1,5 @@
 //! Version numbers that change exactly when content changes (Rec. §2.4.4.5, p.49; A/65
-//! §4.1; `notes/standards-digest.md` §1.3: "+1 mod 32 when the table changes").
+//! §4.1; `docs/notes/standards-digest.md` §1.3: "+1 mod 32 when the table changes").
 //!
 //! A table is identified by a [`Key`]. Its content is compared through a digest of the
 //! sections built with version 0, so the version field itself never makes the content look

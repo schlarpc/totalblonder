@@ -16,7 +16,7 @@ impl Pid {
     pub const PAT: Pid = Pid(0x0000);
     /// Conditional access table.
     pub const CAT: Pid = Pid(0x0001);
-    /// ATSC PSIP base PID: MGT, TVCT/CVCT, STT, RRT (A/65 §6, `notes/standards-digest.md` §2.2).
+    /// ATSC PSIP base PID: MGT, TVCT/CVCT, STT, RRT (A/65 §6, `docs/notes/standards-digest.md` §2.2).
     pub const PSIP_BASE: Pid = Pid(0x1FFB);
     /// Null packets (Rec. Table 2-3, p.21).
     pub const NULL: Pid = Pid(0x1FFF);

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Builds the validation streams of notes/ts-verify-log.md from independent muxers:
+# Builds the validation streams of the checker from independent muxers:
 # ffmpeg's mpegts muxer (CBR, VBR, flag variants) and an ATSC MPTS with PSIP made by
-# TSDuck's inject plugin (the spike of notes/software-survey.md section 2.6, to a file).
+# TSDuck's inject plugin (the spike of docs/notes/software-survey.md section 2.6, to a file).
 #
 # usage: make_streams.sh OUTDIR [SECONDS]
 # needs: ffmpeg on PATH; TSDuck's tsp (TSDUCK=/path/to/tsduck/bin, or found with

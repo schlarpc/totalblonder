@@ -1,2 +1,0 @@
-label,fmt,kind,n,frames,rt,mb_per_s,tick_mean_ms,tick_p50_ms,tick_p99_ms,tick_p999_ms,tick_max_ms,ontime_frac,late_deadline,cpu_cores,mbps_per_session,underflows,dev_mb,sm_mean,mem_mean,watts_mean,watts_max,temp_start,temp_max,pclk_min,load_before,load_after,contaminated
-pcap40-load-1080i,1080i,paced,16,1348,0.9978,3904187,6.863,6.805,7.8889,8.1419,8.1529,1.0,0,0.04818,15.0329,0,983.3,19.7,14.6,29.3,32.0,68.0,70.0,2130.0,1.91,2.79,True

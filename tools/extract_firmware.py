@@ -12,7 +12,7 @@ Writes:
 Unpack the cpio yourself:  (cd OUTDIR/epcs1/rootfs && cpio -idm --no-absolute-filenames < ../initramfs.cpio)
 and the bFLT userland with tools/bflt.py.
 
-Facts used (see notes/firmware.md):
+Facts used (see docs/notes/firmware.md):
   * Dumps are in .rbf byte orientation (FF.. 6A at 0x20). Everything that is not FPGA config
     data must be bit-reversed per byte to get CPU-visible bytes (EPCS is read LSB-first).
   * FPGA config length (bits) is a 24/26-bit LSB-first field carried in bit 2 of the header bytes

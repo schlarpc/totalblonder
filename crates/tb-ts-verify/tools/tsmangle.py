@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Deliberate damage to an MPEG-2 transport stream, for validating tb-ts-verify against
-TSDuck (notes/ts-verify-log.md). Also rewrites STT system_time so that it advances with the
+TSDuck. Also rewrites STT system_time so that it advances with the
 byte position (TSDuck's inject plugin repeats a fixed STT when run offline).
 
 usage: python3 -I tsmangle.py IN OUT OP [options]

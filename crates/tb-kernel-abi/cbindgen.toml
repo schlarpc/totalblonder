@@ -1,4 +1,4 @@
-# cbindgen configuration for kernels/tb_kernel_abi.h (see nix/kernels.nix: `abiHeader`).
+# cbindgen configuration for crates/tb-kernel-abi/kernels/tb_kernel_abi.h (see nix/kernels.nix: `abiHeader`).
 # The header is C++ (the kernels are CUDA C++), constants are macros so that they keep the
 # `int` semantics the kernels were written against.
 language = "C++"

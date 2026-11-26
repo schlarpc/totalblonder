@@ -1,7 +1,7 @@
 //! MPEG-2 transport stream primitives, from ITU-T H.222.0 (06/2012), "Rec." below.
 //!
 //! Page numbers are the printed ones (the PDF page is about 14 higher), as in
-//! `notes/standards-digest.md` §1, which this crate implements.
+//! `docs/notes/standards-digest.md` §1, which this crate implements.
 //!
 //! - [`Pid`], [`Cc`]: identifiers and continuity counters that cannot hold an illegal value;
 //! - [`Stc`], [`Pcr`], [`Ts90k`]: the 27 MHz system clock, its PCR encoding and the 33-bit

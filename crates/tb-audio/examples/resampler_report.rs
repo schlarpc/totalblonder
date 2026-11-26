@@ -1,4 +1,4 @@
-//! Measurements of the resampler for `notes/audio-pipeline-log.md`:
+//! Measurements of the resampler:
 //!
 //! ```text
 //! nix develop -c cargo run --release -p tb-audio --example resampler_report

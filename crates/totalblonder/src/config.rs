@@ -243,7 +243,7 @@ struct ProgramFile {
     /// program's start).
     subtitles: Option<PathBuf>,
     /// Film mode: `auto` codes film sources as film frames with display flags (3:2 by
-    /// repeat_first_field), `off` codes every frame period (notes/film-mode-log.md).
+    /// repeat_first_field), `off` codes every frame period.
     #[serde(default)]
     film: Option<String>,
     /// An input shown while the live input is away (SPEC §9.5 level 2).

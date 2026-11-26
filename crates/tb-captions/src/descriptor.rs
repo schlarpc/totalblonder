@@ -1,6 +1,6 @@
 //! The `caption_service_descriptor()` that announces a program's caption services in its
 //! PMT (video elementary stream loop) and in the EIT events that have captions (ATSC A/65:2013
-//! §6.9.2, Table 6.26, p.68-70; `notes/standards-digest.md` §3.7). It is the CAPTION CHANNEL
+//! §6.9.2, Table 6.26, p.68-70; `docs/notes/standards-digest.md` §3.7). It is the CAPTION CHANNEL
 //! SERVICE DIRECTORY of CTA-708-E §4.5 (p.19-20). This crate does not build tables; the bytes
 //! are here because the services they describe are made here.
 //!

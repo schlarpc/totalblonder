@@ -3,7 +3,7 @@
 //! `QSCALE`, `INTRA_Q` and the scan patterns are typed from the standard and checked against the
 //! golden `tables` record (first recorded by the C++ encoder). The variable-length code tables of
 //! Annex B are generated from the text of the standard (work package S1 adds `vlc.rs`, written by
-//! `kernels/gen_tables.py --rust`).
+//! `crates/tb-kernel-abi/kernels/gen_tables.py --rust`).
 
 use tb_kernel_abi::Tables;
 
@@ -41,7 +41,7 @@ pub const SCAN: [[u8; 64]; 2] = [
 /// the scan patterns and their inverses, the intra matrix, the quantizer scale and the map from
 /// a quantiser_scale value to the nearest code.
 ///
-/// Acceptance: the bytes equal the `tables` record of `golden/`.
+/// Acceptance: the bytes equal the `tables` record of `crates/tb-golden/vectors/`.
 pub fn tables() -> Tables {
     let mut scan_ras = [[0u8; 64]; 2];
     for (ras, pos) in scan_ras.iter_mut().zip(SCAN.iter()) {

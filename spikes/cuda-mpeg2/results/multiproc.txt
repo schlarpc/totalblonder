@@ -1,9 +1,0 @@
-# 2026-11-25T09:28:01Z load 0.22 0.45 0.77
-1080i procs=1 sessions_per_proc=24 total_sessions=24 mean_fps_per_session=36.86 min_fps_per_session=36.86 aggregate_session_fps=884.6 mean_cpu_per_session=0.0006
-1080i procs=2 sessions_per_proc=12 total_sessions=24 mean_fps_per_session=36.33 min_fps_per_session=36.32 aggregate_session_fps=871.8 mean_cpu_per_session=0.0009
-1080i procs=4 sessions_per_proc=6 total_sessions=24 mean_fps_per_session=36.59 min_fps_per_session=36.48 aggregate_session_fps=878.2 mean_cpu_per_session=0.0018
-1080i procs=8 sessions_per_proc=3 total_sessions=24 mean_fps_per_session=36.10 min_fps_per_session=35.92 aggregate_session_fps=866.3 mean_cpu_per_session=0.0044
-# INVALID, do not use: this run exhausted host memory (24 x 0.78 GB of pinned input) and triggered the kernel OOM killer;
-# processes also started and finished at different times, so the per-process rates overlap only partly.
-# 1080i procs=24 sessions_per_proc=1 total_sessions=24 mean_fps_per_session=56.84 min_fps_per_session=40.85 aggregate_session_fps=1364.2 mean_cpu_per_session=0.0378
-# 2026-11-25T09:29:12Z load 10.14 3.04 1.62

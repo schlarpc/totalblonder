@@ -1,4 +1,4 @@
-//! PSI and ATSC PSIP for a US cable MPTS (`docs/SPEC.md` §7, `notes/standards-digest.md` §1.3,
+//! PSI and ATSC PSIP for a US cable MPTS (`docs/SPEC.md` §7, `docs/notes/standards-digest.md` §1.3,
 //! §2–§4).
 //!
 //! - [`lineup`]: the description of one carrier's programs from which every table is built

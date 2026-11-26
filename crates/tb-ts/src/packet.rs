@@ -33,7 +33,7 @@ impl std::fmt::Debug for Packet {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Adaptation {
     /// `discontinuity_indicator` (Rec. §2.4.3.5, p.24). Our output never sets it
-    /// (`notes/standards-digest.md` §1.8); it exists for completeness and tests.
+    /// (`docs/notes/standards-digest.md` §1.8); it exists for completeness and tests.
     pub discontinuity: bool,
     /// `random_access_indicator`: the next PES starting on this PID begins with an access
     /// point (p.25).
@@ -92,7 +92,7 @@ pub enum Fill {
     Adaptation,
     /// 0xFF bytes after the payload: how a section PID ends a packet after a section
     /// (Rec. §2.4.4, p.45; Annex C.4, p.163). PSI and PSIP packets never carry an adaptation
-    /// field (`notes/standards-digest.md` §1.1).
+    /// field (`docs/notes/standards-digest.md` §1.1).
     PayloadFf,
 }
 
@@ -171,7 +171,7 @@ impl Packet {
     }
 
     /// A null packet: PID 0x1FFF, payload only, 184 bytes of 0xFF
-    /// (`notes/standards-digest.md` §1.5).
+    /// (`docs/notes/standards-digest.md` §1.5).
     pub const fn null() -> Packet {
         let mut b = [0xFFu8; PACKET_LEN];
         b[0] = SYNC;

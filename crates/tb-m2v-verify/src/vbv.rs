@@ -42,7 +42,7 @@ pub(crate) struct VbvSeq {
 pub enum Delivery {
     /// H.262 Annex C as coded: C.3.1 if vbv_delay is coded, C.3.2 if it is 0xFFFF.
     Normative,
-    /// The project's operating model in addition (notes/cuda-mpeg2-spike.md §5.1): pictures
+    /// The project's operating model in addition (not part of H.262): pictures
     /// become available at their coding time and leave the multiplexer queue at `rate` bits
     /// per second (`None`: the bit_rate of the sequence header) within
     /// D = vbv_buffer_size / bit_rate.

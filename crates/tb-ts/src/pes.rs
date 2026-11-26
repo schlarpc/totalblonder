@@ -1,7 +1,7 @@
 //! PES packets (Rec. §2.4.3.6–2.4.3.7, Table 2-21, p.31–39) and their cutting into transport
 //! packets.
 //!
-//! Cable rules applied by construction (`notes/standards-digest.md` §1.7, SCTE 54 §7.7, A/53-3
+//! Cable rules applied by construction (`docs/notes/standards-digest.md` §1.7, SCTE 54 §7.7, A/53-3
 //! §5.5): scrambling '00'; no ESCR, ES_rate, DSM trick mode, additional copy info, PES CRC or
 //! extension; a PTS on every PES; a DTS only when it differs from the PTS;
 //! `data_alignment_indicator` 1 (one access unit per PES, starting at the header);

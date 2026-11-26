@@ -1,6 +1,6 @@
 //! The kernel ABI: every record and constant that the host and the CUDA kernels both read.
 //!
-//! This file is the single definition. `kernels/tb_kernel_abi.h` is generated from it by cbindgen
+//! This file is the single definition. `crates/tb-kernel-abi/kernels/tb_kernel_abi.h` is generated from it by cbindgen
 //! (`nix run .#abi-header`, checked for freshness by `nix flake check`) and is what the kernel
 //! sources compile against. Layout is checked on both sides: the tests of this crate pin every size
 //! and offset, and compare them with a manifest that a C++ program prints from the generated header
@@ -476,7 +476,7 @@ mod tests {
     use core::mem::{align_of, offset_of, size_of};
 
     /// Every (record, field, offset, size) of the ABI, and (record, "", size, alignment).
-    /// The same lines are printed by `kernels/abi_layout.cc` from the generated header.
+    /// The same lines are printed by `crates/tb-kernel-abi/kernels/abi_layout.cc` from the generated header.
     fn layout() -> Vec<String> {
         let mut v = Vec::new();
         macro_rules! rec {

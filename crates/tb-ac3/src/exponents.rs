@@ -222,7 +222,7 @@ pub fn difference(a: &[u8; 256], b: &[u8; 256], end: usize) -> u32 {
 /// exponents: FFmpeg's `EXP_DIFF_THRESHOLD`, 500, whatever the bandwidth. A narrow bandwidth
 /// (a low rate per channel) therefore reuses more readily, which is where exponent bits are
 /// dearest. (Scaling the threshold to the bandwidth was tried first: at 3/2 192 kbit/s it spent
-/// a third of the frame on exponents and lost 10 dB on transients; notes/ac3-encoder-log.md.)
+/// a third of the frame on exponents and lost 10 dB on transients.)
 pub fn reuse_threshold(_end: usize) -> u32 {
     500
 }

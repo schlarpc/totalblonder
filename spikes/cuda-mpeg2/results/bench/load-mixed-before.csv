@@ -1,2 +1,0 @@
-label,fmt,kind,n,frames,rt,mb_per_s,tick_mean_ms,tick_p50_ms,tick_p99_ms,tick_p999_ms,tick_max_ms,ontime_frac,late_deadline,cpu_cores,mbps_per_session,underflows,dev_mb,sm_mean,mem_mean,watts_mean,watts_max,temp_start,temp_max,pclk_min,load_before,load_after,contaminated
-load-mixed-before,mixed,paced,8,1798,0.9992,4944520,11.9831,11.9852,14.4066,14.9913,16.0401,1.0,0,0.05825,7.1781,0,1064.6,67.2,22.7,56.4,58.0,65.0,83.0,2430.0,0.41,0.28,False

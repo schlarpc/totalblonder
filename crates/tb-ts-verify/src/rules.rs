@@ -1,5 +1,5 @@
 //! The rule catalog: every check the checker makes, with its clause, page, scope and
-//! severity. `notes/ts-conformance-rules.md` is generated from this table
+//! severity. `docs/notes/ts-conformance-rules.md` is generated from this table
 //! (`tb-ts-verify --rules-md`).
 //!
 //! Page numbers are the printed ones. For ITU-T H.222.0 (06/2012) the printed page is the PDF
@@ -490,7 +490,7 @@ pub fn rule_by_id(id: &str) -> Option<Rule> {
     ALL_RULES.iter().copied().find(|r| r.info().id == id)
 }
 
-/// The catalog as a Markdown document (the body of `notes/ts-conformance-rules.md`).
+/// The catalog as a Markdown document (the body of `docs/notes/ts-conformance-rules.md`).
 pub fn catalog_markdown() -> String {
     use std::fmt::Write as _;
     let mut s = String::new();

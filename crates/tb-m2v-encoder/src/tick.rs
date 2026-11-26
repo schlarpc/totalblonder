@@ -65,7 +65,7 @@
 //! golden cases replay against them in normal form, operation for operation and wait for wait.
 //!
 //! **The upload fence.** The measured rule that the frame upload waits until the tick's
-//! parameter copies have gone through (notes/cuda-mpeg2-optlog.md §41) is `Record(PARAMS)` on
+//! parameter copies have gone through is `Record(PARAMS)` on
 //! `MAIN` after the parameter uploads of all batches and `WaitFor(PARAMS)` as the first step
 //! on `UPLOAD`, as the golden records have it. That next tick's kernels find the frames on the
 //! device is the host wait of [`Phase::Sync`], also as in the C++ encoder; the second event
@@ -664,7 +664,7 @@ impl Encoder {
     }
 
     /// Record what the encoder decides and what crosses the host/device boundary as the
-    /// records of `golden/README.md` (from now on; `false` stops and drops what was not taken).
+    /// records of `crates/tb-golden/vectors/README.md` (from now on; `false` stops and drops what was not taken).
     /// Turn it on before opening sessions. For the records to show one plan per phase as the
     /// format expects, leave [`EncoderOptions::split_plans`] off.
     pub fn record_golden(&mut self, on: bool) {

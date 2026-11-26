@@ -213,7 +213,7 @@ fn shed_has_missed_off_grid_and_staggered_key_frames() {
     assert_ne!(seen.phases[1], 0, "{seen:?}");
 }
 
-/// The cases recorded by the Rust encoder (golden/generate.sh): every submit emits its frames.
+/// The cases recorded by the Rust encoder (crates/tb-golden/vectors/generate.sh): every submit emits its frames.
 #[test]
 fn cases_of_the_rust_recorder() {
     for name in [

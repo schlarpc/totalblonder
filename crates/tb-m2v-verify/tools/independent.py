@@ -7,7 +7,7 @@ Usage: python3 -I independent.py --verify BIN --out DIR [--ffmpeg BIN] [--mpeg2e
 Each case names an encoder command and the rules that encoder is known to break in that
 configuration (ALLOWED). The run fails if a stream cannot be produced, if the verifier reports
 a rule outside the case's list, or if a stream is empty. The lists are findings in
-themselves: notes/m2v-conformance-findings.md discusses each. Their second use is to show
+themselves: docs/notes/m2v-conformance-findings.md discusses each. Their second use is to show
 that the verifier's tables and decoding process agree with other people's encoders: any
 error in a table of Annex B shows at once as BLK-COEF-VLC or the like.
 

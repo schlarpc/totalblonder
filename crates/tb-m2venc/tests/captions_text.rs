@@ -11,7 +11,7 @@
 //!     --release --run-ignored only -E 'test(real_decoders)'
 //! ```
 //!
-//! A decoder that is not found is skipped with a message. Results: `notes/captions-log.md`.
+//! A decoder that is not found is skipped with a message.
 
 mod common;
 

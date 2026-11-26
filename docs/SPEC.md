@@ -20,9 +20,9 @@ How to read this document:
   **[unknown]** marks something nobody has measured or answered; each has an entry in §18.
 - **[K]** and **[I]** are carried over from the notes: [K] is general knowledge that was not
   checked against a document or the device; [I] is an inference from cited material.
-- References such as (standards-digest §1.2) point at `notes/standards-digest.md` section 1.2.
+- References such as (standards-digest §1.2) point at `docs/notes/standards-digest.md` section 1.2.
   The other notes are cited the same way: `software-survey`, `corruption-48`, `device`,
-  `manual`, `firmware`, `research`, `producers`, `design-inputs`. A fact about the box, a
+  `manual`, `firmware`, `research`, `design-inputs`. A fact about the box, a
   standard or third-party software that has no reference is an error in this document.
 
 ## 1. Scope
@@ -84,8 +84,7 @@ allocation (design-inputs "Feature candidates").
   back, and limited to an allow-list.
 - **Pure logic apart from I/O.** The mux scheduler, table generators, statmux controller,
   timeline mapper, fallback state machine and supervisor are pure state machines with no
-  clocks, sockets or libav calls inside them, so they can be unit-tested (producers
-  "Conventions to reuse").
+  clocks, sockets or libav calls inside them, so they can be unit-tested.
 
 ## 2. Constraints from the modulator
 
@@ -163,7 +162,7 @@ Consequences:
                                                                        ▼ TVs
 ```
 
-Runtime model **[decided]** (producers "Conventions to reuse"):
+Runtime model **[decided]**:
 
 - A `tokio` multi-thread runtime runs the control plane, the device supervisor, the probe
   driver and anything that waits on the network without libav.
@@ -329,7 +328,7 @@ never set (standards-digest §1.8).
 
 Producers run on their own clocks and their timestamps reset. The producer restarts each RTMP
 connection at a keyframe with timestamps from zero, sends nothing while idle, and jumps its
-timestamps forward across idle periods (producers "What the producer emits today").
+timestamps forward across idle periods.
 
 **[proposed]** The timeline mapper is a pure state machine per input. It holds one *session*
 at a time. A session is a run of input with consistent timestamps, described by an affine map
@@ -381,8 +380,7 @@ Audio sample clock **[proposed]**: input audio is resampled to 48 kHz by libswre
 its ratio trimmed by the session's `skew` plus a small proportional correction on the audio
 buffer depth, clamped to ±500 ppm in total. If the buffer still runs dry, the missing samples
 are silence with a 10 ms fade at each edge; if it overfills past `2·J`, the mapper ends the
-session (§5.3). When an input has no audio at all, as with the producer today (producers "What
-the producer emits today"), the sample clock produces digital silence.
+session (§5.3). When an input has no audio at all, as with the producer today, the sample clock produces digital silence.
 
 A/V sync: video and audio of a session share one `offset` and `skew`, so their relative
 timing is the producer's. The target is audio within ±1 AC-3 frame of video, checked with a
@@ -740,7 +738,7 @@ delimiter in every AU; SPS and PPS in-band at every keyframe; VUI with timing in
 at most 30 Mbit/s. The TS packet that starts a keyframe's PES sets `random_access_indicator`,
 and the packet with its first slice sets `elementary_stream_priority_indicator`.
 
-The producer delivers 1920×1080 at 30 fps progressive (producers "What the producer emits today").
+The producer delivers 1920×1080 at 30 fps progressive.
 MPEG-2 allows 1080p at 29.97 or 30 fps, so no interlacing is needed for it (standards-digest
 §5.1).
 
@@ -748,8 +746,8 @@ MPEG-2 allows 1080p at 29.97 or 30 fps, so no interlacing is needed for it (stan
 
 - Codec: AC-3, 48 kHz, 192 kbit/s stereo or 384 kbit/s 5.1 for main tracks, at most
   448 kbit/s (software-survey §3.2; standards-digest §5.3). **[changed 2026-11-26]** The
-  encoder is our own pure-Rust `tb-ac3`, not libav's (the owner does not trust FFmpeg's);
-  measurements in `notes/ac3-encoder-log.md`. Its dialnorm defaults to 24, so the libav
+  encoder is our own pure-Rust `tb-ac3`, not libav's (the owner does not trust FFmpeg's).
+  Its dialnorm defaults to 24, so the libav
   default of −31 below no longer applies.
 - Loudness: every input is normalized to −24 LKFS, with a true-peak limit of −2 dBTP, and
   every track carries `dialnorm` −24, including silence (standards-digest §5.4). The libav
@@ -813,13 +811,13 @@ ticket; the encoder wrapper resolves it to the PTS of the first frame coded unde
   is open (software-survey §12 item 4).
   **Correction (2026-11-25):** a reopened encoder that writes a different `bit_rate` in its
   sequence header violates H.262 §6.1.1.6, which requires repeated sequence headers to be
-  identical apart from quantizer matrices (cuda-mpeg2-optimization-ideas §8). The legal
+  identical apart from quantizer matrices. The legal
   mechanism is one continuous sequence whose header declares the program's ceiling rate, with
   `vbv_delay` 0xFFFF in every picture (variable-rate semantics), while the mux varies delivery
   below the ceiling. For libav `mpeg2video` this means keeping `rc_max_rate` fixed at the
   ceiling across reopens (or ending the sequence with `-seq_end 1`, which is legal but risky
   at junctions). The CUDA encoder spike implements the continuous-sequence method and states
-  what the mux must guarantee in return (cuda-mpeg2-spike §5.1).
+  what the mux must guarantee in return (`tb_m2v_rate::vbv`).
 - NVENC: as mpeg2video in timing, because each change forces an IDR (software-survey §9.2).
 
 ## 9. Ingest and fallback
@@ -829,9 +827,8 @@ chain decides, frame by frame, what each program's encoders are fed.
 
 ### 9.1 RTMP push **[decided]**
 
-The first ingest path accepts the producer's RTMP push (design-inputs "Feature candidates";
-producers "Consequences for the server"). Holding the connection also keeps the producer awake,
-because a connected RTMP sink counts as demand there (producers "Demand").
+The first ingest path accepts the producer's RTMP push (design-inputs "Feature candidates"). Holding the connection also keeps the producer awake,
+because a connected RTMP sink counts as demand there.
 
 - Implementation: **superseded (2026-11-26)**: the RTMP server is our own sans-io `tb-rtmp`,
   so libav never faces the network; only codecs go to the sandboxed decoder
@@ -842,10 +839,8 @@ because a connected RTMP sink counts as demand there (producers "Demand").
   instance per input. The fallback, if several publishers must share a port or connection-level
   control is needed, is the `rml_rtmp` crate (software-survey §1, §4.2).
 - Each accepted connection is a new mapper session (§5.3). The producer starts every connection at
-  a keyframe with timestamps from zero and reconnects on its own with backoff (producers "What
-  the producer emits today").
-- After a wake, the producer's real content returns about 15 s later (producers "What the producer
-  emits today"). The fallback chain (§9.5) covers that interval.
+  a keyframe with timestamps from zero and reconnects on its own with backoff.
+- After a wake, the producer's real content returns about 15 s later. The fallback chain (§9.5) covers that interval.
 - The listener binds to a configured address. There is no authentication in RTMP as used
   here; the bind address and the host firewall are the access control. **[proposed]**
 
@@ -854,9 +849,8 @@ because a connected RTMP sink counts as demand there (producers "Demand").
 A small client using `reqwest` and `m3u8-rs`, with our own handling of `EXT-X-PART` and
 `PRELOAD-HINT`, feeding fragmented MP4 to libav through a custom AVIO context. libav's own
 `hls` demuxer treats LL-HLS as ordinary HLS (software-survey §1). The producer stamps
-`PROGRAM-DATE-TIME` at push time, not capture time (producers "What the producer emits today"), so
-it is not a better clock than arrival time. An HLS request also counts as demand for 30 s
-(producers "Demand").
+`PROGRAM-DATE-TIME` at push time, not capture time, so
+it is not a better clock than arrival time. An HLS request also counts as demand for 30 s.
 
 ### 9.3 Decode
 
@@ -874,8 +868,7 @@ full the decoder drops the frame and counts it; it never waits.
 Inputs that already meet the output constraints (rate-capped, suitable GOP, AC-3 audio) may
 later bypass the encoders (design-inputs "Decisions so far"). That path needs compressed-domain
 switching at access points with the rules in standards-digest §1.8 and is deliberately outside
-the first design. The producer cannot use it: its output is not rate-capped and has no audio
-(producers "Consequences for the server").
+the first design. The producer cannot use it: its output is not rate-capped and has no audio.
 
 ### 9.5 Fallback chain **[decided]**
 
@@ -1101,8 +1094,7 @@ model, so that one error cannot hide in both **[proposed]**. It costs one pass o
 ### 11.3 Metrics and logs
 
 `tracing` with spans per carrier, program and input. Metrics are atomic counters and gauges
-per component, rendered by hand as Prometheus text at `/api/metrics` (producers "Conventions
-to reuse"). The names below are the first set.
+per component, rendered by hand as Prometheus text at `/api/metrics`. The names below are the first set.
 
 | Area | Metrics (labels) |
 |---|---|
@@ -1175,7 +1167,7 @@ GET   /healthz
 
 One TOML file, path from `--config` or `TOTALBLONDER_CONFIG`. `serde` with
 `deny_unknown_fields`, humantime durations, and an example file `totalblonder.example.toml`
-listing every key (producers "Conventions to reuse"). A safe subset reloads without a restart:
+listing every key. A safe subset reloads without a restart:
 guide data, fallback timings, statmux weights and limits, probe and supervisor intervals.
 Anything that changes a carrier's program set, PIDs, formats or addresses needs a restart in
 the first version.
@@ -1342,8 +1334,7 @@ Other resources, estimated:
 
 ### 14.x Our own CUDA MPEG-2 encoder (added 2026-11-25) [measured]
 
-A CUDA MPEG-2 encoder was built and optimized as a C++ spike (cuda-mpeg2-spike §0; experiment
-log in cuda-mpeg2-optlog) and ported to Rust (`docs/ARCHITECTURE.md`; the C++ was retired once
+A CUDA MPEG-2 encoder was built and optimized as a C++ spike and ported to Rust (`docs/ARCHITECTURE.md`; the C++ was retired once
 the Rust held its gate and capacity). It is separate from the friend's encoder, which is
 still unseen. It changes the capacity picture: video encode moves off the 8 vCPUs.
 
@@ -1362,8 +1353,8 @@ coding tools on, staggered GOPs, frames uploaded from host memory, card otherwis
 1–3 simultaneous transcodes, some from 2160p sources, tone mapping under 10 % of traffic
 (design-inputs). "Typical" budgets the encoder's tick at 85 % of the frame period (up to
 three real-time transcodes, no tone mapping; worst measured tick ratio 1.13). "Worst case"
-budgets 75 % (a tone-mapped 2160p stream in the mix; 1.18–1.33). Source: cuda-mpeg2-optlog
-§40–§41, cuda-mpeg2-spike §0.7. An earlier version of this table divided by 1.6; most of
+budgets 75 % (a tone-mapped 2160p stream in the mix; 1.18–1.33). Source: the spike's
+measurements on the card. An earlier version of this table divided by 1.6; most of
 that slowdown was an ordering fault in the encoder's own upload, since fixed.
 
 Not covered by either budget: a transcoder running unthrottled (a burst while it fills its
@@ -1613,7 +1604,7 @@ Not used, with reasons in software-survey §4 and §6: FFmpeg's mpegts muxer at 
 GStreamer, the recent DVB crate families, `srt-tokio`, UDP segmentation offload.
 
 Nix: the `rust-flake` template through cruft, with Crane, and checks for build, clippy with
-`--deny warnings`, fmt, nextest and coverage (producers "Conventions to reuse"). FFmpeg with
+`--deny warnings`, fmt, nextest and coverage. FFmpeg with
 x264, `pkg-config` and `libclang` for bindgen as build inputs; TSDuck in the check
 derivation's inputs. `nixosModules.default` provides `services.totalblonder` as a hardened
 systemd unit, sets the `fq` qdisc if `SO_TXTIME` is adopted, and grants real-time scheduling

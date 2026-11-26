@@ -24,7 +24,7 @@
 //! - [`signal`]: test signals and their analysis (tones, program-like noise, sine fit).
 //!
 //! Time is the 27 MHz [`tb_timeline::Ticks27`] of the timeline crate, converted exactly to
-//! 48 kHz sample indices. Measurements: `notes/audio-pipeline-log.md`.
+//! 48 kHz sample indices.
 #![forbid(unsafe_code)]
 
 pub mod clock;

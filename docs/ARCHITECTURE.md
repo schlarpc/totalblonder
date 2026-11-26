@@ -6,14 +6,13 @@ the GPU is modeled, how the CUDA kernels are built, and how the encoder is check
 `docs/SPEC.md` says what the server must do; this says how the code is laid out to do it.
 
 The workspace began as the port of the host side of a CUDA MPEG-2 encoder written as a C++
-spike (`notes/cuda-mpeg2-spike.md`); the port reached the C++'s gate and capacity and the C++
-was retired (§10, "History"). The kernels are CUDA C++ (`kernels/`). The rest of the server
+spike; the port reached the C++'s gate and capacity and the C++
+was retired (§10, "History"). The kernels are CUDA C++ (`crates/tb-kernel-abi/kernels/`). The rest of the server
 (mux, tables, ingest, control, probe) will be added to the same workspace under the same rules
 (§9).
 
 Labels: **[decided]** done or fixed; **[proposed]** designed here, not built; **[unknown]**
-needs a measurement or the owner. Work packages (`E4`, `K3`, …) are the briefs in `docs/port/`
-(completed history).
+needs a measurement or the owner. Work packages (`E4`, `K3`, …) are the steps of the port (§10).
 
 ## 1. Rules
 
@@ -25,7 +24,7 @@ needs a measurement or the owner. Work packages (`E4`, `K3`, …) are the briefs
    each phase of a tick and reads a completion record. Adapters execute plans (§4, §5).
 3. **One definition of the kernel ABI.** [decided] Records shared by host and kernels are
    defined once, in Rust; the C header is generated (§3).
-4. **One copy of the kernels.** [decided] The kernel sources (`kernels/`) are compiled two ways
+4. **One copy of the kernels.** [decided] The kernel sources (`crates/tb-kernel-abi/kernels/`) are compiled two ways
    from the same files, both by Nix: into the device image and for the host (the reference
    adapter) (§6).
 5. **Errors are values.** [decided] A device error is a failed completion that the core turns
@@ -80,10 +79,10 @@ needs a measurement or the owner. Work packages (`E4`, `K3`, …) are the briefs
 | `tb-sandbox` | adapter | Spawns a confined child (namespaces, minimal root, rlimits, Landlock, seccomp; each layer reported), supervises it by pidfd; sealed memfds; the SEQPACKET channel (§5.5) | none |
 | `tb-avworker` | binary | The decoder worker: the only program that links libav (libavcodec, libavutil, libswscale, libswresample) | none |
 | `tb-decoder-client` | adapter | The server's handle: `DecoderPool`, `Decoder` (`try_send`, `poll`, `events`), zero-copy frames (§5.5) | none |
-| `tb-golden` | pure | Embeds and parses `golden/*.jsonl`; the record writer (`write`) of the encoder's golden recorder | none |
+| `tb-golden` | pure | Embeds and parses `crates/tb-golden/vectors/*.jsonl`; the record writer (`write`) of the encoder's golden recorder | none |
 | `tb-engine` | adapter | The device-owning loop: `Engine` (an adapter, the encoder and the plan; one tick at a time), `TickDevice` (what the loop needs of an adapter), `Guarded` (the host-arena rule around any adapter), the drivers' random sequences | the driver's loop |
-| `tb-ac3` | pure | AC-3 (A/52 main body) encoder at 48 kHz: MDCT with block switching, exponents, the decoder's parametric bit allocation, SNR offset search per block, mantissa quantization, syncframe packing with both CRCs; a strict frame parser and a reference decoder for tests (`notes/ac3-encoder-log.md`) | none (new; written from A/52:2012) |
-| `tb-m2v-verify` | pure + binary | MPEG-2 video conformance verifier written from H.262, A/53, SCTE 43 and CTA-708 (`notes/m2v-conformance-rules.md`); runs on every stream of the gate | none |
+| `tb-ac3` | pure | AC-3 (A/52 main body) encoder at 48 kHz: MDCT with block switching, exponents, the decoder's parametric bit allocation, SNR offset search per block, mantissa quantization, syncframe packing with both CRCs; a strict frame parser and a reference decoder for tests | none (new; written from A/52:2012) |
+| `tb-m2v-verify` | pure + binary | MPEG-2 video conformance verifier written from H.262, A/53, SCTE 43 and CTA-708 (`docs/notes/m2v-conformance-rules.md`); runs on every stream of the gate | none |
 | `tb-m2venc` | binary | Command-line driver for the gate and the benchmarks | the driver `m2venc` |
 | `tb-pipe` | binary | The pipeline harness: inputs, frame selection, conversion, sessions | the harness `m2vpipe` |
 
@@ -114,11 +113,11 @@ host fills them; the host should own them.
 
 How the two sides are kept equal:
 
-- The committed header (`kernels/tb_kernel_abi.h`, next to the kernels) must equal the
+- The committed header (`crates/tb-kernel-abi/kernels/tb_kernel_abi.h`, next to the kernels) must equal the
   generated one: check `kernels/abi-header-fresh`. `nix run .#abi-header` rewrites it.
 - Rust side: `tb-kernel-abi` pins every size (`sizes_are_pinned`) and compares every offset
   and size with a manifest printed by a C++ program compiled against the generated header
-  (`kernels/abi_layout.cc`, derivation `abiLayout`, test `layout_matches_the_c_header`).
+  (`crates/tb-kernel-abi/kernels/abi_layout.cc`, derivation `abiLayout`, test `layout_matches_the_c_header`).
 - C++ side: `static_assert`s in `vlc_tables.h` and `kernels.h`; the launch signatures are
   checked separately (§4.3).
 
@@ -128,9 +127,9 @@ adapters only; the core names buffers by handle.
 
 `MbCode` and `FieldRes` stay in the C++ of the kernels: only kernels use them. The conversion
 records (`ConvClass`, `ConvJob`, `RectJob`, `CscPar`, `PreJob`, `Taps`) are in this crate
-[done, K2]; the conversion kernels are `kernels/pipe_kernels.h`, part of the image and of the
+[done, K2]; the conversion kernels are `crates/tb-kernel-abi/kernels/pipe_kernels.h`, part of the image and of the
 host library. The tables the kernels read are built by `tb-m2v-syntax` and uploaded as the
-`Tables` record (the golden `tables` record pins it); `kernels/vlc_tables.h` and `common.h`
+`Tables` record (the golden `tables` record pins it); `crates/tb-kernel-abi/kernels/vlc_tables.h` and `common.h`
 still hold the C++ spike's copy of the table values, which the image does not need [open:
 remove them with the next change to the kernels, it shifts the image's line table].
 
@@ -376,7 +375,7 @@ The C++ exits on any CUDA error; the mapping above is new behavior.
 ### 5.1 `tb-device-ref` [decided, built]
 
 Two byte vectors, synchronous execution, and the kernels compiled for the host from the same
-source (`kernels/tb_kernels_ref.cc` includes `kernels.h` through a stand-in for
+source (`crates/tb-kernel-abi/kernels/tb_kernels_ref.cc` includes `kernels.h` through a stand-in for
 `<cuda_runtime.h>`). The shim defines the qualifiers away, provides `blockIdx` / `threadIdx`
 as thread-locals, and implements the intrinsics the kernels use (`__vsadu4`, `__vavgu4`,
 `__funnelshift_r`, `__dp4a`, `__ffsll`, `__float_as_uint`, `atomicOr`) from their
@@ -473,8 +472,7 @@ from `/run/opengl-driver/lib`.
 
 The owner does not trust libav, so the server does not link it. Receivers (pure Rust) produce
 `tb_media::InputEvent`s; `tb-decoder-client` feeds them to a `tb-avworker` process started
-by `tb-sandbox` and takes decoded frames back from shared memory. Log, decisions,
-measurements: `notes/decoder-sandbox-log.md`.
+by `tb-sandbox` and takes decoded frames back from shared memory.
 
 ```text
  server thread ─ Decoder ── SOCK_SEQPACKET (versioned messages, fds by SCM_RIGHTS) ── tb-avworker
@@ -522,21 +520,21 @@ device-resident pipeline until the CUDA-IPC variant exists.
 flake.nix          nixpkgs, breakbulk, rust-overlay; unfree by license
 nix/kernels.nix    abiHeader, abiLayout, deviceImage, refLib(Asan), and their checks
 nix/rust.nix       the breakbulk module: toolchain, clippy, fmt, nextest, package settings
-nix/gate.nix       the gate's sandbox checks and apps, gpucomp (gate/README.md)
+nix/gate.nix       the gate's sandbox checks and apps, gpucomp (tools/gate/README.md)
 nix/verify.nix     the conformance verifier's checks on our streams and on independent encoders
-kernels/           the kernel sources, translation units, kernel list, host shim, layout printer
-gate/              the gate's tools (Python and shell)
-golden/            the golden vectors and their generator
+crates/tb-kernel-abi/kernels/           the kernel sources, translation units, kernel list, host shim, layout printer
+tools/gate/              the gate's tools (Python and shell)
+crates/tb-golden/vectors/            the golden vectors and their generator
 ```
 
 - **breakbulk** (`github:schlarpc/breakbulk`) builds the workspace, one derivation per Cargo
   unit. `mkRepository` gets `nix/rust.nix` and the kernel checks.
 - **Kernel derivations** are ordinary derivations outside Cargo:
   - `deviceImage`: `nvcc -O3 -std=c++17 -arch=sm_89 -lineinfo -fmad=false -cubin` (the C++ spike's flags) on
-    `kernels/tb_kernels.cu`, CUDA 13.2 pinned as in the spike; plus `tb_kernels.sym`, the
+    `crates/tb-kernel-abi/kernels/tb_kernels.cu`, CUDA 13.2 pinned as in the spike; plus `tb_kernels.sym`, the
     mangled name of each kernel read from the image, and a check that every kernel of
-    `kernels/tb_kernel_list.h` is present.
-  - `refLib`: `libtbkernels_ref.a` from `kernels/tb_kernels_ref.cc` with
+    `crates/tb-kernel-abi/kernels/tb_kernel_list.h` is present.
+  - `refLib`: `libtbkernels_ref.a` from `crates/tb-kernel-abi/kernels/tb_kernels_ref.cc` with
     `-fno-strict-aliasing -ffp-contract=off` (`fmaf` is libm's, correctly rounded), no C++
     runtime needed.
   - `abiHeader`, `abiLayout`: §3.
@@ -547,7 +545,7 @@ golden/            the golden vectors and their generator
   packages.tb-kernel-abi.env.TB_ABI_LAYOUT = kernels.abiLayout;
   packages.tb-device-ref.env.TB_KERNELS_REF = kernels.refLib;        # build.rs links it
   packages.tb-device-cuda.env = { TB_KERNEL_IMAGE = "…/tb_kernels.cubin"; TB_KERNEL_SYMBOLS = "…/tb_kernels.sym"; };
-  packages.tb-golden.extraSources = [ "../../golden" ];
+  packages.tb-golden.extraSources = [ "vectors" ];
   ```
 
   A kernel edit rebuilds the image, `tb-device-cuda` and what links it; nothing else.
@@ -566,17 +564,17 @@ golden/            the golden vectors and their generator
 | `nix run .#gpu-bench` | The protocol-cost bench of `tb-device-cuda` on the card (release build; §8.1) |
 | `nix run .#tb-m2venc -- plumb ref\|cuda` | The plumbing proof as a program |
 | `nix run .#tb-m2venc -- --device ref\|cuda --input …` | The encoder (`crates/tb-m2venc/src/opts.rs`; `--golden FILE` writes the golden records) |
-| `nix run .#gate-check -- [--quick] [--out NAME]` | The correctness gate (`gate/check.py`) on the card: corpus at broadcast sizes, torture cases, features; strict decode in two decoders, both buffer models, reconstruction against decode, quality against `gate/baselines/`, the conformance verifier on every stream |
-| `nix run .#gate-film -- [--only REGEX] [--measure]` | The film-mode gate on the card (`gate/film_gate.py`, §7.6): `tb-m2venc --film` and `tb-pipe film=auto` at broadcast sizes, the cadence on both decoders and the displayed fields, both buffer models, the verifier; `--measure` compares rate and quality with the coded pulldown. Needs `gate-prep film` once |
-| `nix run .#gate-pipe -- [--only REGEX]` | The pipeline's gate (`gate/pipe_check.py`: device input, repeats, run-time sessions, conversions against CPU references and analytic patterns), verifier on every stream |
+| `nix run .#gate-check -- [--quick] [--out NAME]` | The correctness gate (`tools/gate/check.py`) on the card: corpus at broadcast sizes, torture cases, features; strict decode in two decoders, both buffer models, reconstruction against decode, quality against `tools/gate/baselines/`, the conformance verifier on every stream |
+| `nix run .#gate-film -- [--only REGEX] [--measure]` | The film-mode gate on the card (`tools/gate/film_gate.py`, §7.6): `tb-m2venc --film` and `tb-pipe film=auto` at broadcast sizes, the cadence on both decoders and the displayed fields, both buffer models, the verifier; `--measure` compares rate and quality with the coded pulldown. Needs `gate-prep film` once |
+| `nix run .#gate-pipe -- [--only REGEX]` | The pipeline's gate (`tools/gate/pipe_check.py`: device input, repeats, run-time sessions, conversions against CPU references and analytic patterns), verifier on every stream |
 | `nix run .#gate-small -- --device ref\|cuda --golden` | The twelve golden cases through the binary, each stream on its own merits, and the committed digests. With `ref` it is the check `gate/ref-small` |
-| `nix run .#gate-golden -- DIR` | The golden cases on the card: every record (but the measured times) and every stream equal to the committed ones (`golden/README.md`) |
-| `nix run .#gate-bench -- --mode free\|paced\|both --label NAME` | Capacity (`gate/bench_capacity.py`): free-running macroblocks per second with spread, on-time fraction and cap99 / cap999 around given points; watches `nvidia-smi pmon` itself and repeats disturbed runs; more builds compared interleaved with `--bin NAME="PATH …"` |
-| `nix run .#gate-lineup -- …`, `.#gate-contend -- …`, `.#gate-prep -- media\|inputs` | The pipeline's paced line-ups, the encoder next to other users of the card (with `gpucomp`), the corpus (`gate/README.md`) |
+| `nix run .#gate-golden -- DIR` | The golden cases on the card: every record (but the measured times) and every stream equal to the committed ones (`crates/tb-golden/vectors/README.md`) |
+| `nix run .#gate-bench -- --mode free\|paced\|both --label NAME` | Capacity (`tools/gate/bench_capacity.py`): free-running macroblocks per second with spread, on-time fraction and cap99 / cap999 around given points; watches `nvidia-smi pmon` itself and repeats disturbed runs; more builds compared interleaved with `--bin NAME="PATH …"` |
+| `nix run .#gate-lineup -- …`, `.#gate-contend -- …`, `.#gate-prep -- media\|inputs` | The pipeline's paced line-ups, the encoder next to other users of the card (with `gpucomp`), the corpus (`tools/gate/README.md`) |
 | `nix run .#gate-tb-pipe -- --in … --ch …` | The pipeline harness itself |
 | `nix run .#verify-streams -- …` | The conformance verifier on any streams |
-| `nix build .#gate-tools` | The gate programs in one store path, to `nix copy` to nixark and run there through `scripts/nixark.sh` |
-| `nix run .#abi-header` | Rewrite the committed ABI header (`kernels/tb_kernel_abi.h`) |
+| `nix build .#gate-tools` | The gate programs in one store path, to `nix copy` to the GPU host and run there |
+| `nix run .#abi-header` | Rewrite the committed ABI header (`crates/tb-kernel-abi/kernels/tb_kernel_abi.h`) |
 | `nix build .#kernels-device` / `.#kernels-ref` / `.#gpucomp` / `.#nsys` / `.#ncu` | The pieces; Nsight Systems and Compute of the pinned toolkit |
 
 GPU tests are `#[ignore]`d tests in adapter crates: `nix flake check` and a bare `cargo test`
@@ -588,9 +586,8 @@ Both evaluate and build the flake [measured]. bagel has no NVIDIA GPU: it compil
 and runs everything but the GPU tests. nixark has the card (driver 595, libraries in
 `/run/opengl-driver/lib`, which the adapter tries after the loader's own search path).
 
-`scripts/nixark.sh CMD…` copies the tracked tree to `~/totalblonder-rs` on nixark (never
-`~/totalblonder-spike`), refuses to start under 40 GB free, and runs the command through
-`scripts/capped.sh` (transient systemd scope, `MemoryMax=10G`, no swap). The media corpus of
+On nixark, memory-hungry runs go through `tools/gate/capped.sh` (transient systemd scope,
+`MemoryMax=10G`, no swap). The media corpus of
 the gate lives in `~/totalblonder-spike/media` on nixark (the gate's default when the tree has
 no `media/`; `gate-prep` rebuilds it anywhere).
 
@@ -599,7 +596,7 @@ no `media/`; `gate-prep` rebuilds it anywhere).
 Building on bagel and copying is cheaper than building on nixark:
 `nix copy --no-check-sigs --to ssh://nixark <paths>` of the outputs of this flake's own
 derivations (2.4 GB closure) took seconds. breakbulk's own tools are needed at evaluation
-time and were built on nixark the first time; see `notes/breakbulk-feedback.md`.
+time and were built on nixark the first time (reported as schlarpc/breakbulk#232).
 
 ## 7. How the encoder is checked
 
@@ -611,12 +608,12 @@ and every value that crosses the host/device boundary: GOP typing, buffer-model 
 quantizers, every correction pass and its outcome, headers, access units with their bytes, and
 the device operations of each plan with the host's waits (`Encoder::record_golden`; the
 recorder is `tb_m2v_encoder::golden`, rate control reports through
-`tb_m2v_rate::control::Observer`). `golden/README.md` is the format contract. Twelve small cases
-(about 6 MB) are committed, recorded on the reference adapter by `golden/generate.sh`; the
+`tb_m2v_rate::control::Observer`). `crates/tb-golden/vectors/README.md` is the format contract. Twelve small cases
+(about 6 MB) are committed, recorded on the reference adapter by `crates/tb-golden/vectors/generate.sh`; the
 check `golden/fresh` fails when a committed file is not what the tree writes, and
 `nix run .#gate-golden` shows that the card writes the same records. `tb-golden` embeds them for
 tests. The format and the first five cases are the C++ spike's; the Rust recorder was shown to
-write them identically before the C++ was deleted (`golden/README.md`, "Provenance").
+write them identically before the C++ was deleted (`crates/tb-golden/vectors/README.md`, "Provenance").
 
 The recorder is off unless asked for: its hooks are untaken branches, and the gates' streams
 are byte-identical with it in the code (measured in X1). Doubles are printed as `%.17g` and
@@ -647,15 +644,14 @@ Cheapest first:
    decode, rate, quality against the stored baseline, and the conformance verifier
    (`tb-m2v-verify`) on every stream, which fails a case on any S1 or S2 finding and on an S3
    finding not allowed for that stream by `crates/tb-m2v-verify/tools/gate-allow.txt` (each
-   allowance tied to an item of `notes/post-port-worklist.md`; `notes/m2v-conformance-findings.md`
+   allowance tied to an item of `docs/notes/post-port-worklist.md`; `docs/notes/m2v-conformance-findings.md`
    §8).
 4. **Capacity on the card** [built]: `gate-bench` (free-running throughput and paced on-time
    fractions at the line-ups of §8.1), `gate-lineup` (the pipeline at real time), `gate-contend`
    (next to other users of the card).
 
 How the Rust encoder was shown equal to the C++ one before the C++ was deleted (the same
-streams on every case of the gates, byte for byte; capacity within noise) is history (§10;
-`docs/port/G1-notes.md`, `G2-notes.md`, `X1-notes.md`).
+streams on every case of the gates, byte for byte; capacity within noise) is history (§10).
 
 **Design notes that came out of the comparison with the C++** (each was a deliberate
 difference, measured and kept):
@@ -741,14 +737,14 @@ f32 port of `tb-device-ref` show whether both builds still agree.
 
 ### 7.4 What is C++
 
-The kernels (`kernels/`), for good: CUDA C++ compiled by Nix into the device image and, through
+The kernels (`crates/tb-kernel-abi/kernels/`), for good: CUDA C++ compiled by Nix into the device image and, through
 the shim, for the host. Nothing of the host side.
 
 ### 7.5 Conformance: what cannot be configured and what is never emitted [decided, built]
 
 The encoder cannot be configured into an illegal stream, and emits nothing illegal whatever
 the content. Where each rule lives (clauses are in the code; the decisions and their reasons
-in `notes/conformance-fixes-log.md`):
+in the comments next to them):
 
 | Rule | Where | What happens |
 |---|---|---|
@@ -767,7 +763,7 @@ The proof is the strict verifier (`tb-m2v-verify`, written from the standards an
 encoder): in the sandbox on the reference adapter (`verify/ref-streams`: the groups clean,
 broadcast and refused of `tools/ref_cases.sh`; the end-to-end tests
 `crates/tb-m2venc/tests/conformance.rs`), and on every stream of every gate case on the card
-(`gate/conform.py`). No finding is allowed anywhere: `tools/gate-allow.txt` is empty.
+(`tools/gate/conform.py`). No finding is allowed anywhere: `tools/gate-allow.txt` is empty.
 
 ### 7.6 Film mode: flagged pulldown [decided, built]
 
@@ -777,7 +773,7 @@ frames repeated. In film mode the encoder codes the film frames only, each as a 
 frame picture that says how long it is shown (repeat_first_field with top_field_first, H.262
 6.3.10), and the decoder does the pulldown. The mechanism is per picture, with no change of
 sequence parameters, so a channel goes from film to video to a still picture by picture.
-`notes/film-mode-log.md` is the design record with every clause; in brief:
+In brief:
 
 - **Who decides** [decided]: the timeline, not the encoder. `tb_timeline::film::Assembler`
   takes the selection per display unit (a field of an interlaced channel, a frame period of a
@@ -815,11 +811,11 @@ sequence parameters, so a channel goes from film to video to a still picture by 
   device time at 1080i and 480i and about half at 720p. Capacity of sessions without film
   pictures is unchanged, and their streams are byte for byte what they were.
 - **What proves it**: the strict verifier, whose rules of this family were first confirmed on
-  other encoders' soft-telecined streams and by mutations (`notes/m2v-conformance-findings.md`
+  other encoders' soft-telecined streams and by mutations (`docs/notes/m2v-conformance-findings.md`
   §6); property tests of the assembler, of the encoder on the model device, and of both
   together; the reference adapter end to end (`tb-m2venc/tests/film.rs`, golden cases `film`
   and `film60`, the small gates); `gate-film` on the card, which checks the cadence on two
-  decoders and the displayed fields sample for sample (`gate/film_check.py`).
+  decoders and the displayed fields sample for sample (`tools/gate/film_check.py`).
 
 ## 8. Threading and runtime at the edges [proposed]
 
@@ -935,10 +931,9 @@ session per program. libav never runs in the server process: the decoder is a sa
 
 ## 10. History
 
-The encoder began as a C++ spike on nixark (`notes/cuda-mpeg2-spike.md`, the optimization log
-`notes/cuda-mpeg2-optlog.md`): a host program (`m2venc`, its encoder `enc.h`, the pipeline
+The encoder began as a C++ spike on nixark: a host program (`m2venc`, its encoder `enc.h`, the pipeline
 harness `m2vpipe` with its decoder threads `dec.h` and conversion `pipe.h`) and the kernels.
-Its host side was ported to this workspace in work packages (`docs/port/`, completed history):
+Its host side was ported to this workspace in work packages:
 
 ```
 in parallel (CPU):        S1  R1  E1  E2  E3  D2  K1  C1  T1
@@ -954,12 +949,11 @@ GPU, serial:              D1 → K2 → K3 → G1 → G2 → X1
 | C1, T1 | Conversion planning, timeline |
 | G1 | Driver and gate: `check-full` 54 / 54, every coded stream byte-identical to the C++ encoder's |
 | G2 | Capacity within noise of the C++ (0.995 to 1.006 free-running, the C++'s paced capacity points held), the pipeline harness, `check-pipe` 46 / 46 with 212 of 228 streams identical (the 16 others the C++'s run-time sessions opened from its side thread, §7.2) |
-| X1 | The C++ retired: the verifier in the gate, the golden recorder in Rust (the C++'s records reproduced before the switch), kernels to `kernels/`, the gate to `gate/`, `tb-engine`, the C++ deleted; the gates' 308 streams byte-identical before and after, the device image identical but for its recorded source path |
+| X1 | The C++ retired: the verifier in the gate, the golden recorder in Rust (the C++'s records reproduced before the switch), kernels to `crates/tb-kernel-abi/kernels/`, the gate to `tools/gate/`, `tb-engine`, the C++ deleted; the gates' 308 streams byte-identical before and after, the device image identical but for its recorded source path |
 
 Comments in the crates name the C++ functions a part was ported from (`Batch::begin`,
-`Session::enqueue`, `Encoder::step`, …). The C++ is in the git history at commit `e79069b`
-(`git show e79069b:spikes/cuda-mpeg2/src/enc.h`); the results of its runs are frozen in
-`spikes/cuda-mpeg2/results/`.
+`Session::enqueue`, `Encoder::step`, …). The C++ itself and the measurements of the spike are
+not part of this repository.
 
 ## 11. Risks and open decisions
 

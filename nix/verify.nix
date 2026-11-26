@@ -14,16 +14,16 @@ let
       inherit root;
       fileset = fs.unions [
         (root + "/crates/tb-m2v-verify/tools")
-        (root + "/notes/m2v-conformance-rules.md")
+        (root + "/docs/notes/m2v-conformance-rules.md")
       ];
     }
   }/crates/tb-m2v-verify/tools";
   rules = "${
     fs.toSource {
       inherit root;
-      fileset = root + "/notes/m2v-conformance-rules.md";
+      fileset = root + "/docs/notes/m2v-conformance-rules.md";
     }
-  }/notes/m2v-conformance-rules.md";
+  }/docs/notes/m2v-conformance-rules.md";
   verify = "${tb-m2v-verify}/bin/tb-m2v-verify";
   enc = "${tb-m2venc}/bin/tb-m2venc";
   # nix run .#verify-streams -- --profile scte43-256qam --delivery operating DIR...
@@ -39,7 +39,7 @@ in
     # the operating model; the group "broadcast" (formats of A/53 Part 4 Table 6.2 under the
     # default profile) nothing above a note; every configuration of the group "refused" must be
     # refused when the session opens, with the clause in the message. There is no list of
-    # known findings any more: the gaps of notes/post-port-worklist.md are closed.
+    # known findings any more: the gaps of docs/notes/post-port-worklist.md are closed.
     "verify/ref-streams" =
       pkgs.runCommand "verify-ref-streams"
         {
@@ -83,7 +83,7 @@ in
           mkdir -p $out
           python3 -I ${tools}/independent.py --verify ${verify} --out $TMPDIR/s --mpeg2enc mpeg2enc --mencoder mencoder | tee $out/log.txt
         '';
-    # notes/m2v-conformance-rules.md carries the catalog the binary prints.
+    # docs/notes/m2v-conformance-rules.md carries the catalog the binary prints.
     "verify/rules-catalog" = pkgs.runCommand "verify-rules-catalog" { } ''
       ${verify} --rules-md > generated.md
       sed -n '/^<!-- generated: tb-m2v-verify --rules-md -->$/,$p' ${rules} | tail -n +2 > committed.md

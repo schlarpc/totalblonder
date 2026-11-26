@@ -1,6 +1,6 @@
-//! The golden vectors of the conversion path's host arithmetic (`golden/taps.jsonl`): the
+//! The golden vectors of the conversion path's host arithmetic (`crates/tb-golden/vectors/taps.jsonl`): the
 //! filter taps of [`make_taps`] for specs that cover every branch, and every color matrix of
-//! [`make_csc`], as `taps` and `csc` records (golden/README.md). The spec sets are those the
+//! [`make_csc`], as `taps` and `csc` records (crates/tb-golden/vectors/README.md). The spec sets are those the
 //! C++ spike's dump wrote; the file it wrote is what this writes, byte for byte.
 
 use tb_golden::write::Rec;
@@ -148,7 +148,7 @@ fn key(
     }
 }
 
-/// The whole of `golden/taps.jsonl`.
+/// The whole of `crates/tb-golden/vectors/taps.jsonl`.
 pub fn taps_records() -> String {
     let mut d = Dump {
         out: String::new(),
@@ -337,7 +337,7 @@ mod tests {
             .find(|(_, (a, b))| a != b)
         {
             panic!(
-                "golden/taps.jsonl line {}: committed\n{a}\nwritten\n{b}",
+                "crates/tb-golden/vectors/taps.jsonl line {}: committed\n{a}\nwritten\n{b}",
                 i + 1
             );
         }

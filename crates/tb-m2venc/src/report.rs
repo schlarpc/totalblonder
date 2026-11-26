@@ -1,5 +1,5 @@
-//! The statistics of a run: the text report and the `--json` record that `gate/check.py`
-//! and `gate/bench.py` read (the keys of the C++ driver, plus the ones that exist
+//! The statistics of a run: the text report and the `--json` record that `tools/gate/check.py`
+//! and `tools/gate/bench.py` read (the keys of the C++ driver, plus the ones that exist
 //! only here: `device`, `failed_ticks`, `device_errors`, `device_lost`, `host_between_ms`,
 //! `host_submit_ms`, `host_wait_ms`, `host_mb`).
 

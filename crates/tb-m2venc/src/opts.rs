@@ -201,7 +201,7 @@ pub struct Opts {
     pub stats: Option<PathBuf>,
     /// `--ticklog f.txt`.
     pub ticklog: Option<PathBuf>,
-    /// `--golden f.jsonl`: one record per access unit, in the format of golden/README.md.
+    /// `--golden f.jsonl`: one record per access unit, in the format of crates/tb-golden/vectors/README.md.
     pub golden: Option<PathBuf>,
     /// `--oplog f.txt`.
     pub oplog: Option<PathBuf>,

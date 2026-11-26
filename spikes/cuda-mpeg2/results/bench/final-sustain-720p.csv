@@ -1,2 +1,0 @@
-label,fmt,kind,n,frames,rt,mb_per_s,tick_mean_ms,tick_p50_ms,tick_p99_ms,tick_p999_ms,tick_max_ms,ontime_frac,late_deadline,cpu_cores,mbps_per_session,underflows,dev_mb,sm_mean,mem_mean,watts_mean,watts_max,temp_start,temp_max,pclk_min,load_before,load_after,contaminated
-final-sustain-720p,720p,paced,90,10789,0.9997,19415173,15.9135,15.8732,16.5037,19.3762,21.8912,0.983038,182,0.18936,12.0064,0,2441.1,91.9,78.5,68.2,69.0,83.0,91.0,1965.0,1.16,0.61,False

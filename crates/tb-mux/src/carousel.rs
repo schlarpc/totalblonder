@@ -2,7 +2,7 @@
 //! tables queue on their PID; each slot the carousel offers the packet of the most overdue
 //! PID whose buffer models admit it.
 //!
-//! Buffer models per PID (`notes/standards-digest.md` §1.6, §2.3):
+//! Buffer models per PID (`docs/notes/standards-digest.md` §1.6, §2.3):
 //! - every table PID: the transport buffer TBsys, 512 bytes at Rxsys = 1 Mbit/s;
 //! - PSIP PIDs (0x1FFB, EIT, ETT): the smoothing buffer, 1,024 bytes at 250 kbit/s (SCTE 54
 //!   Table 2; A/65 §7.1), which also caps each at 250 kbit/s;

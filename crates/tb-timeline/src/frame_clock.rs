@@ -3,7 +3,7 @@
 //! than one new frame is due. The only place where frames are dropped or repeated, and both are
 //! counted.
 //!
-//! # Hysteresis [choice: the SPEC does not have it; notes/cuda-mpeg2-spike.md §C.9 asks for it]
+//! # Hysteresis [choice: the SPEC does not have it]
 //!
 //! With the plain rule ("output time ≤ T"), a source at the output's rate whose frames sit on a
 //! tick boundary alternates between repeat and drop under the smallest jitter. The clock
@@ -378,7 +378,7 @@ mod tests {
         flips
     }
 
-    /// Hysteresis (notes/cuda-mpeg2-spike.md §C.9): equal rates whose phase sits on the tick
+    /// Hysteresis: equal rates whose phase sits on the tick
     /// boundary, with ±1 ms of jitter on every frame time: no drop, no repeat. The plain rule
     /// of SPEC §5.4 alternates between repeat and drop on the same input.
     #[test]

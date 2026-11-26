@@ -12,8 +12,6 @@
 //! frame rate, statistics are the records the kernels produced. Ported from the C++ encoder of the
 //! CUDA spike (docs/ARCHITECTURE.md, "History"): `Vbv`, `RateControl`, `nz_at`, `Batch::choose`,
 //! the rate control parts of `Batch::begin`, `quantize`, `retry`, `collect`, `host_repeat`.
-//! Work packages: docs/port/R1-buffer-model.md, docs/port/R2-rate-control.md.
-//!
 //! Floating point: the port reproduces the C++ encoder's `double` arithmetic operation for
 //! operation (same order, no fused multiply-add, `ln` where the C++ calls `std::log`), because
 //! the golden vectors compare decisions exactly.

@@ -10,7 +10,7 @@
 #   checks       abi-header-fresh: the committed header equals the generated one;
 #                cuda-api: the CUDA adapter's own driver bindings agree with cuda.h
 #
-# The kernel sources are kernels/ (one copy, compiled by these derivations only).
+# The kernel sources are crates/tb-kernel-abi/kernels/ (one copy, compiled by these derivations only).
 { pkgs, root }:
 let
   inherit (pkgs) lib;
@@ -18,12 +18,12 @@ let
   # The toolkit release the card's driver (595.71.05) was built for.
   cuda = pkgs.cudaPackages_13_2;
 
-  kernelFiles = root + "/kernels";
+  kernelFiles = root + "/crates/tb-kernel-abi/kernels";
   kernelSrc = fs.toSource {
     inherit root;
     fileset = kernelFiles;
   };
-  includes = "-Ikernels";
+  includes = "-Icrates/tb-kernel-abi/kernels";
   # The flags the C++ spike built its kernels with. -fmad=false: no implicit fused
   # multiply-add; the kernels write each fused operation as fmaf, so the image is the machine
   # code nvcc's default contraction made of them before, and refLib (-ffp-contract=off, fmaf
@@ -49,7 +49,7 @@ let
   abiLayout =
     pkgs.runCommandCC "tb-kernel-abi-layout.txt"
       {
-        src = root + "/kernels/abi_layout.cc";
+        src = root + "/crates/tb-kernel-abi/kernels/abi_layout.cc";
       }
       ''
         mkdir inc
@@ -70,7 +70,7 @@ let
     dontFixup = true;
     buildPhase = ''
       runHook preBuild
-      nvcc ${nvflags} ${includes} -cubin -o tb_kernels.cubin kernels/tb_kernels.cu
+      nvcc ${nvflags} ${includes} -cubin -o tb_kernels.cubin crates/tb-kernel-abi/kernels/tb_kernels.cu
       # The kernels' symbols: "<name> <mangled symbol>" per line, for cuModuleGetFunction.
       readelf -sW tb_kernels.cubin \
         | awk '$4 == "FUNC" && $5 == "GLOBAL" { print $NF }' \
@@ -79,7 +79,7 @@ let
             echo "$name $sym"
           done | sort > tb_kernels.sym
       # Every kernel of the list is in the image.
-      for k in $(sed -n 's/^ *X(\([a-z_0-9]*\),.*/\1/p' kernels/tb_kernel_list.h); do
+      for k in $(sed -n 's/^ *X(\([a-z_0-9]*\),.*/\1/p' crates/tb-kernel-abi/kernels/tb_kernel_list.h); do
         grep -q "^$k " tb_kernels.sym || { echo "kernel $k is not in the image"; exit 1; }
       done
       runHook postBuild
@@ -110,14 +110,14 @@ let
         runHook preBuild
         $CXX -std=c++17 -O2 -fPIC -D__CUDACC__ -fno-strict-aliasing -ffp-contract=off \
           -fno-exceptions -fno-rtti -Wall -Wno-unknown-pragmas -Wno-maybe-uninitialized ${extraFlags} \
-          -Ikernels/shim ${includes} -c kernels/tb_kernels_ref.cc -o tb_kernels_ref.o
+          -Icrates/tb-kernel-abi/kernels/shim ${includes} -c crates/tb-kernel-abi/kernels/tb_kernels_ref.cc -o tb_kernels_ref.o
         $AR rcs libtbkernels_ref.a tb_kernels_ref.o
         runHook postBuild
       '';
       installPhase = ''
         mkdir -p $out/lib $out/include
         cp libtbkernels_ref.a $out/lib/
-        cp kernels/tb_kernels_ref.h $out/include/
+        cp crates/tb-kernel-abi/kernels/tb_kernels_ref.h $out/include/
       '';
     };
   refLib = mkRefLib { name = "tb-kernels-ref"; };
@@ -130,8 +130,8 @@ let
   };
 
   abiHeaderFresh = pkgs.runCommand "abi-header-fresh" { } ''
-    if ! diff -u ${root + "/kernels/tb_kernel_abi.h"} ${abiHeader}; then
-      echo "kernels/tb_kernel_abi.h is stale: run 'nix run .#abi-header'"
+    if ! diff -u ${root + "/crates/tb-kernel-abi/kernels/tb_kernel_abi.h"} ${abiHeader}; then
+      echo "crates/tb-kernel-abi/kernels/tb_kernel_abi.h is stale: run 'nix run .#abi-header'"
       exit 1
     fi
     touch $out

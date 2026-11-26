@@ -9,7 +9,7 @@ It is written from the standards (ITU-T H.222.0, ETSI TR 101 290, SCTE 54, ATSC 
 Part 3 and Part 5, A/52 Annex A, the buffer tables of H.262), not from the mux crates of this
 workspace, and shares no code with them, so that one misreading cannot hide in both. Every
 check is a rule with an identifier, a severity and a clause and page: 147 rules, listed with
-their sources in `notes/ts-conformance-rules.md` (generated from `src/rules.rs`).
+their sources in `docs/notes/ts-conformance-rules.md` (generated from `src/rules.rs`).
 
 ## What it checks
 
@@ -85,7 +85,7 @@ It is sans-io: bytes in, findings out. Memory is bounded by the PIDs and tables 
 stream and the findings kept per rule (table instances not seen for ten minutes are
 dropped); a ten-minute run uses the same 3 MB as a twenty-second one. Cost: about 80 ns per
 packet with the buffer model, so a 38.8 Mbit/s carrier (25,800 packets/s) costs about 2 ms of
-CPU per second (notes/ts-verify-log.md).
+CPU per second.
 
 ### Time base
 
@@ -155,8 +155,8 @@ schema; a change of meaning or a removal changes it.
 
 ## Validation
 
-`notes/ts-verify-log.md`: the checker against TSDuck on streams from ffmpeg and TSDuck,
-and on deliberately damaged ones. The tools are in `tools/`: `make_streams.sh` (the
+The checker was validated against TSDuck on streams from ffmpeg and TSDuck, and on
+deliberately damaged ones. The tools are in `tools/`: `make_streams.sh` (the
 streams), `tsmangle.py` (the damage), `validate.sh` (the comparison table),
 `tsduck_intervals.py` (table cycles from TSDuck's section log). The tests need none of them:
 `tests/rules.rs` builds a stream that violates each rule from a conformant synthetic stream

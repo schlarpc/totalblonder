@@ -1,4 +1,4 @@
-//! The conversion, composition and color kernels (`kernels/pipe_kernels.h`) on
+//! The conversion, composition and color kernels (`crates/tb-kernel-abi/kernels/pipe_kernels.h`) on
 //! the reference adapter, each against a Rust model written from its definition, sample by
 //! sample. The kernels are integer arithmetic, so every comparison is exact.
 //!

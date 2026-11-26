@@ -212,7 +212,7 @@ pub fn geo(n: i32, mbw: i32, mbh: i32) -> Geo {
     }
 }
 
-/// The table record the encoder uploads (golden/tables.jsonl).
+/// The table record the encoder uploads (crates/tb-golden/vectors/tables.jsonl).
 pub fn tables() -> Tables {
     let recs = tb_golden::case("tables").unwrap();
     let r = recs.iter().find(|r| r.kind() == "tables").unwrap();

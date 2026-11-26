@@ -1,5 +1,5 @@
-//! Value types that can only hold what the device accepts (SPEC §10.1, notes/device.md §3,
-//! notes/manual.md §4–§5, notes/corruption-48.md §2 "Triggers and damage").
+//! Value types that can only hold what the device accepts (SPEC §10.1, docs/notes/device.md §3,
+//! docs/notes/manual.md §4–§5, docs/notes/corruption-48.md §2 "Triggers and damage").
 
 use std::fmt;
 use std::net::Ipv4Addr;

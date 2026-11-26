@@ -19,7 +19,7 @@ use tb_ts::{PACKET_LEN, STC_HZ, Stc};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TsRate(u64);
 
-/// The modulator's 256-QAM Annex B payload rate, bit/s (SCTE 07; `notes/standards-digest.md`
+/// The modulator's 256-QAM Annex B payload rate, bit/s (SCTE 07; `docs/notes/standards-digest.md`
 /// §8). A carrier's rate must stay below it.
 pub const QAM256_PAYLOAD: u64 = 38_810_701;
 

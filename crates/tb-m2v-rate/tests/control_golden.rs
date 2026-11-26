@@ -371,7 +371,7 @@ fn shed() {
     );
 }
 
-/// The cases recorded by the Rust encoder (golden/generate.sh). `skip` reaches the all-skipped
+/// The cases recorded by the Rust encoder (crates/tb-golden/vectors/generate.sh). `skip` reaches the all-skipped
 /// rung and replaces I pictures by P pictures.
 #[test]
 fn cases_of_the_rust_recorder() {

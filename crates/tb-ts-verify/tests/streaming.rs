@@ -67,8 +67,8 @@ fn garbage_before_the_stream_is_skipped() {
     assert!(serious(&r).is_empty(), "{}", r.summary());
 }
 
-/// Writes the synthetic streams to `$TB_EXPORT_DIR` for the validation with TSDuck
-/// (notes/ts-verify-log.md). Run with
+/// Writes the synthetic streams to `$TB_EXPORT_DIR` for the validation with TSDuck.
+/// Run with
 /// `TB_EXPORT_DIR=/some/dir cargo nextest run -p tb-ts-verify --run-ignored only export`.
 #[test]
 #[ignore = "writes files; run by hand for the validation log"]

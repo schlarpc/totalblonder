@@ -1,5 +1,5 @@
 //! Sans-io client and supervisor for the Blonder Tongue EQAM-420B web interface
-//! (docs/SPEC.md §10; notes/device.md; notes/corruption-48.md).
+//! (docs/SPEC.md §10; docs/notes/device.md; docs/notes/corruption-48.md).
 //!
 //! The crate never opens a socket and has no clock. It builds requests and reads responses;
 //! a thin adapter in the server sends them through [`Transport`] and passes the time in.

@@ -1,5 +1,5 @@
 //! The golden recorder: what the encoder decided and what crossed the host/device boundary,
-//! as the JSON records of `golden/README.md` (the format the C++ encoder first wrote with
+//! as the JSON records of `crates/tb-golden/vectors/README.md` (the format the C++ encoder first wrote with
 //! `--golden`, and the replay tests read).
 //!
 //! Off unless [`Encoder::record_golden`](crate::Encoder::record_golden) turns it on; then every

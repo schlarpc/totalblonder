@@ -7,8 +7,8 @@
 //!
 //! Ported from the C++ encoder of the CUDA spike (docs/ARCHITECTURE.md, "History"): `HBits`,
 //! `Batch::headers`, `Batch::skip_slices`, the table set-up in `Encoder::Encoder`, and
-//! `kernels/common.h`. Section numbers refer to H.262
-//! (02/2000). Work package: docs/port/S1-syntax.md.
+//! `crates/tb-kernel-abi/kernels/common.h`. Section numbers refer to H.262
+//! (02/2000).
 #![forbid(unsafe_code)]
 
 pub mod bits;

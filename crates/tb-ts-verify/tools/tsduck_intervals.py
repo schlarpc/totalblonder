@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Repetition intervals of tables from TSDuck's section log, to compare with
-`tb-ts-verify --tables` (notes/ts-verify-log.md).
+`tb-ts-verify --tables`.
 
 usage: tsp --atsc -I file X.ts -P tables --all-sections --packet-index --log \
            [--pid ...] -O drop 2>&1 | python3 -I tsduck_intervals.py RATE

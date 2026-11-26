@@ -6,7 +6,7 @@
 //! For each case the test takes the command line from the case's `golden` record, as the
 //! recorder was given it (only the file names are replaced), and requires:
 //! - every written stream byte-identical to the recorded one: equal to the `au.data` records of
-//!   its session followed by `sequence_end_code`, and with the SHA-256 of `golden/<case>.sha256`;
+//!   its session followed by `sequence_end_code`, and with the SHA-256 of `crates/tb-golden/vectors/<case>.sha256`;
 //! - every access unit's fields (types, flags, times, sizes, quantizer, complexity, buffer
 //!   state, rung, passes, macroblock counts) equal to the golden `au` record, through the
 //!   driver's own `--golden` output;
@@ -173,7 +173,7 @@ fn film_is_byte_identical_on_the_reference_adapter() {
 }
 
 /// The table record the kernels read, as `tb-m2venc --golden-tables` writes it, is the
-/// recorded one (`golden/tables.jsonl`).
+/// recorded one (`crates/tb-golden/vectors/tables.jsonl`).
 #[test]
 fn the_tables_are_the_recorded_ones() {
     let t = tb_m2v_syntax::tables::tables();

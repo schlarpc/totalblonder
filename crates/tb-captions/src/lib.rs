@@ -3,8 +3,7 @@
 //!
 //! Pure (docs/ARCHITECTURE.md §1): no clock, file or thread; time is an argument. Everything
 //! is cross-checked against the standards in `docs/external/standards/` (CTA-608-E S-2019, CTA-708-E
-//! S-2023), with clause, table and page in the comments; `notes/captions-log.md` records the
-//! decisions and the checks against real decoders.
+//! S-2023), with clause, table and page in the comments.
 //!
 //! ```text
 //!  SRT / WebVTT / tb_media Text packets ──► Cue ──► layout: Screens (rows, 32 columns)

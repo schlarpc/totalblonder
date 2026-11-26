@@ -1,4 +1,4 @@
-//! Planner tests. The `geom_*` tests are the conversions of `gate/pipe_check.py` `geom-*`: the
+//! Planner tests. The `geom_*` tests are the conversions of `tools/gate/pipe_check.py` `geom-*`: the
 //! keys are the ones the C++ pipeline harness made for them (`fit=stretch`, so
 //! the whole source into the whole frame; sources tagged with the output's matrix, so no color
 //! matrix; full rectangles, so no fill), and the expected launches, orders and counts follow

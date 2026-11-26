@@ -55,31 +55,19 @@ MIT, see `LICENSE`. Vendor firmware, manuals and standards documents are not inc
 
 | Path | Content |
 |---|---|
-| `docs/STATUS.md` | What is built and what is still needed, with the order of work |
-| `docs/SPEC.md` | Design specification for the streaming server: output contract, clocking, mux, tables, encode, ingest, device control, monitoring, milestones, open questions |
-| `docs/ARCHITECTURE.md` | The Rust workspace: crate map, sans-io rule, device protocol, kernel ABI, Nix build, how the encoder is checked, history |
-| `crates/`, `nix/`, `flake.nix` | The workspace (built by `github:schlarpc/breakbulk`): `nix flake check`, `nix develop`, `nix run .#gpu-plumbing` on nixark |
-| `kernels/` | The CUDA kernels (one copy, built by Nix into the device image and for the host) |
-| `gate/` | The gate and the benchmarks: decoders, buffer models, conformance verifier, capacity, line-ups, contention, corpus recipes (`gate/README.md`) |
-| `golden/` | Golden vectors: the encoder's decisions and device operations for ten small cases, written by the Rust recorder, and how to regenerate them |
-| `scripts/` | `nixark.sh` (run a command of the tree on the GPU host), `capped.sh` (the memory cap) |
-| `docs/port/` | Completed history: the work packages of the port of the CUDA MPEG-2 encoder's host side to Rust and of the C++'s retirement (X1) |
-| `spikes/cuda-mpeg2/results/` | Frozen history: the measurements of the C++ spike and of the port while it was compared with it |
-| `notes/post-port-worklist.md` | The encoder's work queue now that the C++ is retired |
-| `notes/cuda-mpeg2-spike.md`, `notes/cuda-mpeg2-optlog.md` | History: the C++ spike's measurements and optimization log |
-| `notes/m2v-conformance-findings.md`, `notes/m2v-conformance-rules.md` | What the conformance verifier finds in our streams; its rule catalog |
-| `notes/breakbulk-feedback.md` | What was missing in breakbulk when the workspace was set up |
-| `notes/firmware.md` | Flash layout, CPU/OS, rootfs inventory, config storage, Ghidra setup |
-| `notes/device.md` | Live device surface: web forms, FTP/telnet, current state, dangerous URLs |
-| `notes/manual.md` | Digest of the 420B manual with page references |
-| `notes/research.md` | Vendor changelogs, sister products, standards, documents obtained and missing |
-| `notes/producers.md` | What the first producer emits, its demand model, conventions to reuse |
-| `notes/design-inputs.md` | Decisions, owner-supplied facts, feature candidates, research still to do |
-| `notes/standards-digest.md` | Implementer's digest of MPEG-TS, PSIP, SCTE cable, captions, AC-3, EAS, conformance tests |
-| `notes/corruption-48.md` | The ">48 channels corrupts config" investigation |
-| `notes/software-survey.md` | Reuse-versus-write survey: TSDuck, libav, crates, statmux, hardware encode, spike commands |
+| `crates/` | The Rust workspace: the server (`totalblonder`), the encoder, mux, tables, audio, captions, ingest, the decoder sandbox, the modulator client, the stream checkers |
+| `crates/tb-kernel-abi/kernels/` | The CUDA kernels (one copy, built by Nix into the device image and for the host) |
+| `crates/tb-golden/vectors/` | Golden vectors: the encoder's decisions and device operations for small cases, and how to regenerate them |
+| `nix/`, `flake.nix` | The build (with `github:schlarpc/breakbulk`), the kernels, the gate's apps and checks, the NixOS module |
+| `docs/STATUS.md` | What is built and what is still needed |
+| `docs/SPEC.md` | Design specification: output contract, clocking, mux, tables, encode, ingest, device control, monitoring, milestones, open questions |
+| `docs/ARCHITECTURE.md` | The workspace: crate map, sans-io rule, device protocol, kernel ABI, Nix build, how the encoder is checked |
+| `docs/SERVER.md` | The server: data flow, threads, clocks, isolation of libav, how to run it, measurements |
+| `docs/FIRST-AIR.md` | Runbook for the first stream into the modulator |
+| `docs/notes/` | Reference notes: the modulator (`device.md`, `firmware.md`, `manual.md`, `research.md`, `corruption-48.md`), the standards (`standards-digest.md`), conformance rules and findings, the software survey, design inputs, the encoder's work queue |
 | `docs/external/` | Gitignored: vendor manuals, firmware images, spec sheets and standards (fetch lists and checksums for the standards are tracked) |
-| `tools/` | Firmware extractors, Nios II Ghidra module, device login/crawl/mirror scripts |
+| `tools/gate/` | The GPU gate and benchmarks: decoders, buffer models, capacity, line-ups, contention, corpus recipes (`tools/gate/README.md`) |
+| `tools/` | Firmware extractors, the Nios II Ghidra module, device login/crawl/mirror scripts |
 | `work/` | Gitignored: extracted firmware, decompilation, device captures, flash dump |
 
 ## What the box is
@@ -137,9 +125,9 @@ in `docs/SPEC.md`.
 ## Open questions
 
 - Which of the three confirmed config/memory defects is the reported ">48" corruption
-  (`notes/corruption-48.md`): the `mux_sync` table overrun, the `qamconfig.cgi` shared
+  (`docs/notes/corruption-48.md`): the `mux_sync` table overrun, the `qamconfig.cgi` shared
   offset, or the `update_config` boot reconcile. None is dimensioned 48.
-- Who wrote the table at EEPROM 0xF10 during the 2026-09-07 setup (`notes/corruption-48.md`
+- Who wrote the table at EEPROM 0xF10 during the 2026-09-07 setup (`docs/notes/corruption-48.md`
   section 8).
 - Feed tolerances listed under "Input contract".
 - EAS trigger packet format on UDP 5050.

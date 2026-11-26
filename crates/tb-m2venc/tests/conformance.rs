@@ -48,7 +48,7 @@ fn white_noise_at_a_high_rate_keeps_the_macroblock_limit() {
     assert_clean(&r, "white noise");
 }
 
-/// The case of `notes/format-conformance.md`, open question 5: a busy patch in an easy picture.
+/// The case of `docs/notes/format-conformance.md`, open question 5: a busy patch in an easy picture.
 /// Rate control picks a fine quantizer for the whole picture and the rows of the patch break
 /// the rule; only they are made coarser.
 #[test]

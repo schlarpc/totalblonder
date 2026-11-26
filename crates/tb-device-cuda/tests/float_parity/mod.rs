@@ -13,7 +13,7 @@
 //! (`k_set_mode`, `k_pyr`, `k_mvsmooth`, `k_mbstat`, `k_rowstat`) are compared as well.
 //!
 //! Content: the gate's clips when `TB_PARITY_MEDIA` names the directory that holds them
-//! (on nixark: `~/totalblonder-spike/media`; raw 4:2:0 as `gate/formats.py` names them),
+//! (on nixark: `~/totalblonder-spike/media`; raw 4:2:0 as `tools/gate/formats.py` names them),
 //! otherwise a synthetic moving texture (the test says which it used).
 
 use std::path::PathBuf;
@@ -81,7 +81,7 @@ impl Clip {
     }
 }
 
-/// golden/make_clip.py's picture, in short: a textured background that pans, a block moving the
+/// crates/tb-golden/vectors/make_clip.py's picture, in short: a textured background that pans, a block moving the
 /// other way, a little noise; with `interlaced` the bottom field is the next phase of the motion.
 fn synthetic(w: usize, h: usize, f: usize, interlaced: bool) -> Vec<u8> {
     let mut state = (f as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15);
@@ -182,7 +182,7 @@ fn geo(c: &Clip, tpred: bool) -> Geo {
     }
 }
 
-/// The table record the encoder uploads (golden/tables.jsonl).
+/// The table record the encoder uploads (crates/tb-golden/vectors/tables.jsonl).
 fn tables() -> Tables {
     let recs = tb_golden::case("tables").unwrap();
     let r = recs.iter().find(|r| r.kind() == "tables").unwrap();

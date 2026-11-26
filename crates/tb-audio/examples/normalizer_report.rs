@@ -1,4 +1,4 @@
-//! How the normalizer and limiter behave over time, for `notes/audio-pipeline-log.md`:
+//! How the normalizer and limiter behave over time:
 //!
 //! ```text
 //! nix develop -c cargo run --release -p tb-audio --example normalizer_report

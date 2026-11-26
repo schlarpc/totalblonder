@@ -49,7 +49,7 @@ pub const RUNG_KEEP: [u8; 6] = [12, 6, 3, 1, 0, 0];
 pub const QFLOOR_MARGIN: u8 = 3;
 
 /// What rate control decided, as it decides it: the hooks of the golden recorder
-/// (`golden/README.md`, records `vbv`, `choose` and `pass`). Every method has an empty default;
+/// (`crates/tb-golden/vectors/README.md`, records `vbv`, `choose` and `pass`). Every method has an empty default;
 /// `()` observes nothing. The `*_obs` methods of [`RateControl`] call it at the points where the
 /// C++ wrote those records; the plain methods pass `()`.
 pub trait Observer {
@@ -113,7 +113,7 @@ pub struct ChooseEvent<'a> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(
     missing_docs,
-    reason = "the fields of the golden record `pass` (golden/README.md)"
+    reason = "the fields of the golden record `pass` (crates/tb-golden/vectors/README.md)"
 )]
 pub struct PassEvent {
     pub pic_type: u8,

@@ -1,6 +1,6 @@
 //! Admission control for the card's hardware decoder (NVDEC).
 //!
-//! notes/cuda-mpeg2-spike.md §C.9: "The decoder is the limit and nothing manages it": a line-up
+//! The decoder is the limit, and without this nothing manages it: a line-up
 //! that needs more than the decoder has is accepted and every input degrades. This module is
 //! the manager's arithmetic: a [`DecoderBudget`] that knows what each admitted input takes from
 //! the decoder and answers, for a new input, [`Admission::Hardware`], [`Admission::Software`]
@@ -120,9 +120,8 @@ const F24: f64 = 24000.0 / 1001.0;
 const F30: f64 = 30000.0 / 1001.0;
 const F60: f64 = 60000.0 / 1001.0;
 
-/// The table of notes/cuda-mpeg2-spike.md §C.2 (columns "frames per second in total" and
-/// "software decode: cores per real-time stream"; MPEG-2 480i's 0.011 core is from the text
-/// below the table).
+/// Measured decoder capacity on the card (frames per second in total) and software decode
+/// cost (cores per real-time stream).
 pub const MEASURED: [Measured; 18] = [
     row(InputKind::new(Codec::Av1, 1920, 1080, F30), 1816.0, 0.18),
     row(
@@ -604,7 +603,7 @@ mod tests {
         assert_eq!(got, 27);
     }
 
-    /// The inputs of unit `u` of line-up (c) (`gate/pipe_lineup.py`): one of four kinds of
+    /// The inputs of unit `u` of line-up (c) (`tools/gate/pipe_lineup.py`): one of four kinds of
     /// 1080 source, a 720p60 and four small ones; nine kinds in all.
     fn unit(u: usize) -> [InputKind; 6] {
         let hd = [H264_1080P30, H264_1080I, HEVC_1080P30, MPEG2_1080I][u % 4];

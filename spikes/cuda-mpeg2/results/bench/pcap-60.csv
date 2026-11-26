@@ -1,5 +1,0 @@
-label,fmt,kind,n,frames,rt,mb_per_s,tick_mean_ms,tick_p50_ms,tick_p99_ms,tick_p999_ms,tick_max_ms,ontime_frac,late_deadline,cpu_cores,mbps_per_session,underflows,dev_mb,sm_mean,mem_mean,watts_mean,watts_max,temp_start,temp_max,pclk_min,load_before,load_after,contaminated,stage:download,stage:host,stage:pred+dct+stats,stage:pyramid+ME+mbstat,stage:quant+entropy,stage:rate control (host),stage:recon+pyr,stage:scatter,stage:upload+pad
-pcap-60,1080i,freerun,16,149,4.3253,16924425,7.5608,7.5033,8.7865,14.9665,14.9665,1.0,0,0.21758,15.2993,0,983.5,91.5,54.0,53.5,62.0,75.0,75.0,1845.0,2.37,2.37,True,,,,,,,,,
-pcap-60,1080i,freerun,16,149,4.3199,16903442,7.5704,7.4828,8.8459,15.3448,15.3448,1.0,0,0.21527,15.2993,0,983.5,98.0,65.0,35.0,35.0,70.0,73.0,1860.0,2.37,2.18,True,,,,,,,,,
-pcap-60,1080i,freerun,16,149,4.3212,16908185,7.5675,7.5103,8.8587,15.26,15.26,1.0,0,0.22047,15.2993,0,983.5,98.0,65.0,50.0,50.0,69.0,74.0,1845.0,2.18,2.18,True,,,,,,,,,
-pcap-60,1080i,profile,16,149,2.9909,11703236,11.0143,10.9143,13.4018,16.4627,16.4627,1.0,0,0.0641,15.2993,0,983.5,49.0,24.0,43.5,48.0,70.0,75.0,2325.0,2.18,2.18,True,0.1415,0.0969,2.2517,2.6683,1.0538,0.047,0.6709,0.1497,3.8467

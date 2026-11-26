@@ -164,7 +164,7 @@ pub fn finish<D: Device>(enc: &mut Encoder, dev: &mut D, plan: &mut Plan) -> Dri
     all
 }
 
-/// SHA-256 (FIPS 180-4), for the stream digests of `golden/*.sha256`.
+/// SHA-256 (FIPS 180-4), for the stream digests of `crates/tb-golden/vectors/*.sha256`.
 pub fn sha256(data: &[u8]) -> String {
     const K: [u32; 64] = [
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,

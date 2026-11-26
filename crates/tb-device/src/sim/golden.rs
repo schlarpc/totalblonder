@@ -1,4 +1,4 @@
-//! Traces and normal forms from the golden records (`golden/README.md`).
+//! Traces and normal forms from the golden records (`crates/tb-golden/vectors/README.md`).
 //!
 //! - [`golden_plans`]: the plans of the recorded run, from its `op` records. Each host wait (`op`
 //!   record `wait`) ends a plan; the plan waits on the waited stream. The operations keep the

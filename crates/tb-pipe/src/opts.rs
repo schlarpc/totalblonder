@@ -211,7 +211,7 @@ pub const USAGE: &str = "usage: tb-pipe --in FILE[*N][@sw[,threads=N]|@at=S|@uns
   [--output PREFIX] [--write K] [--dump-conv F.yuv] [--ptslog F] [--ticklog F] [--json F]
   [--device cuda|ref] [--gpu N] [--conv-mb MB] [--mem-limit-mb MB] [--nvdec-share F] [--sw-cores C]
   [--no-cc] [--device-timeout S]
-       tb-pipe --golden-taps FILE   the conversion path's golden records (golden/taps.jsonl)";
+       tb-pipe --golden-taps FILE   the conversion path's golden records (crates/tb-golden/vectors/taps.jsonl)";
 
 /// Why the command line was refused.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]

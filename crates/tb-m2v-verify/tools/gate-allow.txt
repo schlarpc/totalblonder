@@ -1,7 +1,7 @@
-# S3 findings the gate allows (gate/conform.py reads this file; every gate
+# S3 findings the gate allows (tools/gate/conform.py reads this file; every gate
 # stream is verified with --delivery operating under the case's profile, and any S1 or S2
 # finding, or an S3 finding not allowed here for that stream, fails the case).
 # Each line: the rule, globs on the stream's file name (none: every stream), then the entry of
-# notes/post-port-worklist.md ("Conformance gaps") that removes it. When the item is fixed, delete
+# docs/notes/post-port-worklist.md ("Conformance gaps") that removes it. When the item is fixed, delete
 # the line; the pipeline gate prints entries that matched nothing in a full run.
-# Nothing is allowed: items 2 and 7 are fixed (notes/conformance-fixes-log.md).
+# Nothing is allowed: items 2 and 7 are fixed.

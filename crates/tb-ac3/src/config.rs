@@ -683,7 +683,7 @@ impl Config {
     /// full-bandwidth channel `r`: ≥ 96 kbit/s → 20 kHz, ≥ 80 → 19 kHz, ≥ 64 → 18 kHz,
     /// ≥ 48 → 13 kHz, ≥ 32 → 10 kHz, below → 7 kHz. Without coupling, bandwidth is the main
     /// lever against bit starvation at low rates. The steps were set against FFmpeg's choices
-    /// with coupling off (notes/ac3-encoder-log.md): the same at 2/0 192 and 3/2 384, wider
+    /// with coupling off: the same at 2/0 192 and 3/2 384, wider
     /// below 64 kbit/s per channel, where FFmpeg drops to 6.8 kHz.
     pub fn bandwidth_code(&self) -> BandwidthCode {
         match self.b.bandwidth {

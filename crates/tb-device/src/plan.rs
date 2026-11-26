@@ -28,7 +28,7 @@ impl EventId {
     /// The tick's parameter copies have gone through on [`StreamId::MAIN`]. The frame upload
     /// waits for it: next to a busy context of another process the copy engine was seen to run
     /// the whole upload before parameter copies queued ahead of it, which held the first kernel
-    /// back by the upload time (notes/cuda-mpeg2-optlog.md, experiment 41).
+    /// back by the upload time.
     pub const PARAMS: EventId = EventId(0);
     /// The frames queued on [`StreamId::UPLOAD`] are on the device. The first kernel that reads
     /// them waits for it on [`StreamId::MAIN`] (the C++ synchronizes the upload stream from the

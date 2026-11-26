@@ -35,8 +35,7 @@
 //! squares slope and a first-order filter, see `skew.rs`); its result is quantized to an integer
 //! parts-per-billion value before it touches a time, and it is recomputed from a bounded window,
 //! never integrated, so float rounding cannot accumulate.
-//!
-//! Work package: docs/port/T1-timeline.md.
+
 #![forbid(unsafe_code)]
 
 pub mod admission;

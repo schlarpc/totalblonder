@@ -109,7 +109,7 @@ impl std::fmt::Display for ChannelNumber {
     }
 }
 
-/// `service_type` (A/53-3 §5.1.3, `notes/standards-digest.md` §2.7).
+/// `service_type` (A/53-3 §5.1.3, `docs/notes/standards-digest.md` §2.7).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ServiceType {
     /// 0x02: ATSC digital television (MPEG-2 or AVC video with AC-3).

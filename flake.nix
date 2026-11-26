@@ -112,7 +112,7 @@
         abi-header = kernels.abiHeader;
         gate-tools = gate.tools;
         gpucomp = gate.gpucomp;
-        # Nsight Systems and Compute of the pinned toolkit (gate/nsys_*.sh, gate/ncu_profile.sh)
+        # Nsight Systems and Compute of the pinned toolkit (tools/gate/nsys_*.sh, tools/gate/ncu_profile.sh)
         nsys = kernels.cuda.nsight_systems;
         ncu = kernels.cuda.nsight_compute;
       };
@@ -132,8 +132,8 @@
         # Regenerate the committed copy of the kernel ABI header.
         abi-header = script "abi-header" ''
           set -euo pipefail
-          install -m 644 ${kernels.abiHeader} kernels/tb_kernel_abi.h
-          echo "wrote kernels/tb_kernel_abi.h"
+          install -m 644 ${kernels.abiHeader} crates/tb-kernel-abi/kernels/tb_kernel_abi.h
+          echo "wrote crates/tb-kernel-abi/kernels/tb_kernel_abi.h"
         '';
       };
 

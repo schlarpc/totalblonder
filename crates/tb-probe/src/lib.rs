@@ -4,7 +4,7 @@
 //! The adapter runs `hdhomerun_config <id> set /tunerN/channel auto:<Hz>`, then `get
 //! /tunerN/status` and `get /tunerN/streaminfo`, and optionally `save` for a capture that goes
 //! through `tb-ts-verify`. This crate parses the two text replies
-//! (`notes/software-survey.md` §7.1) and turns them into a verdict per carrier.
+//! (`docs/notes/software-survey.md` §7.1) and turns them into a verdict per carrier.
 //!
 //! Status line: `ch=qam256:57000000 lock=qam256 ss=83 snq=90 seq=100 bps=38807712 pps=0`
 //! (`seq` 100 means no uncorrectable errors). Stream info: one line per program,
@@ -239,7 +239,7 @@ impl Rotation {
 /// US cable (STD plan) center frequency of channel `ch`, Hz: CTA-542-D Table 1 (checked against
 /// the PDF in `docs/external/standards/2026-11-24-archive-org/`: ch 100 at 651, 140 at 891, 158 at 999 MHz)
 /// and, where they overlap,
-/// the frequencies `notes/device.md` §4 records for the box's carriers.
+/// the frequencies `docs/notes/device.md` §4 records for the box's carriers.
 pub fn std_frequency(ch: u16) -> Option<u32> {
     let mhz: f64 = match ch {
         2..=4 => 57.0 + 6.0 * f64::from(ch - 2),

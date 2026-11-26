@@ -1,5 +1,5 @@
 //! Text types: ISO 639 language codes, channel short names, and the A/65
-//! `multiple_string_structure` (A/65 §6.10 Table 6.39, p.79–82; `notes/standards-digest.md`
+//! `multiple_string_structure` (A/65 §6.10 Table 6.39, p.79–82; `docs/notes/standards-digest.md`
 //! §3.8).
 
 use crate::Error;

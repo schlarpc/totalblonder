@@ -1,4 +1,4 @@
-//! The host launcher's fibers and shuffles (kernels/tb_kernels_ref.cc), tested directly with
+//! The host launcher's fibers and shuffles (crates/tb-kernel-abi/kernels/tb_kernels_ref.cc), tested directly with
 //! its own test kernels: what `k_xf`, `k_rowstat` and `k_ent_rowsum` rely on.
 
 use tb_device_ref::{LauncherTest, launcher_test_count, run_launcher_test, sanitized};

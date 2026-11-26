@@ -9,7 +9,7 @@
 //! Everything that touches the device goes through [`Engine`]; what is above it (inputs,
 //! schedules, files, statistics) issues encoder commands between ticks and takes access units.
 //! That is the cut along which the loop can move into a child process (docs/ARCHITECTURE.md
-//! §4.5, notes/post-port-worklist.md).
+//! §4.5, docs/notes/post-port-worklist.md).
 
 pub mod device;
 pub mod engine;

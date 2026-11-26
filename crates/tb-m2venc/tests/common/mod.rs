@@ -34,7 +34,7 @@ impl Scratch {
     pub fn exists(&self, name: &str) -> bool {
         self.0.join(name).exists()
     }
-    /// The clips of `golden/generate.sh`, by the name it gives them.
+    /// The clips of `crates/tb-golden/vectors/generate.sh`, by the name it gives them.
     pub fn clip(&self, name: &str) -> String {
         let (w, h, n, seed, kind) = match name {
             "qcif" => (176, 144, 30, 1, ClipKind::Plain),
@@ -130,7 +130,7 @@ pub fn file_exists(p: &str) -> bool {
     Path::new(p).exists()
 }
 
-/// SHA-256 (FIPS 180-4), for the stream digests of `golden/*.sha256`.
+/// SHA-256 (FIPS 180-4), for the stream digests of `crates/tb-golden/vectors/*.sha256`.
 pub fn sha256(data: &[u8]) -> String {
     const K: [u32; 64] = [
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,

@@ -47,7 +47,7 @@ status_interval_s = 30
 level_dbmv = 40
 defect_d_limit_h = 24         # alarm when the box has run this long since its tables were reset
 
-  [[device.rf_module]]        # exactly four; the box's current plan (notes/device.md §4)
+  [[device.rf_module]]        # exactly four; the box's current plan (docs/notes/device.md §4)
   module = 1
   first_channel = 2
   qam = "256B"

@@ -1,6 +1,6 @@
 [package]
 name = "tb-golden"
-description = "Reader and writer of the golden vectors (golden/*.jsonl): the record format of the encoder's recorder and of the tests that replay it"
+description = "Reader and writer of the golden vectors (crates/tb-golden/vectors/*.jsonl): the record format of the encoder's recorder and of the tests that replay it"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

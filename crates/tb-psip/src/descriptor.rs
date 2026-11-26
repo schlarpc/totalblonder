@@ -54,7 +54,7 @@ pub enum Descriptor {
 }
 
 /// The fields of an AC-3 audio descriptor that vary (A/52 Table A4.1; values for us in
-/// `notes/standards-digest.md` §4.3–4.4).
+/// `docs/notes/standards-digest.md` §4.3–4.4).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Ac3Descriptor {
     /// Index 0..=18 of the exact bit rate (A/52 Table A4.3: 32, 40, 48, 56, 64, 80, 96, 112,

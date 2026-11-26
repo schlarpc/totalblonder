@@ -1,6 +1,6 @@
 //! The kernels of the device image and their argument records.
 //!
-//! One record per kernel, with the fields of the C signature in order (`kernels/kernels.h`; the
+//! One record per kernel, with the fields of the C signature in order (`crates/tb-kernel-abi/kernels/kernels.h`; the
 //! comment above each kernel there says what it does and how its threads map to work). Pointers are
 //! [`DevBuf`] handles; an adapter turns them into addresses when it launches. The host build of the
 //! kernels reports the size of every parameter, and the tests of `tb-device-ref` compare them with
@@ -693,7 +693,7 @@ kernels! {
         slice_off: ptr, out: ptr, outpos: ptr,
     }
     /// `k_conv_h`: horizontal pass of the resampler, source rows of the lattice into the
-    /// intermediate planes (`kernels/pipe_kernels.h`). `jobs` holds `nj`
+    /// intermediate planes (`crates/tb-kernel-abi/kernels/pipe_kernels.h`). `jobs` holds `nj`
     /// `ConvJob` records ([`Op::UploadRefs`](crate::plan::Op::UploadRefs)).
     ConvH = "k_conv_h" { c: class, jobs: ptr, nj: int, tmp: ptr }
     /// `k_conv_v`: vertical pass, intermediate planes into the destination rectangle.

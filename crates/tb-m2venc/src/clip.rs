@@ -1,4 +1,4 @@
-//! The deterministic test clips of the golden vectors: a port of `golden/make_clip.py`
+//! The deterministic test clips of the golden vectors: a port of `crates/tb-golden/vectors/make_clip.py`
 //! (`tb-m2venc --make-clip`). The flake check `gate/make-clip` compares the two outputs.
 
 /// What kind of clip.

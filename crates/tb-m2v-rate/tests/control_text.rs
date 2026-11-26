@@ -1,4 +1,4 @@
-//! Paths of the rate control that the golden vectors do not reach (golden/README.md), tested
+//! Paths of the rate control that the golden vectors do not reach (crates/tb-golden/vectors/README.md), tested
 //! from the text of the C++ encoder (`Batch::quantize`, `retry`, `collect`,
 //! `host_repeat`, `Encoder::open`): the all-skipped rung 37, an I picture replaced by a P
 //! picture, the first picture of a stream held on rung 36, rungs past 37, `over_cap`, larger

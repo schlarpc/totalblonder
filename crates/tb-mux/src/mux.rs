@@ -11,7 +11,7 @@
 //!    2 Mbit/s) and the AC-3 main buffer (2,592 bytes; A/53-5 §5.7) admit it; earliest PTS
 //!    first;
 //! 4. **video**: an access unit may start at `DTS − D` (never earlier: that is the encoder's
-//!    buffer contract, `tb_m2v_rate::vbv` and `notes/film-mode-log.md`), delivered through a
+//!    buffer contract, `tb_m2v_rate::vbv`), delivered through a
 //!    token bucket at the program's delivery rate and admitted by its transport buffer;
 //!    earliest DTS first;
 //! 5. **null**.

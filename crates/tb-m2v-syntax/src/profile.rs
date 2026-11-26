@@ -795,7 +795,7 @@ mod tests {
         }
     }
 
-    /// The levels of `notes/format-conformance.md` §2.1, computed from Tables 8-8, 8-11, 8-12.
+    /// The levels of `docs/notes/format-conformance.md` §2.1, computed from Tables 8-8, 8-11, 8-12.
     #[test]
     fn lowest_levels() {
         use Level::{High, High1440, Main};

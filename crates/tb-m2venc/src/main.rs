@@ -57,7 +57,7 @@ fn plumb(dev: &mut impl Device, what: &str) -> ExitCode {
     }
 }
 
-/// `--golden-tables FILE`: the `tables` record of golden/README.md, as the encoder uploads it.
+/// `--golden-tables FILE`: the `tables` record of crates/tb-golden/vectors/README.md, as the encoder uploads it.
 fn golden_tables(path: &str) -> anyhow::Result<()> {
     let t = tb_m2v_syntax::tables::tables();
     let bytes = bytemuck::bytes_of(&t);

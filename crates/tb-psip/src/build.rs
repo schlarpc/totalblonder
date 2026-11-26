@@ -21,7 +21,7 @@ type SectionsFn = Box<dyn Fn(Version) -> Result<Vec<Section>, Error>>;
 pub struct GuideConfig {
     /// EIT windows sent, 1..=128 (the default 8 covers 24 hours). At least EIT-0 is always
     /// sent: an MGT listing the CVCT alone is an open question of the standard
-    /// (`notes/standards-digest.md` "Open questions" 2).
+    /// (`docs/notes/standards-digest.md` "Open questions" 2).
     pub windows: u8,
     /// Each ETT instance on a PID gets its own `ETT_table_id_extension` (1, 2, …) as A/65
     /// §6.6 requires; `false` sends 0 everywhere, which some receivers need (footnote 13).

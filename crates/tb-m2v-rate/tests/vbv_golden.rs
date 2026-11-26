@@ -86,7 +86,7 @@ fn shed() {
     assert_eq!(replay("shed").unwrap(), 120);
 }
 
-/// The cases recorded by the Rust encoder (golden/generate.sh): all-skipped pictures and I
+/// The cases recorded by the Rust encoder (crates/tb-golden/vectors/generate.sh): all-skipped pictures and I
 /// pictures replaced, a real deadline, sessions at run time, device-written frames, two formats.
 #[test]
 fn cases_of_the_rust_recorder() {

@@ -1,5 +1,0 @@
-{"w":1920,"h":1080,"interlaced":1,"fps":29.9700,"sessions":40,"frames":750,"groups":5,"ticks":1440,"paced":1,"overlap":1,
- "wall_s":25.0751,"rt":0.9980,"mb_per_s":9762659,"period_ms":16.6833,"tick_mean_ms":8.1314,"tick_p50_ms":8.2493,"tick_p99_ms":10.4692,"tick_p999_ms":11.1166,"tick_max_ms":11.2793,
- "late_proc":0,"late_deadline":0,"ontime_frac":1.000000,"cpu_cores":0.10561,"mbps_per_session":15.0601,"dev_mb":2453.2,"load_before":2.11,"load_after":1.62,
- "repeats":0,"shed":0,"keys_missed":0,"dev_input":0,"pool_opens":0,"pool_closes":0,"op_ticks":0,"op_ticks_late":0,"up_mb_s":3721.30,"down_mb_s":75.150,
- "underflows":0,"retries_per_picture":0.0012,"ladder_pictures":0,"skipped_pictures":0,"i_replaced":0,"room_min_frac":0.4174,"pictures":30000,"stages_ms":{}}

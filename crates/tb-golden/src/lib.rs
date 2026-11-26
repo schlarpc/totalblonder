@@ -1,11 +1,11 @@
 //! Reader (and writer, [`write`]) of the golden vectors.
 //!
-//! `golden/*.jsonl` at the repository root holds what the encoder decided and what crossed its
+//! `crates/tb-golden/vectors/*.jsonl` at the repository root holds what the encoder decided and what crossed its
 //! host/device boundary, one JSON object per line, as `tb-m2venc --golden` records it on the
-//! reference adapter (`golden/generate.sh`; the first five cases and the tables were recorded by
+//! reference adapter (`crates/tb-golden/vectors/generate.sh`; the first five cases and the tables were recorded by
 //! the C++ encoder of the CUDA spike first, docs/ARCHITECTURE.md "History", and the Rust recorder
-//! writes the same records, `golden/README.md`).
-//! `golden/README.md` describes every record. This crate embeds the files, so tests need no
+//! writes the same records, `crates/tb-golden/vectors/README.md`).
+//! `crates/tb-golden/vectors/README.md` describes every record. This crate embeds the files, so tests need no
 //! file access (they run in the Nix sandbox), and gives typed access to the fields.
 //!
 //! A test of a ported function typically walks the records of one kind, feeds the recorded
@@ -28,46 +28,40 @@ pub mod write;
 
 /// The embedded cases: name and text.
 const CASES: &[(&str, &str)] = &[
-    ("tables", include_str!("../../../golden/tables.jsonl")),
-    ("cbr", include_str!("../../../golden/cbr.jsonl")),
-    ("ladder", include_str!("../../../golden/ladder.jsonl")),
-    ("fixedq", include_str!("../../../golden/fixedq.jsonl")),
-    (
-        "interlaced",
-        include_str!("../../../golden/interlaced.jsonl"),
-    ),
-    ("shed", include_str!("../../../golden/shed.jsonl")),
-    ("skip", include_str!("../../../golden/skip.jsonl")),
-    ("deadline", include_str!("../../../golden/deadline.jsonl")),
-    ("churn", include_str!("../../../golden/churn.jsonl")),
-    ("devin", include_str!("../../../golden/devin.jsonl")),
-    ("twofmt", include_str!("../../../golden/twofmt.jsonl")),
-    ("film", include_str!("../../../golden/film.jsonl")),
-    ("film60", include_str!("../../../golden/film60.jsonl")),
-    ("taps", include_str!("../../../golden/taps.jsonl")),
+    ("tables", include_str!("../vectors/tables.jsonl")),
+    ("cbr", include_str!("../vectors/cbr.jsonl")),
+    ("ladder", include_str!("../vectors/ladder.jsonl")),
+    ("fixedq", include_str!("../vectors/fixedq.jsonl")),
+    ("interlaced", include_str!("../vectors/interlaced.jsonl")),
+    ("shed", include_str!("../vectors/shed.jsonl")),
+    ("skip", include_str!("../vectors/skip.jsonl")),
+    ("deadline", include_str!("../vectors/deadline.jsonl")),
+    ("churn", include_str!("../vectors/churn.jsonl")),
+    ("devin", include_str!("../vectors/devin.jsonl")),
+    ("twofmt", include_str!("../vectors/twofmt.jsonl")),
+    ("film", include_str!("../vectors/film.jsonl")),
+    ("film60", include_str!("../vectors/film60.jsonl")),
+    ("taps", include_str!("../vectors/taps.jsonl")),
 ];
 
-/// `golden/<case>.sha256` of the cases whose streams the tests compare.
+/// `crates/tb-golden/vectors/<case>.sha256` of the cases whose streams the tests compare.
 const DIGESTS: &[(&str, &str)] = &[
-    ("cbr", include_str!("../../../golden/cbr.sha256")),
-    ("ladder", include_str!("../../../golden/ladder.sha256")),
-    ("fixedq", include_str!("../../../golden/fixedq.sha256")),
-    (
-        "interlaced",
-        include_str!("../../../golden/interlaced.sha256"),
-    ),
-    ("shed", include_str!("../../../golden/shed.sha256")),
-    ("skip", include_str!("../../../golden/skip.sha256")),
-    ("deadline", include_str!("../../../golden/deadline.sha256")),
-    ("churn", include_str!("../../../golden/churn.sha256")),
-    ("devin", include_str!("../../../golden/devin.sha256")),
-    ("twofmt", include_str!("../../../golden/twofmt.sha256")),
-    ("film", include_str!("../../../golden/film.sha256")),
-    ("film60", include_str!("../../../golden/film60.sha256")),
+    ("cbr", include_str!("../vectors/cbr.sha256")),
+    ("ladder", include_str!("../vectors/ladder.sha256")),
+    ("fixedq", include_str!("../vectors/fixedq.sha256")),
+    ("interlaced", include_str!("../vectors/interlaced.sha256")),
+    ("shed", include_str!("../vectors/shed.sha256")),
+    ("skip", include_str!("../vectors/skip.sha256")),
+    ("deadline", include_str!("../vectors/deadline.sha256")),
+    ("churn", include_str!("../vectors/churn.sha256")),
+    ("devin", include_str!("../vectors/devin.sha256")),
+    ("twofmt", include_str!("../vectors/twofmt.sha256")),
+    ("film", include_str!("../vectors/film.sha256")),
+    ("film60", include_str!("../vectors/film60.sha256")),
 ];
 
 /// The SHA-256 digests (lowercase hex) of a case's coded streams, in the order of
-/// `golden/<case>.sha256` (by file name: the sessions in order). Empty for an unknown case.
+/// `crates/tb-golden/vectors/<case>.sha256` (by file name: the sessions in order). Empty for an unknown case.
 pub fn digests(name: &str) -> Vec<&'static str> {
     DIGESTS
         .iter()

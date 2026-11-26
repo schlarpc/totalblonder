@@ -14,7 +14,7 @@
 //!
 //! The set-up of a batch (clearing its block, uploading the tables) is in the records as the
 //! first two operations of the first plan that waits on the kernel stream (`ablk_d`, `d_T`,
-//! `e->T`); the table bytes come from `golden/tables.jsonl`.
+//! `e->T`); the table bytes come from `crates/tb-golden/vectors/tables.jsonl`.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -551,7 +551,7 @@ fn skip_equals_the_records() {
     );
 }
 
-/// The fence of the overlapped upload (notes/cuda-mpeg2-optlog.md §41) in every `Begin` plan
+/// The fence of the overlapped upload in every `Begin` plan
 /// of the overlapped case: the event is recorded on the kernel stream after every parameter
 /// upload and before the first kernel; the upload stream's first step waits for it, after the
 /// record in queue order; everything else on the upload stream follows that wait.

@@ -8,8 +8,8 @@ owner.
 ## 0. Where things stand (2026-11-26, 03:30)
 
 - The control port 10.42.0.184 answers from bagel and nixark; the supervisor has run against it
-  in report mode (every page parsed, nothing written; `notes/eqam-client-log.md`).
-- GIGE1 (10.42.0.183, MAC 00:14:39:00:35:C6 per `notes/device.md` §1) does not answer ARP
+  in report mode (every page parsed, nothing written).
+- GIGE1 (10.42.0.183, MAC 00:14:39:00:35:C6 per `docs/notes/device.md` §1) does not answer ARP
   from either host: `ip neigh` shows it INCOMPLETE. Either the port is not cabled to this LAN,
   or the FPGA's data port does not answer ARP at all (the Linux side of eth2 saw 0 packets in
   the survey). Ping is therefore not a test of the data path; the box's own status page is.

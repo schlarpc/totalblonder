@@ -671,7 +671,7 @@ pub fn run<D: TickDevice>(o: &Opts, dev: D, console: &mut dyn Write) -> Result<O
     dev.set_timing(o.profile);
     let device = dev.describe();
     let mut eng = Engine::new(dev, encoder_options(o), o.device_timeout);
-    // `--golden`: the encoder's records of golden/README.md, written as they come
+    // `--golden`: the encoder's records of crates/tb-golden/vectors/README.md, written as they come
     eng.enc_mut().record_golden(o.golden.is_some());
 
     let base_fps = o.groups.iter().map(Group::fps).fold(0.0, f64::max);

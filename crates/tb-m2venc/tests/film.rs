@@ -1,7 +1,7 @@
 //! Film mode end to end on the reference device: the driver's `--film` (frames shown for two
 //! and three fields, or one, two and three frame periods), the real kernels, and every stream
 //! through the conformance verifier, which was shown right on other encoders' soft-telecined
-//! streams first (`notes/m2v-conformance-findings.md` §6). No finding of any severity under
+//! streams first (`docs/notes/m2v-conformance-findings.md` §6). No finding of any severity under
 //! H.262 with the operating buffer model, and under the broadcast profile nothing but what
 //! the small test picture itself brings.
 

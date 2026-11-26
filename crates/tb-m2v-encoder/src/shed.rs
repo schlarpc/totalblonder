@@ -1,4 +1,4 @@
-//! The deadline-miss policy (the C++ `Encoder::plan`; notes/cuda-mpeg2-spike.md §C.7).
+//! The deadline-miss policy (the C++ spike's `Encoder::plan`).
 //!
 //! Before a tick's work is queued, the macroblocks that fit into the time left are estimated
 //! from the throughput of the last three ticks that coded something (the best of them). If the

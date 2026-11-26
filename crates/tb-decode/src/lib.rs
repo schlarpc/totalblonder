@@ -7,7 +7,7 @@
 //! frames come out as `AV_PIX_FMT_CUDA`, the luma plane and the interleaved chroma plane as device
 //! addresses ([`Surface::Cuda`]), so they are plain device memory for the conversion kernels and
 //! the driver's decode work is not time-sliced against them as a second context's would be
-//! (`notes/cuda-mpeg2-spike.md` §C.2). Without a device, decoding is libavcodec's software
+//! (measured on the card). Without a device, decoding is libavcodec's software
 //! decoders; with [`DecOptions::host_size`] each frame is also converted with swscale in the decode
 //! thread to planar 8-bit 4:2:0 of that size ([`Surface::Host`]).
 //!

@@ -98,6 +98,10 @@ in
         $CC -std=c11 -Wall -Werror -fsyntax-only $src
         touch $out
       '';
-  # The golden vectors live outside the crate that embeds them.
-  packages.tb-golden.extraSources = [ "../../golden" ];
+  # The CUDA kernels live in this crate's directory but are built by nix/kernels.nix, not by
+  # Cargo: keep them out of the crate's source view so a kernel edit does not rebuild every
+  # crate that depends on the ABI.
+  packages.tb-kernel-abi.sources.noKernels =
+    { default, root, packageDir, ... }:
+    pkgs.lib.fileset.difference default (root + "/${packageDir}/kernels");
 }

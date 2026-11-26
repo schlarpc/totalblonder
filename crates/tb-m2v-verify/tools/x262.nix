@@ -2,7 +2,7 @@
 #   nix build --impure -f crates/tb-m2v-verify/tools/x262.nix --no-link --print-out-paths
 # Not part of the flake: it fetches the branch head from GitHub (impure), and builds it without
 # assembly with the flags an old C code base needs on a current compiler. Obtained and run on
-# 2026-11-26 (commit bb887aa of branch x262-legacy); notes/m2v-conformance-findings.md, section 6.
+# 2026-11-26 (commit bb887aa of branch x262-legacy); docs/notes/m2v-conformance-findings.md, section 6.
 let
   flake = builtins.getFlake (toString ../../..);
   pkgs = import flake.inputs.nixpkgs { system = "x86_64-linux"; };

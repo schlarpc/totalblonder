@@ -1,5 +1,5 @@
 //! Links the host build of the kernels (`libtbkernels_ref.a`), which Nix builds from the sources in
-//! `kernels/` (nix/kernels.nix: `refLib`) and names in `TB_KERNELS_REF`. The flake sets the
+//! `crates/tb-kernel-abi/kernels/` (nix/kernels.nix: `refLib`) and names in `TB_KERNELS_REF`. The flake sets the
 //! variable for this package's build and in the dev shell.
 //!
 //! With the feature `asan`, links the same kernels built with AddressSanitizer instead

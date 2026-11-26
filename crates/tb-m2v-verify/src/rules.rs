@@ -1,5 +1,5 @@
 //! The rule catalog: every normative constraint the verifier knows, with its clause, page,
-//! scope and severity. `notes/m2v-conformance-rules.md` is generated from this table
+//! scope and severity. `docs/notes/m2v-conformance-rules.md` is generated from this table
 //! (`tb-m2v-verify --rules-md`).
 //!
 //! Page numbers are the printed ones of ITU-T H.262 (02/2000), ATSC A/53 Part 4:2009,
@@ -429,7 +429,7 @@ rules! {
         "The data of one picture never exceed the VBV buffer size (it could not be all present, C.6, within B, C.5).";
     VbvLowDelayBig, "VBV-LOW-DELAY-BIG", BufferModel, S2, No("big pictures are modeled (their temporal_reference gap lengthens the examination interval), but the rule that the last picture is not one cannot be told from underflow"), "H.262 Annex C.7", "140",
         "With low_delay '1', a big picture is removed at a later re-examination; the last coded picture of a sequence shall not be a big picture.";
-    VbvOperating, "VBV-OPERATING-MODEL", BufferModel, S3, Yes, "notes/cuda-mpeg2-spike.md §5.1 (not a standard)", "-",
+    VbvOperating, "VBV-OPERATING-MODEL", BufferModel, S3, Yes, "this project's delivery contract (not a standard)", "-",
         "Operating model of this project (--delivery operating): picture n enters the multiplexer queue at its coding time e(n); the queue drains at the declared rate; every picture has left it by e(n) + D, with D = vbv_buffer_size / bit_rate.";
 
     // ---------------------------------------------------------------- profile and level
@@ -560,7 +560,7 @@ pub fn rule_by_id(id: &str) -> Option<Rule> {
     ALL_RULES.iter().copied().find(|r| r.info().id == id)
 }
 
-/// The catalog as a Markdown document (the body of `notes/m2v-conformance-rules.md`).
+/// The catalog as a Markdown document (the body of `docs/notes/m2v-conformance-rules.md`).
 pub fn catalog_markdown() -> String {
     use std::fmt::Write as _;
     let mut s = String::new();

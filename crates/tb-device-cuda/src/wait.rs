@@ -1,5 +1,5 @@
-//! How the host waits for a plan: the hybrid wait of the C++ (`Encoder::wait`;
-//! notes/cuda-mpeg2-optlog.md, experiment 19).
+//! How the host waits for a plan: a hybrid wait (from the C++
+//! spike's `Encoder::wait`).
 //!
 //! A blocking wait wakes the host about 0.1 ms after the device has finished, four times per
 //! tick; spinning costs a whole core. The hybrid wait sleeps for 85 % of the time the same kind

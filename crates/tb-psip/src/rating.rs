@@ -1,5 +1,5 @@
 //! US content advisories (rating region 0x01), as CTA-766-D §4.1 Table 3 (p.7–8) allows them
-//! (`notes/standards-digest.md` §3.4).
+//! (`docs/notes/standards-digest.md` §3.4).
 //!
 //! [`UsRating`] can only hold one of the permitted messages: TV-Y7 may carry FV, TV-PG and
 //! TV-14 any subset of D, L, S, V, TV-MA any subset of L, S, V (no D), and an MPAA rating is

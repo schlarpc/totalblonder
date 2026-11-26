@@ -9,7 +9,7 @@ use tb_device_ref::RefDevice;
 use tb_pipe::opts::{DeviceKind, OptError, Opts, USAGE};
 
 fn real_main() -> anyhow::Result<ExitCode> {
-    // `tb-pipe --golden-taps FILE`: golden/taps.jsonl, the conversion path's tap tables and
+    // `tb-pipe --golden-taps FILE`: crates/tb-golden/vectors/taps.jsonl, the conversion path's tap tables and
     // color matrices (tb_convert::golden)
     let args: Vec<String> = std::env::args().skip(1).collect();
     if let [flag, path] = args.as_slice()

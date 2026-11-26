@@ -1,9 +1,0 @@
-  input h264_1080p30.mkv           frames   57576  after its nominal time: median    3.1 ms, p99  223.3 ms, max  295.7 ms; late for the frame clock (> 300 ms) 0.00%
-channels 24, inputs 24 (decoders in the encoder's context), paced, 4975 ticks of 16.683 ms
-ticks on time 100.00% (0 late of 4825); tick ms: mean 6.231 p50 5.812 p99 10.684 p99.9 13.525 max 15.464
-output frames 57900: from new input frames 57900 (progressive in an interlaced frame 57900, two instants woven 0), repeated 0, slate 0; input frames dropped by the frame clock 0
-pictures coded 59700, repeats made on the host 3 (deadline policy 3); buffer violations 0; 5869828 macroblocks/s
-inputs: decoded 59736 frames (719.8 fps), all on the device; late for the frame clock 0 of 57576 (0.00%), worst 296 ms after its time; dropped in a full queue 0; decode errors 0
-host cpu 0.260 cores total = 0.0108 per channel: tick thread 0.079, decode threads 0.173 (0.0072 per input), other 0.008
-conversion: 1 classes (made in 0.0 ms), 1.0 kernel launches per tick, 0.041 ms of host time per tick; device memory: encoder 1472 MB, converter 0.0 MB, decoders and frames 3152 MB, context total 4624 MB
-bus: frames uploaded from host memory 0.0 MB/s, coded pictures downloaded 44.84 MB/s

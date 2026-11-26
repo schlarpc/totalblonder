@@ -75,8 +75,7 @@ fn batch_records_match() {
             let cap: u32 = b.int("capacity").unwrap().try_into().unwrap();
             let keep_recon = b.flag("keep_recon").unwrap();
             // The Rust recorder's batches are laid out in the arena (the C++ encoder's cases ran
-            // without it and recorded the sum of unrounded allocations; the hand-over of X1,
-            // docs/port/X1-notes.md, lists the difference)
+            // without it and recorded the sum of unrounded allocations)
             assert!(b.flag("arena").unwrap(), "{name}: a batch in the arena");
 
             let want_geo: Vec<Geo> = b.pods("geo").unwrap();

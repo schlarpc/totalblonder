@@ -10,9 +10,9 @@
 //!
 //! Ported from the conversion path of the C++ CUDA spike (docs/ARCHITECTURE.md, "History"):
 //! the host half (`pp_kernel`, `make_taps`, `ConvKey`, `ConvClassHost`, `Converter`,
-//! `make_csc`) and `make_fit` of the pipeline harness. The kernels (`kernels/pipe_kernels.h`)
+//! `make_csc`) and `make_fit` of the pipeline harness. The kernels (`crates/tb-kernel-abi/kernels/pipe_kernels.h`)
 //! are part of the device image and the host reference library (K2); [`Lowerer`] turns
-//! [`ConvOp`]s into plan steps with the kernel records of `tb_device`. Work package: docs/port/C1-convert.md.
+//! [`ConvOp`]s into plan steps with the kernel records of `tb_device`.
 #![forbid(unsafe_code)]
 
 mod csc;
