@@ -1,0 +1,20 @@
+[package]
+name = "tb-captions"
+description = "Captions made from timed text: SubRip and WebVTT parsing, CEA-608 and CEA-708 encoding, scheduling into the cc_data() of each picture, pass-through of a source's captions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-media.workspace = true
+tb-m2v-syntax.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+# the carrier of a source's captions, to check that our output has its form
+tb-timeline.workspace = true
+
+[lints]
+workspace = true

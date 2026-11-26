@@ -1,0 +1,19 @@
+[package]
+name = "tb-engine"
+description = "The device-owning loop: an adapter, the encoder and the plan between them (Engine), what the loop needs of an adapter (TickDevice), the host-arena rule around any adapter (Guarded); shared by tb-m2venc and tb-pipe"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-device.workspace = true
+tb-device-ref.workspace = true
+tb-device-cuda.workspace = true
+tb-m2v-encoder.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,26 @@
+# 2026-11-25T09:29:37Z load 6.84 2.82 1.59
+== range R2=2 (full-pel +-11)
+RESULT n=16 fps_per_session=63.153 rt=2.107 late=0 p99_ms=20.290 cpu_per_session=0.0015 mbps=15.048
+PSNR y:26.718080 u:32.313696 v:32.725090 average:27.941982 min:26.765198 max:31.891664
+VBV RESULT: PASS
+PSNR y:38.427341 u:42.338614 v:43.111444 average:39.445200 min:36.135040 max:43.892455
+VBV RESULT: PASS
+== range R2=4 (full-pel +-19)
+RESULT n=16 fps_per_session=61.695 rt=2.059 late=0 p99_ms=22.589 cpu_per_session=0.0012 mbps=14.997
+PSNR y:26.864659 u:32.365184 v:32.755092 average:28.076177 min:26.898373 max:31.891664
+VBV RESULT: PASS
+PSNR y:38.399839 u:42.303695 v:43.072698 average:39.416256 min:36.209965 max:43.892455
+VBV RESULT: PASS
+== range R2=8 (full-pel +-35)
+RESULT n=16 fps_per_session=57.252 rt=1.910 late=0 p99_ms=24.574 cpu_per_session=0.0011 mbps=14.995
+PSNR y:26.823877 u:32.248399 v:32.612876 average:28.024824 min:26.898235 max:31.891664
+VBV RESULT: PASS
+PSNR y:38.421161 u:42.192107 v:42.922385 average:39.413503 min:36.686919 max:43.892455
+VBV RESULT: PASS
+== range R2=16 (full-pel +-67)
+RESULT n=16 fps_per_session=45.882 rt=1.531 late=0 p99_ms=29.916 cpu_per_session=0.0009 mbps=14.999
+PSNR y:26.687021 u:32.072268 v:32.412737 average:27.881792 min:26.574740 max:31.891664
+VBV RESULT: PASS
+PSNR y:38.480669 u:42.074010 v:42.768928 average:39.440978 min:37.239097 max:43.892455
+VBV RESULT: PASS
+# 2026-11-25T09:30:38Z load 3.48 2.57 1.58

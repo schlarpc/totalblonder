@@ -1,0 +1,373 @@
+{
+ "1080i-crowd_run": {
+  "mbps": 15.2278,
+  "psnr_u": 32.4119,
+  "psnr_v": 32.809,
+  "psnr_y": 26.9447,
+  "ssim": 0.7808
+ },
+ "1080i-crowd_run-half": {
+  "mbps": 7.6225,
+  "psnr_u": 31.0899,
+  "psnr_v": 31.2502,
+  "psnr_y": 24.4734,
+  "ssim": 0.6936
+ },
+ "1080i-crowd_run-quarter": {
+  "mbps": 3.9567,
+  "psnr_u": 29.3654,
+  "psnr_v": 29.27,
+  "psnr_y": 20.0799,
+  "ssim": 0.5424
+ },
+ "1080i-crowd_run-ratewalk": {
+  "mbps": 7.3834,
+  "psnr_u": 30.5985,
+  "psnr_v": 30.8711,
+  "psnr_y": 23.1651,
+  "ssim": 0.6592
+ },
+ "1080i-crowd_run-stagger4": {
+  "mbps": 15.2278,
+  "psnr_u": 32.4119,
+  "psnr_v": 32.809,
+  "psnr_y": 26.9447,
+  "ssim": 0.7808
+ },
+ "1080i-cuts": {
+  "mbps": 15.2288,
+  "psnr_u": 34.4744,
+  "psnr_v": 36.222,
+  "psnr_y": 29.4486,
+  "ssim": 0.87
+ },
+ "1080i-cuts-quarter": {
+  "mbps": 3.9587,
+  "psnr_u": 27.9978,
+  "psnr_v": 30.0717,
+  "psnr_y": 18.1517,
+  "ssim": 0.6426
+ },
+ "1080i-cuts-ratestep": {
+  "mbps": 11.7489,
+  "psnr_u": 33.3167,
+  "psnr_v": 35.0858,
+  "psnr_y": 27.3833,
+  "ssim": 0.8292
+ },
+ "1080i-fade": {
+  "mbps": 15.2312,
+  "psnr_u": 32.2393,
+  "psnr_v": 35.0097,
+  "psnr_y": 26.8367,
+  "ssim": 0.7979
+ },
+ "1080i-fourpeople": {
+  "mbps": 15.235,
+  "psnr_u": 46.8897,
+  "psnr_v": 48.0891,
+  "psnr_y": 42.9186,
+  "ssim": 0.9782
+ },
+ "1080i-grain": {
+  "mbps": 15.2253,
+  "psnr_u": 34.673,
+  "psnr_v": 34.8299,
+  "psnr_y": 33.6476,
+  "ssim": 0.7976
+ },
+ "1080i-noise": {
+  "mbps": 15.3763,
+  "psnr_u": 11.789,
+  "psnr_v": 11.7928,
+  "psnr_y": 12.2141,
+  "ssim": 0.3215
+ },
+ "1080i-noise-quarter": {
+  "mbps": 3.9917,
+  "psnr_u": 12.1747,
+  "psnr_v": 12.1708,
+  "psnr_y": 12.0026,
+  "ssim": 0.1997
+ },
+ "1080i-park_joy": {
+  "mbps": 15.2375,
+  "psnr_u": 29.4359,
+  "psnr_v": 34.0375,
+  "psnr_y": 24.4257,
+  "ssim": 0.712
+ },
+ "1080i-park_joy-quarter": {
+  "mbps": 3.9586,
+  "psnr_u": 26.9501,
+  "psnr_v": 32.7183,
+  "psnr_y": 18.1519,
+  "ssim": 0.4619
+ },
+ "1080i-pedestrian_area": {
+  "mbps": 15.2268,
+  "psnr_u": 41.7874,
+  "psnr_v": 42.515,
+  "psnr_y": 38.0206,
+  "ssim": 0.9444
+ },
+ "1080i-pedestrian_area-cc": {
+  "mbps": 15.227,
+  "psnr_u": 41.7851,
+  "psnr_v": 42.5065,
+  "psnr_y": 38.0164,
+  "ssim": 0.9444
+ },
+ "1080i-still": {
+  "mbps": 12.4097,
+  "psnr_u": 36.9504,
+  "psnr_v": 37.3348,
+  "psnr_y": 32.4259,
+  "ssim": 0.9265
+ },
+ "1080p-crowd_run": {
+  "mbps": 15.2223,
+  "psnr_u": 33.1769,
+  "psnr_v": 33.6748,
+  "psnr_y": 28.6691,
+  "ssim": 0.8222
+ },
+ "1080p-cuts": {
+  "mbps": 15.2274,
+  "psnr_u": 35.6748,
+  "psnr_v": 37.2617,
+  "psnr_y": 31.3404,
+  "ssim": 0.8983
+ },
+ "1080p-noise-quarter": {
+  "mbps": 4.0148,
+  "psnr_u": 12.1724,
+  "psnr_v": 12.1688,
+  "psnr_y": 12.0189,
+  "ssim": 0.2076
+ },
+ "1080p-pedestrian_area": {
+  "mbps": 15.2296,
+  "psnr_u": 43.7591,
+  "psnr_v": 45.0319,
+  "psnr_y": 40.1249,
+  "ssim": 0.9565
+ },
+ "480i-crowd_run": {
+  "mbps": 4.0525,
+  "psnr_u": 32.4963,
+  "psnr_v": 32.6793,
+  "psnr_y": 26.4078,
+  "ssim": 0.8151
+ },
+ "480i-crowd_run-forcekey": {
+  "mbps": 4.086,
+  "psnr_u": 32.506,
+  "psnr_v": 32.6886,
+  "psnr_y": 26.3464,
+  "ssim": 0.8128
+ },
+ "480i-crowd_run-half": {
+  "mbps": 2.03,
+  "psnr_u": 31.3958,
+  "psnr_v": 31.5204,
+  "psnr_y": 24.1473,
+  "ssim": 0.7336
+ },
+ "480i-crowd_run-quarter": {
+  "mbps": 1.0411,
+  "psnr_u": 30.3809,
+  "psnr_v": 30.4785,
+  "psnr_y": 22.2518,
+  "ssim": 0.6335
+ },
+ "480i-cuts": {
+  "mbps": 4.053,
+  "psnr_u": 35.0944,
+  "psnr_v": 36.4519,
+  "psnr_y": 29.5192,
+  "ssim": 0.8945
+ },
+ "480i-cuts-quarter": {
+  "mbps": 1.0542,
+  "psnr_u": 31.0418,
+  "psnr_v": 32.272,
+  "psnr_y": 23.4369,
+  "ssim": 0.7088
+ },
+ "480i-cuts-stagger7-overlap": {
+  "mbps": 4.053,
+  "psnr_u": 35.0944,
+  "psnr_v": 36.4519,
+  "psnr_y": 29.5192,
+  "ssim": 0.8945
+ },
+ "480i-football": {
+  "mbps": 4.0586,
+  "psnr_u": 38.783,
+  "psnr_v": 39.1836,
+  "psnr_y": 35.0212,
+  "ssim": 0.9347
+ },
+ "480i-football-ratewalk": {
+  "mbps": 1.9041,
+  "psnr_u": 34.2098,
+  "psnr_v": 35.6109,
+  "psnr_y": 29.2268,
+  "ssim": 0.8254
+ },
+ "480i-football_bff-bff": {
+  "mbps": 4.0583,
+  "psnr_u": 38.7965,
+  "psnr_v": 39.1974,
+  "psnr_y": 35.0366,
+  "ssim": 0.9348
+ },
+ "480i-mobcal": {
+  "mbps": 4.0554,
+  "psnr_u": 35.0205,
+  "psnr_v": 35.8243,
+  "psnr_y": 27.1731,
+  "ssim": 0.8971
+ },
+ "480i-noise": {
+  "mbps": 4.0895,
+  "psnr_u": 12.2774,
+  "psnr_v": 12.2791,
+  "psnr_y": 12.6599,
+  "ssim": 0.392
+ },
+ "480i-noise-quarter": {
+  "mbps": 1.0859,
+  "psnr_u": 12.0525,
+  "psnr_v": 12.0538,
+  "psnr_y": 12.0461,
+  "ssim": 0.2297
+ },
+ "480i-park_joy": {
+  "mbps": 4.0559,
+  "psnr_u": 31.0362,
+  "psnr_v": 36.1307,
+  "psnr_y": 25.3573,
+  "ssim": 0.783
+ },
+ "480i-still": {
+  "mbps": 3.2941,
+  "psnr_u": 37.6631,
+  "psnr_v": 37.7387,
+  "psnr_y": 32.2824,
+  "ssim": 0.9469
+ },
+ "480i-testsrc2": {
+  "mbps": 4.055,
+  "psnr_u": 44.2607,
+  "psnr_v": 44.949,
+  "psnr_y": 45.6209,
+  "ssim": 0.995
+ },
+ "720p-crowd_run": {
+  "mbps": 12.1791,
+  "psnr_u": 33.2629,
+  "psnr_v": 33.6404,
+  "psnr_y": 27.7857,
+  "ssim": 0.8282
+ },
+ "720p-crowd_run-forcekey": {
+  "mbps": 12.2393,
+  "psnr_u": 33.2395,
+  "psnr_v": 33.6095,
+  "psnr_y": 27.7077,
+  "ssim": 0.8264
+ },
+ "720p-crowd_run-half": {
+  "mbps": 6.0922,
+  "psnr_u": 31.872,
+  "psnr_v": 32.1425,
+  "psnr_y": 25.2606,
+  "ssim": 0.7454
+ },
+ "720p-crowd_run-quarter": {
+  "mbps": 3.1923,
+  "psnr_u": 30.2901,
+  "psnr_v": 30.346,
+  "psnr_y": 21.4773,
+  "ssim": 0.6003
+ },
+ "720p-crowd_run-ratenow": {
+  "mbps": 9.7038,
+  "psnr_u": 32.2798,
+  "psnr_v": 32.6093,
+  "psnr_y": 26.0386,
+  "ssim": 0.7761
+ },
+ "720p-cuts": {
+  "mbps": 12.1795,
+  "psnr_u": 35.9023,
+  "psnr_v": 37.4775,
+  "psnr_y": 30.9379,
+  "ssim": 0.9041
+ },
+ "720p-cuts-quarter": {
+  "mbps": 3.1958,
+  "psnr_u": 29.8855,
+  "psnr_v": 31.6971,
+  "psnr_y": 22.4193,
+  "ssim": 0.7111
+ },
+ "720p-cuts-ratewalk": {
+  "mbps": 5.6672,
+  "psnr_u": 32.9546,
+  "psnr_v": 34.191,
+  "psnr_y": 27.0357,
+  "ssim": 0.8045
+ },
+ "720p-fade": {
+  "mbps": 12.1819,
+  "psnr_u": 33.4939,
+  "psnr_v": 36.1508,
+  "psnr_y": 28.2722,
+  "ssim": 0.8508
+ },
+ "720p-fourpeople": {
+  "mbps": 12.1747,
+  "psnr_u": 45.7766,
+  "psnr_v": 46.986,
+  "psnr_y": 41.6937,
+  "ssim": 0.9763
+ },
+ "720p-fourpeople-cc": {
+  "mbps": 12.1883,
+  "psnr_u": 45.7916,
+  "psnr_v": 47.002,
+  "psnr_y": 41.707,
+  "ssim": 0.9763
+ },
+ "720p-noise": {
+  "mbps": 12.2965,
+  "psnr_u": 11.9241,
+  "psnr_v": 11.9254,
+  "psnr_y": 12.2922,
+  "ssim": 0.3239
+ },
+ "720p-noise-quarter": {
+  "mbps": 3.3158,
+  "psnr_u": 11.9911,
+  "psnr_v": 11.9871,
+  "psnr_y": 11.9664,
+  "ssim": 0.215
+ },
+ "720p-park_joy": {
+  "mbps": 12.1814,
+  "psnr_u": 31.0065,
+  "psnr_v": 35.5652,
+  "psnr_y": 26.1232,
+  "ssim": 0.7907
+ },
+ "720p-still": {
+  "mbps": 9.9119,
+  "psnr_u": 38.5717,
+  "psnr_v": 38.8915,
+  "psnr_y": 33.9087,
+  "ssim": 0.9523
+ }
+}

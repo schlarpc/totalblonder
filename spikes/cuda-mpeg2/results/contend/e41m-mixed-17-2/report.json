@@ -1,0 +1,116 @@
+{
+ "dir": "results/contend/e41m-mixed-17-2",
+ "hdr": "fmt mixed n 17",
+ "period_ms": 16.683333333333334,
+ "other_active_s": 0,
+ "rows": [
+  {
+   "comp": "(alone)",
+   "ticks": 339,
+   "base_ms": 8.537,
+   "med_ms": 8.537,
+   "p95_ms": 9.293,
+   "max_ms": 13.5,
+   "ratio": 1.0,
+   "added_ms": 0.0,
+   "late": 0.0,
+   "slow": 2,
+   "slow_excess_ms": 3.8164999999999996,
+   "slow_ph0_excess_ms": 2.3250000000000006,
+   "ph_ms": [
+    6.175,
+    1.395,
+    0.841
+   ],
+   "base_ph_ms": [
+    6.175,
+    1.395,
+    0.841
+   ],
+   "upwait_ms": 0.004,
+   "result": "",
+   "pwr": 57.333333333333336,
+   "gtemp": 87.0,
+   "sm": 49.666666666666664,
+   "mem": 37.0,
+   "enc": 0.0,
+   "dec": 0.0,
+   "pclk": 2430.0,
+   "pviol": 0.0,
+   "tviol": 0.0,
+   "pclk_min": 2430.0
+  },
+  {
+   "comp": "scale_max+scale_max",
+   "ticks": 346,
+   "base_ms": 8.528,
+   "med_ms": 10.8185,
+   "p95_ms": 11.72,
+   "max_ms": 12.203,
+   "ratio": 1.2685858348968104,
+   "added_ms": 2.2904999999999998,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    7.6055,
+    1.9735,
+    1.1135000000000002
+   ],
+   "base_ph_ms": [
+    6.148,
+    1.397,
+    0.836
+   ],
+   "upwait_ms": 0.004,
+   "result": "2945 frames, 365 fps | 2944 frames, 365 fps",
+   "pwr": 65.6,
+   "gtemp": 89.0,
+   "sm": 69.2,
+   "mem": 48.2,
+   "enc": 32.2,
+   "dec": 100.0,
+   "pclk": 2139.0,
+   "pviol": 0.0,
+   "tviol": 0.0,
+   "pclk_min": 2130.0
+  },
+  {
+   "comp": "scale_max+scale_max+scale_max",
+   "ticks": 360,
+   "base_ms": 8.599499999999999,
+   "med_ms": 10.9005,
+   "p95_ms": 11.861,
+   "max_ms": 13.032,
+   "ratio": 1.2675736961451247,
+   "added_ms": 2.301,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    7.6305,
+    1.9745,
+    1.119
+   ],
+   "base_ph_ms": [
+    6.254,
+    1.3925,
+    0.8465
+   ],
+   "upwait_ms": 0.005,
+   "result": "1954 frames, 242 fps | 1953 frames, 241 fps | 1951 frames, 241 fps",
+   "pwr": 65.25,
+   "gtemp": 90.0,
+   "sm": 67.5,
+   "mem": 47.0,
+   "enc": 31.75,
+   "dec": 100.0,
+   "pclk": 2130.0,
+   "pviol": 0.0,
+   "tviol": 0.0,
+   "pclk_min": 2130.0
+  }
+ ]
+}

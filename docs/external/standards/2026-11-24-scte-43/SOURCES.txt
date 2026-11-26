@@ -1,0 +1,7 @@
+Downloaded 2026-11-24 (untrusted data; checksums in SHA256SUMS).
+The link is only rendered by JavaScript on the catalog page and the server returns 403 to curl;
+the file was fetched through a browser session (no login).
+
+ANSI_SCTE_43_2015_R2021.pdf  https://account.scte.org/documents/4298/ANSI_SCTE_43_2015_R2021.pdf
+                             (catalog page: https://account.scte.org/standards/library/catalog/scte-43-digital-video-system-characteristics-standard-for-cable-television/)
+                             ANSI/SCTE 43 2015 (R2021), reaffirmation of SCTE 43 2015 with no substantive change, 9 pages.

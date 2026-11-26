@@ -1,0 +1,427 @@
+<html>
+  <head>
+    <title>Status - Ball Holdings</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+    <link rel="stylesheet" type="text/css" href="../eqam.css">
+    <script language="JavaScript">
+      <!-- Begin
+      function logout()
+      {
+        var temp;
+        temp = "status.cgi?logout=1&session_id=" + document.configForm.session_id.value;
+        document.location = temp;
+        return 0;
+      }
+      function golink(field)
+      {
+        var temp;
+        temp = field + "?session_id=" + document.configForm.session_id.value;
+        document.location = temp;
+        return 0;
+      }
+
+      function gobox(field1, field2)
+      {
+        var temp;
+        temp = field1 + "?session_id=" + document.configForm.session_id.value + "&boxNumber=" + field2;
+        document.location = temp;
+        return 0;
+      }
+
+      function goslot(field1, field2)
+      {
+        var temp;
+        temp = field1 + "?session_id=" + document.configForm.session_id.value + "&slotNumber=" + field2;
+        document.location = temp;
+        return 0;
+      }
+
+      function getCookie(c_name)
+      {
+        if(document.cookie.length > 0)
+        {
+          c_start = document.cookie.indexOf(c_name + "=");
+          if(c_start != -1)
+          {
+            c_start = c_start + c_name.length + 1;
+            c_end = document.cookie.indexOf(";", c_start);
+            if(c_end == -1) c_end = document.cookie.length;
+            document.configForm.session_id.value = document.cookie.substring(c_start, c_end);
+          }
+        }
+        return "";
+      }
+
+    //  End -->
+    </script>
+  </head>
+  <body onload="getCookie('session_id')">
+    <form name="configForm" action="status.cgi" method="post">
+      <div align="center">
+        <table style="border-collapse: collapse;" width="1000" bgcolor="#FFFFFF" border="0" cellpadding="0">
+          <tbody>
+          <tr>
+            <td>
+            <a href="http://www.blondertongue.com"><img border="0" src="../images/logo.png" alt="Blonder Tongue Laboratories, Inc."></a></td>
+          </tr>
+          <tr>
+            <td bgcolor="#66CEF6" align="center"><font size="6">EQAM-420B-4-64</font></td>
+          </tr>
+          <tr>
+            <td bgcolor="#66CEF6" align="center">
+              <table>
+                <tbody>
+                  <tr>
+                    <td></td>
+                    <td width="25%">ESN: 2013090274</td>
+                    <td></td>
+                    <td width="25%">Temperature: 81.2ºF</td>
+                    <td></td>
+                    <td width="25%">Uptime: 6d 17h 54m 17s</td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td>Headend Name: Ball Holdings</td>
+                    <td></td>
+                    <td>Mode: MPTS</td>
+                    <td></td>
+                    <td>Location: </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="left" style="font-size: medium; background-color: #66CEF6;">
+              <table style="width: 700px; background-color: #000000;" cellpadding="4" cellspacing="1">
+                <tbody>
+                  <tr>
+                    <td style="width: 100px; text-align: center; background-color: #FFFFFF;">
+                    <a href="javascript:golink('status.cgi')">Main</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('network.cgi')">Network</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('time.cgi')">Time</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('errorlog.cgi')">Event Log</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('config.cgi')">Config</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:logout()">Logout</a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+            <tr>
+              <td valign="top" align="center">
+                <br>
+                <table width="800px" cellpadding="0" cellspacing="0">
+                  <tbody>
+                <tr>
+                  <td>
+                    <table style="width: 600px; background-color: #000000;" cellpadding="4" cellspacing="1">
+                      <tbody>
+                        <tr>
+                          <td style="width: 100px; text-align: center; background-color: #FFFFFF;">
+                          <a href="javascript:golink('status.cgi')">Status</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('streaminfo.cgi')">Stream Info</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:goslot('qamconfig.cgi', 1)">QAM Config</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('diagnostic.cgi')">Diagnostics</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('mode.cgi')">Mode</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('eas.cgi')">EAS</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('status.cgi')">Refresh</a></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+                    <tr>
+                      <td style="border: 1px solid #000000; background-color: #FFFFFF; text-align: center;" valign="top" align="center">
+                        <table style="border-style: none; border-width: 0pt;" width="800px" cellpadding="4">
+                          <tbody>
+                            <tr>
+                              <td colspan="7" align="center" bgcolor="#33CC33" width="80%"><font size="5">Stream Input</font></td>
+                              <td colspan="2" align="center" bgcolor="#0066FF"><font size="5" color="white">QAM Output </font><font size="3" color="white">(40dBmV)</font></td>
+                            </tr>
+                            <tr>
+                              <td align="center" bgcolor="#33CC33" width="10%"><font size="4">#</font></td>
+                              <td colspan="1" align="center" bgcolor="#33CC33" width="25%"><font size="4">Stream</font></td>
+                              <td align="center" bgcolor="#33CC33"><font size="4">Source</font></td>
+                              <td align="center" bgcolor="#33CC33"><font size="4">Name</font></td>
+                              <td align="center" bgcolor="#33CC33"><font size="4">IP</font></td>
+                              <td align="center" bgcolor="#33CC33"><font size="4">Bitrate</font></td>
+                              <td align="center" bgcolor="#33CC33"><font size="4">Pro:Idiom</font></td>
+                              <td align="center" bgcolor="#0066FF"><font size="4" color="white">RF Chan.</font></td>
+                              <td align="center" bgcolor="#0066FF"><font size="4" color="white">Status</font></td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">1</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">2 / On</td>
+                              <td rowspan="8" align="center" bgcolor="#C0C0C0">Locked</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">2</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">3 / On</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">3</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">4 / On</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">4</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">5 / On</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">5</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">10 / On</td>
+                              <td rowspan="8" align="center" bgcolor="#C0C0C0">Locked</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">6</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">11 / On</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">7</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">12 / On</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">8</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">13 / On</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                           <tr>
+                            <td colspan="9" bgcolor="#C0C0C0"></td>
+                           </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">9</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">6 / On</td>
+                              <td rowspan="8" align="center" bgcolor="#C0C0C0">Locked</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">10</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">95 / On</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">11</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">96 / On</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">12</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">97 / On</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">13</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">140 / On</td>
+                              <td rowspan="8" align="center" bgcolor="#C0C0C0">Locked</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">14</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">141 / On</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">15</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">142 / On</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td width="2%" rowspan="2" bgcolor="#C0C0C0" height="30">16</td>
+                              <td rowspan="2" bgcolor="#C0C0C0">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">Disabled</td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">143 / On</td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                           <tr>
+                            <td colspan="9" bgcolor="#C0C0C0"></td>
+                           </tr>
+                            <tr>
+                              <td height="40" bgcolor="#C0C0C0" rowspan="2"><font size="2">GIGE1 EAS</font></td>
+                              <td bgcolor="#C0C0C0" rowspan="2">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td align="center" bgcolor="#C0C0C0" rowspan="2"><font size="2"></font></td>
+                              <td align="center" rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td align="center" bgcolor="#C0C0C0" colspan="3" rowspan="2"><font size="2">-</font></td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            <tr>
+                              <td height="40" bgcolor="#C0C0C0" rowspan="2"><font size="2">GIGE2 EAS</font></td>
+                              <td bgcolor="#C0C0C0" rowspan="2">No IP Assigned</td>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                              <td align="center" bgcolor="#C0C0C0" rowspan="2"><font size="2"></font></td>
+                              <td align="center" rowspan="2" bgcolor="#C0C0C0"></td>
+                              <td rowspan="2" align="center" bgcolor="#C0C0C0">-</td>
+                              <td align="center" bgcolor="#C0C0C0" colspan="3" rowspan="2"><font size="2">-</font></td>
+                            </tr>
+                            <tr>
+                              <td rowspan="1" align="center" bgcolor="#C0C0C0">-</td>
+                            </tr>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <br>
+                <input name="session_id" value="" type="hidden">
+                <input value="Edit" style="width: 85px;" name="btnEdit" onclick="javascript:golink('statusedit.cgi')" type="button">
+                <br>
+                <br>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </form>
+  </body>
+</html>

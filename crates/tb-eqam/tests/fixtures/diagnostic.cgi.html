@@ -1,0 +1,184 @@
+<html>
+  <head>
+    <title>Diagnostics - Ball Holdings</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+    <link rel="stylesheet" type="text/css" href="../eqam.css">
+    <script language="JavaScript">
+      <!-- Begin
+      function logout()
+      {
+        var temp;
+        temp = "diagnostic.cgi?logout=1&session_id=" + document.configForm.session_id.value;
+        document.location = temp;
+        return 0;
+      }
+      function golink(field)
+      {
+        var temp;
+        temp = field + "?session_id=" + document.configForm.session_id.value;
+        document.location = temp;
+        return 0;
+      }
+
+      function gobox(field1, field2)
+      {
+        var temp;
+        temp = field1 + "?session_id=" + document.configForm.session_id.value + "&boxNumber=" + field2;
+        document.location = temp;
+        return 0;
+      }
+
+      function goslot(field1, field2)
+      {
+        var temp;
+        temp = field1 + "?session_id=" + document.configForm.session_id.value + "&slotNumber=" + field2;
+        document.location = temp;
+        return 0;
+      }
+
+      function getCookie(c_name)
+      {
+        if(document.cookie.length > 0)
+        {
+          c_start = document.cookie.indexOf(c_name + "=");
+          if(c_start != -1)
+          {
+            c_start = c_start + c_name.length + 1;
+            c_end = document.cookie.indexOf(";", c_start);
+            if(c_end == -1) c_end = document.cookie.length;
+            document.configForm.session_id.value = document.cookie.substring(c_start, c_end);
+          }
+        }
+        return "";
+      }
+
+    //  End -->
+    </script>
+  </head>
+  <body onload="getCookie('session_id')">
+    <form name="configForm" action="diagnostic.cgi" method="post">
+      <div align="center">
+        <table style="border-collapse: collapse;" width="1000" bgcolor="#FFFFFF" border="0" cellpadding="0">
+          <tbody>
+          <tr>
+            <td>
+            <a href="http://www.blondertongue.com"><img border="0" src="../images/logo.png" alt="Blonder Tongue Laboratories, Inc."></a></td>
+          </tr>
+          <tr>
+            <td bgcolor="#66CEF6" align="center"><font size="6">EQAM-420B-4-64</font></td>
+          </tr>
+          <tr>
+            <td bgcolor="#66CEF6" align="center">
+              <table>
+                <tbody>
+                  <tr>
+                    <td></td>
+                    <td width="25%">ESN: 2013090274</td>
+                    <td></td>
+                    <td width="25%">Temperature: 80.9ºF</td>
+                    <td></td>
+                    <td width="25%">Uptime: 6d 17h 50m 31s</td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td>Headend Name: Ball Holdings</td>
+                    <td></td>
+                    <td>Mode: MPTS</td>
+                    <td></td>
+                    <td>Location: </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="left" style="font-size: medium; background-color: #66CEF6;">
+              <table style="width: 700px; background-color: #000000;" cellpadding="4" cellspacing="1">
+                <tbody>
+                  <tr>
+                    <td style="width: 100px; text-align: center; background-color: #FFFFFF;">
+                    <a href="javascript:golink('status.cgi')">Main</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('network.cgi')">Network</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('time.cgi')">Time</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('errorlog.cgi')">Event Log</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('config.cgi')">Config</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:logout()">Logout</a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+            <tr>
+              <td valign="top" align="center">
+                <br>
+                <table width="800px" cellpadding="0" cellspacing="0">
+                  <tbody>
+                <tr>
+                  <td>
+                    <table style="width: 600px; background-color: #000000;" cellpadding="4" cellspacing="1">
+                      <tbody>
+                        <tr>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('status.cgi')">Status</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('streaminfo.cgi')">Stream Info</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:goslot('qamconfig.cgi', 1)">QAM Config</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #FFFFFF;">
+                          <a href="javascript:golink('diagnostic.cgi')">Diagnostics</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('mode.cgi')">Mode</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('eas.cgi')">EAS</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('diagnostic.cgi')">Refresh</a></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+                    <tr>
+                      <td style="border: 1px solid 000000; background-color: #FFFFFF; text-align: center;" valign="top" align="center">
+                        <br>
+                        <br>
+                        <table style="border-collapse: collapse;" align="center" border="1" bordercolor="black">
+                          <tbody>
+                            <tr>
+                              <td colspan="6">
+                                <table style="border-style: none; border-width: 0pt; width: 750px;" cellpadding="4">
+                                  <tbody>
+                                    <tr>
+                                      <td align="center" bgcolor="#3366FF"><font color="white">#</font></td>
+                                      <td align="center" bgcolor="#3366FF"><font color="white">Stream</font></td>
+                                      <td align="center" bgcolor="#3366FF"><font color="white">IP</font></td>
+                                      <td align="center" bgcolor="#3366FF" colspan="2"><font color="white">Ping</font></td>
+                                      <td align="center" bgcolor="#3366FF"><font color="white">Oversubscription</font></td>
+                                      <td align="center" bgcolor="#3366FF"><font color="white">TS Sync Errors</font>		<input type="submit" value="Clear Errors" style="width: 85px" name="btnClear"></td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <br>
+                        <input name="session_id" value="" type="hidden">
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </form>
+  </body>
+</html>

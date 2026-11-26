@@ -1,0 +1,13 @@
+Downloaded 2026-11-24 (untrusted data; checksums in SHA256SUMS).
+
+A52-201212-17.pdf                   https://www.atsc.org/wp-content/uploads/2015/03/A52-201212-17.pdf
+A53-Part-1-2013.pdf                 https://www.atsc.org/wp-content/uploads/2021/04/A53-Part-1-2013.pdf
+A53-Part-3-2013.pdf                 https://www.atsc.org/wp-content/uploads/2021/04/A53-Part-3-2013.pdf
+A53-Part-3-2013-Amend-1.pdf         https://www.atsc.org/wp-content/uploads/2023/02/A53-Part-3-2013-Amend-1.pdf
+A_53-Part-4-2009.pdf                https://www.atsc.org/wp-content/uploads/2021/04/A_53-Part-4-2009.pdf
+A53-Part-5-2014.pdf                 https://www.atsc.org/wp-content/uploads/2021/04/A53-Part-5-2014.pdf
+A53-Part-6-2013.pdf                 https://www.atsc.org/wp-content/uploads/2015/03/A53-Part-6-2013.pdf
+A72-Part-1-2015.pdf                 https://www.atsc.org/wp-content/uploads/2015/03/A72-Part-1-2015.pdf
+A85-2013-with-Corrigendum-No-1.pdf  https://www.atsc.org/wp-content/uploads/2025/06/A85-2013-with-Corrigendum-No-1.pdf
+ITU-T_H.222.0-201206.pdf            https://www.itu.int/rec/dologin_pub.asp?lang=e&id=T-REC-H.222.0-201206-S!!PDF-E&type=items
+tr_101290v010401p.pdf               https://www.etsi.org/deliver/etsi_tr/101200_101299/101290/01.04.01_60/tr_101290v010401p.pdf

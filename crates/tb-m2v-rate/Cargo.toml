@@ -1,0 +1,22 @@
+[package]
+name = "tb-m2v-rate"
+description = "The buffer model with its rate-change contract, and rate control: picture allocation, rho-domain row quantizers, the ladder"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-kernel-abi.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tb-golden.workspace = true
+# tb-golden parses with serde_json, whose default float parser is not correctly rounded: some
+# of the golden records' 17-digit doubles (0.10010000000000001) would read back one ulp off. The
+# feature unifies into tb-golden's serde_json for this crate's tests.
+serde_json = { workspace = true, features = ["float_roundtrip"] }
+
+[lints]
+workspace = true

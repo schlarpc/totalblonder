@@ -1,0 +1,17 @@
+Downloaded 2026-11-24 from the eCFR versioner API (XML; untrusted data; checksums in SHA256SUMS).
+Title 47 up to date as of 2026-11-23.
+
+47CFR_15.120.xml   https://www.ecfr.gov/api/versioner/v1/full/2026-11-23/title-47.xml?part=15&section=15.120
+                   Program blocking technology requirements for TV receivers (cites CEA-766-A).
+47CFR_15.123.xml   https://www.ecfr.gov/api/versioner/v1/full/2026-11-23/title-47.xml?part=15&section=15.123
+47CFR_76.640.xml   https://www.ecfr.gov/api/versioner/v1/full/2026-11-23/title-47.xml?part=76&section=76.640
+47CFR_79.102.xml   https://www.ecfr.gov/api/versioner/v1/full/2026-11-23/title-47.xml?part=79&section=79.102
+                   DTV closed caption decoder requirements (cites EIA-708-B).
+47CFR_79.101_as-of-2025-10-02.xml
+                   https://www.ecfr.gov/api/versioner/v1/full/2025-10-02/title-47.xml?part=79&section=79.101
+                   Line-21 caption decoder requirements for analog receivers: the former §15.119 text
+                   (moved to §79.101 in 2016; §79.101 became [Reserved] on 2025-10-03, so this is the last
+                   version with text).
+
+§15.119 and §15.122 are [Reserved] since 2016-12-15 (their content moved to §79.101 and §79.102)
+and were removed from Part 15 on 2026-03-27.

@@ -1,0 +1,20 @@
+group 0: 1920x1080i 29.97 fps, coded 1920x1088, GOP 15 M 3 staggered, f_code 4, search +-35 pel, field pred 1, aq 1, sessions 48, frames 750, mean 15.060 Mbit/s
+group 1: pool of 8 slots, 1920x1080i
+group 2: pool of 6 slots, 1280x720p
+group 3: pool of 16 slots, 704x480i
+group 4: pool of 4 slots, 1920x1080p
+input from pinned host memory, upload overlapped (+1 frame delay), paced; device memory 3662.0 MB allocated (76.3 MB/session), context total 4502.0 MB
+wall 25.077 s, 1.00x real time, 13285527 macroblocks/s, 45793 pictures
+tick ms: mean 11.492 p50 11.508 p99 13.605 p99.9 14.379 max 16.132, period 16.683, late 0 (deadline 0) of 1440
+host cpu 3.814 s = 0.152 cores total, 0.0032 per session; pcie up 5065.6 MB/s down 101.84 MB/s
+repeated pictures (made on the host) 0 of 45793 = 0.00%, of them by the deadline policy 0; key frames missed 0
+churn: 39 opens, 39 closes; ticks with an operation 43, of them late 0; wait for a reserved batch: mean 0.0 ms, max 0.5 ms (39 opens)
+  open in a free slot                              n   80  mean    0.002 ms  max    0.009 ms
+  open with a new batch (allocation in the tick)   n    7  mean    0.457 ms  max    1.845 ms
+  close                                            n   39  mean    0.000 ms  max    0.002 ms
+session 0 I: 50 pictures, mean 152749 bytes, mean quantiser_scale 38.7
+session 0 P: 250 pictures, mean 84807 bytes, mean quantiser_scale 44.2
+session 0 B: 450 pictures, mean 40499 bytes, mean quantiser_scale 58.2
+rate control: buffer violations 0, least room 41.7% of vbv_buffer_size, extra passes 43 (0.001 per picture), repeated transforms 314 (0.0069 per picture), ladder pictures 0, skipped pictures 0, I replaced by P 0
+loadavg before 0.48 after 0.53
+ticks with operations: 43, median 11.65 p99 13.12 max 13.12 ms, late 0; ticks without: 1400, median 11.51 p99 13.70 max 24.77 ms, late 3; period 16.68 ms; time spent in the operations of a tick: max 0.410 ms

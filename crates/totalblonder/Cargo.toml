@@ -1,0 +1,45 @@
+[package]
+name = "totalblonder"
+description = "The server: configuration, carriers (mux and pacer), tables, programs (video, audio, fallback), inputs, control"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-ts.workspace = true
+tb-psip.workspace = true
+tb-mux.workspace = true
+tb-output.workspace = true
+tb-media.workspace = true
+tb-rtmp.workspace = true
+tb-tsin.workspace = true
+tb-eqam.workspace = true
+tb-audio.workspace = true
+tb-ac3.workspace = true
+tb-captions.workspace = true
+tb-statmux.workspace = true
+tb-decoder-client.workspace = true
+tb-ts-verify.workspace = true
+tb-timeline.workspace = true
+serde_json.workspace = true
+tb-device.workspace = true
+tb-device-ref.workspace = true
+tb-device-cuda.workspace = true
+tb-engine.workspace = true
+tb-m2v-encoder.workspace = true
+tb-m2v-syntax.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+serde.workspace = true
+anyhow = "1"
+signal-hook = { version = "0.3", default-features = false }
+toml = { version = "0.9", default-features = false, features = ["parse", "serde", "std"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

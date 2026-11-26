@@ -1,0 +1,22 @@
+Downloaded 2026-11-24 (untrusted data; checksums in SHA256SUMS).
+
+ITU-T_H.262-200002-S.pdf   https://www.itu.int/rec/dologin_pub.asp?lang=e&id=T-REC-H.262-200002-S!!PDF-E&type=items
+                           H.262 (02/2000), 220 pages. The in-force edition H.262 (02/2012) is not a free
+                           download (dologin returns a login page); 2000 is the newest free edition.
+ITU-T_H.264-202606-I.pdf   https://www.itu.int/rec/dologin_pub.asp?lang=e&id=T-REC-H.264-202606-I!!PDF-E&type=items
+                           H.264 (V16) (06/2026), in force, 854 pages.
+a_54a_with_corr_1.pdf      https://www.atsc.org/wp-content/uploads/2015/03/a_54a_with_corr_1.pdf
+                           ATSC A/54A, 4 Dec 2003, with Corrigendum No. 1 (20 Dec 2006), 110 pages.
+A-71-2012a-Parameterized-Services-Standard.pdf
+                           https://www.atsc.org/wp-content/uploads/2021/04/A-71-2012a-Parameterized-Services-Standard.pdf
+                           ATSC A/71:2012, 3 Dec 2012, 15 pages.
+                           (atsc.org returns 403 to curl; both ATSC files fetched through a browser session.)
+ATSC_IS-191.pdf            https://web.archive.org/web/20051004001811id_/http://www.atsc.org:80/standards/is_191.pdf
+                           ATSC IS-191, 26 June 2003, 4 pages. No longer on atsc.org; Wayback copy of ATSC's
+                           original URL (SHA-1 matches the Wayback CDX digest STGENCCUPCFBB72DAGCOUF3MALFKDYRZ).
+
+ITU-T_H.262-201202-Amd4-prepub.pdf  downloaded by the owner from itu.int (original name
+                      T-REC-H.262-201202-T!Amd4!PDF-E.pdf). Cover: H.262 Amendment 4 (02/2012), "Frame packing
+                      arrangement signalling for 3D content", PREPUBLISHED (unedited). 238 pages, so it appears
+                      to carry the full text with the amendment integrated; PDF title metadata still says
+                      "H.262 (02/2000)". Not yet compared against the 2000 edition.

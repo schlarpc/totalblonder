@@ -1,0 +1,8 @@
+build/
+result
+*.m2v
+*.yuv
+*.y4m
+media/
+out/
+__pycache__/

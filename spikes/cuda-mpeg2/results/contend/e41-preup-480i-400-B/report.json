@@ -1,0 +1,152 @@
+{
+ "dir": "results/contend/e41-preup-480i-400-B",
+ "hdr": "fmt 480i n 400",
+ "period_ms": 33.36666666666667,
+ "other_active_s": 6,
+ "rows": [
+  {
+   "comp": "(alone)",
+   "ticks": 226,
+   "base_ms": 31.3395,
+   "med_ms": 31.3395,
+   "p95_ms": 31.864,
+   "max_ms": 44.861,
+   "ratio": 1.0,
+   "added_ms": 0.0,
+   "late": 0.004424778761061947,
+   "slow": 1,
+   "slow_excess_ms": 13.521499999999996,
+   "slow_ph0_excess_ms": 0.616500000000002,
+   "ph_ms": [
+    20.8005,
+    5.8309999999999995,
+    3.572
+   ],
+   "base_ph_ms": [
+    20.8005,
+    5.8309999999999995,
+    3.572
+   ],
+   "upwait_ms": 0.006,
+   "result": "",
+   "pwr": 67.0,
+   "gtemp": 90.0,
+   "sm": 83.33333333333333,
+   "mem": 65.33333333333333,
+   "enc": 0.0,
+   "dec": 0.3333333333333333,
+   "pclk": 2060.0,
+   "pviol": 100.0,
+   "tviol": 0.0,
+   "pclk_min": 2010.0
+  },
+  {
+   "comp": "scale_re",
+   "ticks": 129,
+   "base_ms": 31.274,
+   "med_ms": 31.797,
+   "p95_ms": 46.534,
+   "max_ms": 47.306,
+   "ratio": 1.016723156615719,
+   "added_ms": 0.5229999999999997,
+   "late": 0.10077519379844961,
+   "slow": 12,
+   "slow_excess_ms": 14.779499999999999,
+   "slow_ph0_excess_ms": 14.468499999999999,
+   "ph_ms": [
+    21.029,
+    5.884,
+    3.582
+   ],
+   "base_ph_ms": [
+    20.592,
+    5.851,
+    3.562
+   ],
+   "upwait_ms": 0.005,
+   "result": "206 frames, 26 fps",
+   "pwr": 67.0,
+   "gtemp": 91.0,
+   "sm": 92.8,
+   "mem": 72.8,
+   "enc": 0.0,
+   "dec": 4.8,
+   "pclk": 1956.0,
+   "pviol": 96.0,
+   "tviol": 0.0,
+   "pclk_min": 1905.0
+  },
+  {
+   "comp": "tonemap_max",
+   "ticks": 127,
+   "base_ms": 31.388,
+   "med_ms": 47.878,
+   "p95_ms": 59.067,
+   "max_ms": 65.866,
+   "ratio": 1.525360010194979,
+   "added_ms": 16.49,
+   "late": 1.0,
+   "slow": 4,
+   "slow_excess_ms": 15.399499999999996,
+   "slow_ph0_excess_ms": 14.8205,
+   "ph_ms": [
+    33.228,
+    7.938,
+    4.968
+   ],
+   "base_ph_ms": [
+    20.942,
+    5.823,
+    3.579
+   ],
+   "upwait_ms": 0.005,
+   "result": "498 frames, 59 fps",
+   "pwr": 65.16666666666667,
+   "gtemp": 91.0,
+   "sm": 90.66666666666667,
+   "mem": 61.0,
+   "enc": 47.166666666666664,
+   "dec": 14.166666666666666,
+   "pclk": 2060.0,
+   "pviol": 100.0,
+   "tviol": 0.0,
+   "pclk_min": 1995.0
+  },
+  {
+   "comp": "(plex)",
+   "ticks": 22,
+   "base_ms": 31.3395,
+   "med_ms": 31.2275,
+   "p95_ms": 35.849,
+   "max_ms": 67.899,
+   "ratio": 0.996426235262209,
+   "added_ms": -0.11200000000000188,
+   "late": 0.13636363636363635,
+   "slow": 1,
+   "slow_excess_ms": 36.6715,
+   "slow_ph0_excess_ms": -9.187000000000001,
+   "ph_ms": [
+    20.606,
+    6.3845,
+    3.3715
+   ],
+   "base_ph_ms": [
+    20.8005,
+    5.8309999999999995,
+    3.572
+   ],
+   "upwait_ms": 0.0045000000000000005,
+   "result": "",
+   "pwr": null,
+   "gtemp": null,
+   "sm": null,
+   "mem": null,
+   "enc": null,
+   "dec": null,
+   "pclk": null,
+   "pviol": null,
+   "tviol": null,
+   "pclk_min": null
+  }
+ ]
+}

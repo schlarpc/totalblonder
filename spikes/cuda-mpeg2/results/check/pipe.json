@@ -1,0 +1,709 @@
+{
+ "results": [
+  {
+   "id": "devin-identical",
+   "fails": [],
+   "streams": 23,
+   "note": "23 streams identical"
+  },
+  {
+   "id": "shed10-1080i-crowd_run",
+   "fails": [],
+   "repeats": 18,
+   "keys_missed": 0,
+   "off_grid": 0,
+   "pictures": 150,
+   "dec2_db": 69.138438,
+   "vbv_ok": true,
+   "drift_min_db": 65.39,
+   "psnr_y": 24.172406,
+   "note": "18 of 150 pictures repeated, 0 key frames missed and 0 made up, drift min 65.4 dB, PSNR-Y 24.17"
+  },
+  {
+   "id": "shed50-1080i-crowd_run",
+   "fails": [],
+   "repeats": 104,
+   "keys_missed": 7,
+   "off_grid": 3,
+   "pictures": 150,
+   "dec2_db": 69.511726,
+   "vbv_ok": true,
+   "drift_min_db": 64.71,
+   "psnr_y": 18.206712,
+   "note": "104 of 150 pictures repeated, 7 key frames missed and 3 made up, drift min 64.7 dB, PSNR-Y 18.21"
+  },
+  {
+   "id": "shed10-720p-cuts",
+   "fails": [],
+   "repeats": 39,
+   "keys_missed": 0,
+   "off_grid": 0,
+   "pictures": 300,
+   "dec2_db": 68.417763,
+   "vbv_ok": true,
+   "drift_min_db": 63.77,
+   "psnr_y": 25.598081,
+   "note": "39 of 300 pictures repeated, 0 key frames missed and 0 made up, drift min 63.8 dB, PSNR-Y 25.60"
+  },
+  {
+   "id": "shed50-720p-cuts",
+   "fails": [],
+   "repeats": 202,
+   "keys_missed": 5,
+   "off_grid": 1,
+   "pictures": 300,
+   "dec2_db": 69.39736,
+   "vbv_ok": true,
+   "drift_min_db": 63.81,
+   "psnr_y": 18.436845,
+   "note": "202 of 300 pictures repeated, 5 key frames missed and 1 made up, drift min 63.8 dB, PSNR-Y 18.44"
+  },
+  {
+   "id": "shed10-480i-football",
+   "fails": [],
+   "repeats": 18,
+   "keys_missed": 0,
+   "off_grid": 0,
+   "pictures": 150,
+   "dec2_db": 66.927659,
+   "vbv_ok": true,
+   "drift_min_db": 63.57,
+   "psnr_y": 27.355619,
+   "note": "18 of 150 pictures repeated, 0 key frames missed and 0 made up, drift min 63.6 dB, PSNR-Y 27.36"
+  },
+  {
+   "id": "shed50-480i-football",
+   "fails": [],
+   "repeats": 104,
+   "keys_missed": 7,
+   "off_grid": 3,
+   "pictures": 150,
+   "dec2_db": 67.275343,
+   "vbv_ok": true,
+   "drift_min_db": 63.23,
+   "psnr_y": 19.474164,
+   "note": "104 of 150 pictures repeated, 7 key frames missed and 3 made up, drift min 63.2 dB, PSNR-Y 19.47"
+  },
+  {
+   "id": "shed90-1080i-park_joy",
+   "fails": [],
+   "repeats": 143,
+   "keys_missed": 14,
+   "off_grid": 2,
+   "pictures": 150,
+   "dec2_db": 69.021898,
+   "vbv_ok": true,
+   "drift_min_db": 66.37,
+   "psnr_y": 14.399113,
+   "note": "143 of 150 pictures repeated, 14 key frames missed and 2 made up, drift min 66.4 dB, PSNR-Y 14.40"
+  },
+  {
+   "id": "hold-720p-crowd_run",
+   "fails": [],
+   "repeats": 121,
+   "keys_missed": 8,
+   "off_grid": 1,
+   "pictures": 300,
+   "dec2_db": 67.598253,
+   "vbv_ok": true,
+   "drift_min_db": 63.41,
+   "psnr_y": 18.453062,
+   "note": "121 of 300 pictures repeated, 8 key frames missed and 1 made up, drift min 63.4 dB, PSNR-Y 18.45"
+  },
+  {
+   "id": "hold-480i-mobcal",
+   "fails": [],
+   "repeats": 34,
+   "keys_missed": 4,
+   "off_grid": 1,
+   "pictures": 150,
+   "dec2_db": 66.49588,
+   "vbv_ok": true,
+   "drift_min_db": 64.49,
+   "psnr_y": 18.380146,
+   "note": "34 of 150 pictures repeated, 4 key frames missed and 1 made up, drift min 64.5 dB, PSNR-Y 18.38"
+  },
+  {
+   "id": "churn-identical",
+   "fails": [],
+   "note": "36 undisturbed streams identical in 4 churn runs, 93 streams of churned sessions decode strictly; churn: 20 opens, 20 closes; ticks with an operation 33, of them late 0; wait for a reserved batch: mean 4.0 ms, max 13.9 ms (20 opens)",
+   "streams": 36
+  },
+  {
+   "id": "geom-1080p-720p",
+   "fails": [],
+   "psnr_y": 53.872342,
+   "psnr_u": 55.481458,
+   "psnr_v": 55.477261,
+   "psnr_min": 54.344874,
+   "cpu": {
+    "psnr_y": 55.290443,
+    "psnr_u": 56.023546,
+    "psnr_v": 56.074785
+   },
+   "note": "18 frames against the analytic pattern: Y 53.87 U 55.48 V 55.48 dB, worst frame 54.34 (need Y 48, C 48); ffmpeg `zscale=1280:720:filter=lanczos:dither=no` on the CPU: Y 55.29 U 56.02 V 56.07 dB"
+  },
+  {
+   "id": "geom-1080p-480i-psf",
+   "fails": [],
+   "psnr_y": 53.994989,
+   "psnr_u": 53.915489,
+   "psnr_v": 53.907705,
+   "psnr_min": 53.966982,
+   "cpu": {
+    "psnr_y": 53.526274,
+    "psnr_u": 54.050589,
+    "psnr_v": 54.008601
+   },
+   "note": "17 frames against the analytic pattern: Y 53.99 U 53.92 V 53.91 dB, worst frame 53.97 (need Y 48, C 48); ffmpeg `zscale=704:480:filter=lanczos:dither=non` on the CPU: Y 53.53 U 54.05 V 54.01 dB"
+  },
+  {
+   "id": "geom-720p-1080p",
+   "fails": [],
+   "psnr_y": 50.881306,
+   "psnr_u": 52.570339,
+   "psnr_v": 52.571736,
+   "psnr_min": 51.374925,
+   "cpu": {
+    "psnr_y": 53.736662,
+    "psnr_u": 53.685693,
+    "psnr_v": 53.670938
+   },
+   "note": "17 frames against the analytic pattern: Y 50.88 U 52.57 V 52.57 dB, worst frame 51.37 (need Y 46, C 46); ffmpeg `zscale=1920:1080:filter=lanczos:dither=n` on the CPU: Y 53.74 U 53.69 V 53.67 dB"
+  },
+  {
+   "id": "geom-2160p-720p-halved",
+   "fails": [],
+   "psnr_y": 51.398911,
+   "psnr_u": 50.778336,
+   "psnr_v": 50.636017,
+   "psnr_min": 51.155667,
+   "cpu": {
+    "psnr_y": 51.299122,
+    "psnr_u": 51.930881,
+    "psnr_v": 51.931695
+   },
+   "note": "18 frames against the analytic pattern: Y 51.40 U 50.78 V 50.64 dB, worst frame 51.16 (need Y 44, C 44); ffmpeg `zscale=1280:720:filter=lanczos:dither=no` on the CPU: Y 51.30 U 51.93 V 51.93 dB"
+  },
+  {
+   "id": "geom-2160p-480i-halved",
+   "fails": [],
+   "psnr_y": 49.164675,
+   "psnr_u": 50.172662,
+   "psnr_v": 50.146089,
+   "psnr_min": 49.47159,
+   "cpu": {
+    "psnr_y": 50.950387,
+    "psnr_u": 51.057804,
+    "psnr_v": 51.069115
+   },
+   "note": "17 frames against the analytic pattern: Y 49.16 U 50.17 V 50.15 dB, worst frame 49.47 (need Y 44, C 44); ffmpeg `zscale=704:480:filter=lanczos:dither=non` on the CPU: Y 50.95 U 51.06 V 51.07 dB"
+  },
+  {
+   "id": "geom-1080i-480i-fields",
+   "fails": [],
+   "psnr_y": 52.076924,
+   "psnr_u": 52.026324,
+   "psnr_v": 52.013359,
+   "psnr_min": 52.057806,
+   "cpu": {
+    "psnr_y": 27.801561,
+    "psnr_u": 33.460058,
+    "psnr_v": 33.469851
+   },
+   "note": "17 frames against the analytic pattern: Y 52.08 U 52.03 V 52.01 dB, worst frame 52.06 (need Y 46, C 46); ffmpeg `scale=704:480:interl=1:flags=lanczos` on the CPU: Y 27.80 U 33.46 V 33.47 dB"
+  },
+  {
+   "id": "geom-480i-1080i-fields",
+   "fails": [],
+   "psnr_y": 48.721488,
+   "psnr_u": 47.819034,
+   "psnr_v": 47.819385,
+   "psnr_min": 48.399437,
+   "cpu": {
+    "psnr_y": 34.660002,
+    "psnr_u": 40.201836,
+    "psnr_v": 40.210362
+   },
+   "note": "17 frames against the analytic pattern: Y 48.72 U 47.82 V 47.82 dB, worst frame 48.40 (need Y 44, C 44); ffmpeg `scale=1920:1080:interl=1:flags=lanczos` on the CPU: Y 34.66 U 40.20 V 40.21 dB"
+  },
+  {
+   "id": "geom-1080i-720p-bob",
+   "fails": [],
+   "psnr_y": 50.578761,
+   "psnr_u": 51.367758,
+   "psnr_v": 51.36841,
+   "psnr_min": 50.172491,
+   "cpu": {
+    "psnr_y": 54.339344,
+    "psnr_u": 47.949472,
+    "psnr_v": 48.09173
+   },
+   "note": "35 frames against the analytic pattern: Y 50.58 U 51.37 V 51.37 dB, worst frame 50.17 (need Y 46, C 46); ffmpeg `bwdif=mode=send_field` on the CPU: Y 54.34 U 47.95 V 48.09 dB"
+  },
+  {
+   "id": "geom-1080i-1080p-bob",
+   "fails": [],
+   "psnr_y": 51.249882,
+   "psnr_u": 53.26026,
+   "psnr_v": 53.2736,
+   "psnr_min": 51.824001,
+   "cpu": {
+    "psnr_y": 64.203767,
+    "psnr_u": 61.949435,
+    "psnr_v": 61.939556
+   },
+   "note": "17 frames against the analytic pattern: Y 51.25 U 53.26 V 53.27 dB, worst frame 51.82 (need Y 46, C 46); ffmpeg `yadif=mode=send_frame` on the CPU: Y 64.20 U 61.95 V 61.94 dB"
+  },
+  {
+   "id": "pipe-1080p30-1080i-psf",
+   "fails": [],
+   "psnr_y": 99.0,
+   "psnr_u": 99.0,
+   "psnr_v": 99.0,
+   "ssim": 1.0,
+   "psnr_min": 99.0,
+   "note": "89 converted frames; Y 99.00 U 99.00 V 99.00 dB, worst frame 99.00, SSIM 1.0000 (need Y 99, C 99); new 89 (PsF 89, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 89,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-720p60-720p",
+   "fails": [],
+   "psnr_y": 99.0,
+   "psnr_u": 99.0,
+   "psnr_v": 99.0,
+   "ssim": 1.0,
+   "psnr_min": 99.0,
+   "note": "179 converted frames; Y 99.00 U 99.00 V 99.00 dB, worst frame 99.00, SSIM 1.0000 (need Y 99, C 99); new 179 (PsF 0, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 179,
+    "fresh": 179,
+    "psf": 0,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-1080i-1080i-fields",
+   "fails": [],
+   "psnr_y": 99.0,
+   "psnr_u": 99.0,
+   "psnr_v": 99.0,
+   "ssim": 1.0,
+   "psnr_min": 99.0,
+   "note": "89 converted frames; Y 99.00 U 99.00 V 99.00 dB, worst frame 99.00, SSIM 1.0000 (need Y 99, C 99); new 89 (PsF 0, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 0,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-hevc10-1080p-round",
+   "fails": [],
+   "psnr_y": 57.171177,
+   "psnr_u": 57.283285,
+   "psnr_v": 56.605385,
+   "ssim": 0.999145,
+   "psnr_min": 56.865006,
+   "note": "89 converted frames; Y 57.17 U 57.28 V 56.61 dB, worst frame 56.87, SSIM 0.9991 (need Y 55, C 55); new 89 (PsF 0, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 0,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-2160p10-1080p",
+   "fails": [],
+   "psnr_y": 55.344578,
+   "psnr_u": 55.558913,
+   "psnr_v": 55.559788,
+   "ssim": 0.998627,
+   "psnr_min": 55.26422,
+   "note": "71 converted frames; Y 55.34 U 55.56 V 55.56 dB, worst frame 55.26, SSIM 0.9986 (need Y 45, C 45); new 71 (PsF 0, woven 0), repeated 18, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 71,
+    "psf": 0,
+    "weaves": 0,
+    "again": 18,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-2160p-720p",
+   "fails": [],
+   "psnr_y": 49.544683,
+   "psnr_u": 53.750955,
+   "psnr_v": 54.111918,
+   "ssim": 0.998302,
+   "psnr_min": 50.161887,
+   "note": "60 converted frames; Y 49.54 U 53.75 V 54.11 dB, worst frame 50.16, SSIM 0.9983 (need Y 45, C 45); new 60 (PsF 0, woven 0), repeated 59, dropped 0",
+   "j": {
+    "frames": 119,
+    "fresh": 60,
+    "psf": 0,
+    "weaves": 0,
+    "again": 59,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-1080p-720p",
+   "fails": [],
+   "psnr_y": 56.129635,
+   "psnr_u": 57.937402,
+   "psnr_v": 58.488531,
+   "ssim": 0.999217,
+   "psnr_min": 56.297961,
+   "note": "179 converted frames; Y 56.13 U 57.94 V 58.49 dB, worst frame 56.30, SSIM 0.9992 (need Y 45, C 45); new 179 (PsF 0, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 179,
+    "fresh": 179,
+    "psf": 0,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-720p-1080p",
+   "fails": [],
+   "psnr_y": 55.405059,
+   "psnr_u": 57.908169,
+   "psnr_v": 58.566361,
+   "ssim": 0.998935,
+   "psnr_min": 56.001577,
+   "note": "89 converted frames; Y 55.41 U 57.91 V 58.57 dB, worst frame 56.00, SSIM 0.9989 (need Y 45, C 45); new 89 (PsF 0, woven 0), repeated 0, dropped 88",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 0,
+    "weaves": 0,
+    "again": 0,
+    "drops": 88,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-1366x768-720p",
+   "fails": [],
+   "psnr_y": 56.074401,
+   "psnr_u": 58.53543,
+   "psnr_v": 59.156654,
+   "ssim": 0.999235,
+   "psnr_min": 56.393159,
+   "note": "90 converted frames; Y 56.07 U 58.54 V 59.16 dB, worst frame 56.39, SSIM 0.9992 (need Y 42, C 42); new 90 (PsF 0, woven 0), repeated 89, dropped 0",
+   "j": {
+    "frames": 179,
+    "fresh": 90,
+    "psf": 0,
+    "weaves": 0,
+    "again": 89,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-1080p-480i-letterbox",
+   "fails": [],
+   "psnr_y": 52.285135,
+   "psnr_u": 55.501733,
+   "psnr_v": 55.983785,
+   "ssim": 0.998838,
+   "psnr_min": 51.928785,
+   "note": "89 converted frames; Y 52.29 U 55.50 V 55.98 dB, worst frame 51.93, SSIM 0.9988 (need Y 40, C 40); new 89 (PsF 89, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 89,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-1080p-480i-crop",
+   "fails": [],
+   "psnr_y": 51.580585,
+   "psnr_u": 54.328464,
+   "psnr_v": 54.774728,
+   "ssim": 0.998429,
+   "psnr_min": 51.031642,
+   "note": "89 converted frames; Y 51.58 U 54.33 V 54.77 dB, worst frame 51.03, SSIM 0.9984 (need Y 40, C 40); new 89 (PsF 89, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 89,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-854x480-1080i",
+   "fails": [],
+   "psnr_y": 53.268891,
+   "psnr_u": 54.715208,
+   "psnr_v": 55.581498,
+   "ssim": 0.997891,
+   "psnr_min": 53.42342,
+   "note": "89 converted frames; Y 53.27 U 54.72 V 55.58 dB, worst frame 53.42, SSIM 0.9979 (need Y 40, C 40); new 89 (PsF 89, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 89,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-1080p60-1080i-weave",
+   "fails": [],
+   "psnr_y": 54.907955,
+   "psnr_u": 57.844639,
+   "psnr_v": 58.351547,
+   "ssim": 0.999125,
+   "psnr_min": 55.188423,
+   "note": "89 converted frames; Y 54.91 U 57.84 V 58.35 dB, worst frame 55.19, SSIM 0.9991 (need Y 42, C 42); new 89 (PsF 0, woven 89), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 0,
+    "weaves": 89,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-720p60-1080i-weave",
+   "fails": [],
+   "psnr_y": 55.081408,
+   "psnr_u": 57.604162,
+   "psnr_v": 58.267766,
+   "ssim": 0.998888,
+   "psnr_min": 55.663409,
+   "note": "89 converted frames; Y 55.08 U 57.60 V 58.27 dB, worst frame 55.66, SSIM 0.9989 (need Y 40, C 40); new 89 (PsF 0, woven 89), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 0,
+    "weaves": 89,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-720p60-480i-weave",
+   "fails": [],
+   "psnr_y": 51.784851,
+   "psnr_u": 55.204278,
+   "psnr_v": 55.817789,
+   "ssim": 0.998622,
+   "psnr_min": 51.900935,
+   "note": "89 converted frames; Y 51.78 U 55.20 V 55.82 dB, worst frame 51.90, SSIM 0.9986 (need Y 38, C 38); new 89 (PsF 0, woven 89), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 0,
+    "weaves": 89,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-1080i-480i-fields",
+   "fails": [],
+   "note": "89 converted frames; new 89 (PsF 0, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 0,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-480i-1080i-fields",
+   "fails": [],
+   "note": "89 converted frames; new 89 (PsF 0, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 0,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-1080i-720p-bob",
+   "fails": [],
+   "note": "179 converted frames; new 179 (PsF 0, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 179,
+    "fresh": 179,
+    "psf": 0,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-mpeg2-480i-480i",
+   "fails": [],
+   "psnr_y": 60.934256,
+   "psnr_u": 64.906607,
+   "psnr_v": 65.389807,
+   "ssim": 0.999879,
+   "psnr_min": 59.532721,
+   "note": "89 converted frames; Y 60.93 U 64.91 V 65.39 dB, worst frame 59.53, SSIM 0.9999 (need Y 50, C 50); new 89 (PsF 0, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 0,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-1080p24-1080i-pulldown",
+   "fails": [],
+   "note": "89 converted frames; new 89 (PsF 53, woven 36), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 53,
+    "weaves": 36,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-1080p25-720p",
+   "fails": [],
+   "note": "75 converted frames; new 75 (PsF 0, woven 0), repeated 104, dropped 0",
+   "j": {
+    "frames": 179,
+    "fresh": 75,
+    "psf": 0,
+    "weaves": 0,
+    "again": 104,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-720p50-1080i",
+   "fails": [],
+   "note": "89 converted frames; new 89 (PsF 30, woven 59), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 30,
+    "weaves": 59,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-av1-1080i",
+   "fails": [],
+   "psnr_y": 99.0,
+   "psnr_u": 99.0,
+   "psnr_v": 99.0,
+   "ssim": 1.0,
+   "psnr_min": 99.0,
+   "note": "89 converted frames; Y 99.00 U 99.00 V 99.00 dB, worst frame 99.00, SSIM 1.0000 (need Y 99, C 99); new 89 (PsF 89, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 89,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-vp9-720p",
+   "fails": [],
+   "note": "90 converted frames; new 90 (PsF 0, woven 0), repeated 89, dropped 0",
+   "j": {
+    "frames": 179,
+    "fresh": 90,
+    "psf": 0,
+    "weaves": 0,
+    "again": 89,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-mosaic-2x2-overlay",
+   "fails": [],
+   "note": "89 converted frames; new 89 (PsF 0, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 89,
+    "fresh": 89,
+    "psf": 0,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 0
+   }
+  },
+  {
+   "id": "pipe-slate",
+   "fails": [],
+   "note": "0 converted frames; new 0 (PsF 0, woven 0), repeated 0, dropped 0",
+   "j": {
+    "frames": 179,
+    "fresh": 0,
+    "psf": 0,
+    "weaves": 0,
+    "again": 0,
+    "drops": 0,
+    "slates": 179
+   }
+  }
+ ],
+ "summary": "46 cases, 0 failed"
+}

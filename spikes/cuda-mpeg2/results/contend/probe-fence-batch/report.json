@@ -1,0 +1,116 @@
+{
+ "dir": "results/contend/probe-fence-batch",
+ "hdr": "fmt 480i n 300",
+ "period_ms": 33.36666666666667,
+ "other_active_s": 4,
+ "rows": [
+  {
+   "comp": "(alone)",
+   "ticks": 185,
+   "base_ms": 21.778,
+   "med_ms": 21.778,
+   "p95_ms": 22.551,
+   "max_ms": 22.92,
+   "ratio": 1.0,
+   "added_ms": 0.0,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    14.204,
+    4.319,
+    2.605
+   ],
+   "base_ph_ms": [
+    14.204,
+    4.319,
+    2.605
+   ],
+   "upwait_ms": 0.008,
+   "result": "",
+   "pwr": 58.333333333333336,
+   "gtemp": 73.0,
+   "sm": 61.666666666666664,
+   "mem": 52.0,
+   "enc": 0.3333333333333333,
+   "dec": 0.3333333333333333,
+   "pclk": 2400.0,
+   "pviol": 0.0,
+   "tviol": 0.0,
+   "pclk_min": 2355.0
+  },
+  {
+   "comp": "cuda_tinycont",
+   "ticks": 93,
+   "base_ms": 21.784,
+   "med_ms": 24.257,
+   "p95_ms": 24.885,
+   "max_ms": 27.92,
+   "ratio": 1.1135236871098055,
+   "added_ms": 2.4730000000000025,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    15.919,
+    4.707,
+    2.892
+   ],
+   "base_ph_ms": [
+    14.206,
+    4.321,
+    2.604
+   ],
+   "upwait_ms": 0.008,
+   "result": "55774 launches, round trip p50 0.038 p99 2.294 max 5.169 ms",
+   "pwr": 62.0,
+   "gtemp": 76.0,
+   "sm": 82.25,
+   "mem": 55.0,
+   "enc": 5.0,
+   "dec": 16.75,
+   "pclk": 2321.25,
+   "pviol": 0.0,
+   "tviol": 0.0,
+   "pclk_min": 2295.0
+  },
+  {
+   "comp": "(plex)",
+   "ticks": 4,
+   "base_ms": 21.778,
+   "med_ms": 14.5465,
+   "p95_ms": 49.585,
+   "max_ms": 49.585,
+   "ratio": 0.6679447148498485,
+   "added_ms": -7.231499999999999,
+   "late": 0.25,
+   "slow": 1,
+   "slow_excess_ms": 35.0385,
+   "slow_ph0_excess_ms": 7.4405,
+   "ph_ms": [
+    1.4405000000000001,
+    11.0985,
+    1.5350000000000001
+   ],
+   "base_ph_ms": [
+    14.204,
+    4.319,
+    2.605
+   ],
+   "upwait_ms": 0.0045000000000000005,
+   "result": "",
+   "pwr": null,
+   "gtemp": null,
+   "sm": null,
+   "mem": null,
+   "enc": null,
+   "dec": null,
+   "pclk": null,
+   "pviol": null,
+   "tviol": null,
+   "pclk_min": null
+  }
+ ]
+}

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<processor_spec>
+  <properties>
+    <property key="addressesDoNotAppearDirectlyInCode" value="true"/>
+  </properties>
+  <programcounter register="pc"/>
+  <register_data>
+    <register name="c0" group="Custom"/>
+    <register name="c1" group="Custom"/>
+    <register name="c2" group="Custom"/>
+    <register name="c3" group="Custom"/>
+    <register name="c4" group="Custom"/>
+    <register name="c5" group="Custom"/>
+    <register name="c6" group="Custom"/>
+    <register name="c7" group="Custom"/>
+    <register name="c8" group="Custom"/>
+    <register name="c9" group="Custom"/>
+    <register name="c10" group="Custom"/>
+    <register name="c11" group="Custom"/>
+    <register name="c12" group="Custom"/>
+    <register name="c13" group="Custom"/>
+    <register name="c14" group="Custom"/>
+    <register name="c15" group="Custom"/>
+    <register name="c16" group="Custom"/>
+    <register name="c17" group="Custom"/>
+    <register name="c18" group="Custom"/>
+    <register name="c19" group="Custom"/>
+    <register name="c20" group="Custom"/>
+    <register name="c21" group="Custom"/>
+    <register name="c22" group="Custom"/>
+    <register name="c23" group="Custom"/>
+    <register name="c24" group="Custom"/>
+    <register name="c25" group="Custom"/>
+    <register name="c26" group="Custom"/>
+    <register name="c27" group="Custom"/>
+    <register name="c28" group="Custom"/>
+    <register name="c29" group="Custom"/>
+    <register name="c30" group="Custom"/>
+    <register name="c31" group="Custom"/>
+  </register_data>
+</processor_spec>

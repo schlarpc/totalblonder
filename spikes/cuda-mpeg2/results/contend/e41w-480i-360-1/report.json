@@ -1,0 +1,116 @@
+{
+ "dir": "results/contend/e41w-480i-360-1",
+ "hdr": "fmt 480i n 360",
+ "period_ms": 33.36666666666667,
+ "other_active_s": 12,
+ "rows": [
+  {
+   "comp": "(alone)",
+   "ticks": 161,
+   "base_ms": 27.767,
+   "med_ms": 27.767,
+   "p95_ms": 28.508,
+   "max_ms": 29.019,
+   "ratio": 1.0,
+   "added_ms": 0.0,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    18.394,
+    5.375,
+    3.196
+   ],
+   "base_ph_ms": [
+    18.394,
+    5.375,
+    3.196
+   ],
+   "upwait_ms": 0.006,
+   "result": "",
+   "pwr": 65.0,
+   "gtemp": 89.0,
+   "sm": 78.33333333333333,
+   "mem": 62.333333333333336,
+   "enc": 0.0,
+   "dec": 0.3333333333333333,
+   "pclk": 2110.0,
+   "pviol": 80.0,
+   "tviol": 0.0,
+   "pclk_min": 2100.0
+  },
+  {
+   "comp": "x4k_re+x4k_re+tonemap_re",
+   "ticks": 41,
+   "base_ms": 27.7905,
+   "med_ms": 33.7,
+   "p95_ms": 37.869,
+   "max_ms": 51.582,
+   "ratio": 1.2126446087691838,
+   "added_ms": 5.909500000000001,
+   "late": 0.5609756097560976,
+   "slow": 1,
+   "slow_excess_ms": 17.881999999999998,
+   "slow_ph0_excess_ms": 12.52,
+   "ph_ms": [
+    22.276,
+    6.293,
+    3.555
+   ],
+   "base_ph_ms": [
+    18.3735,
+    5.3815,
+    3.197
+   ],
+   "upwait_ms": 0.005,
+   "result": "206 frames, 25 fps | 206 frames, 25 fps | 194 frames, 25 fps",
+   "pwr": 67.83333333333333,
+   "gtemp": 91.0,
+   "sm": 96.0,
+   "mem": 76.5,
+   "enc": 32.333333333333336,
+   "dec": 23.333333333333332,
+   "pclk": 1935.0,
+   "pviol": 99.0,
+   "tviol": 0.0,
+   "pclk_min": 1890.0
+  },
+  {
+   "comp": "tonemap_re+scale_re+scale_re",
+   "ticks": 30,
+   "base_ms": 28.096,
+   "med_ms": 31.948500000000003,
+   "p95_ms": 36.457,
+   "max_ms": 37.23,
+   "ratio": 1.1371191628701596,
+   "added_ms": 3.8525000000000027,
+   "late": 0.2,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    21.145,
+    6.252000000000001,
+    3.473
+   ],
+   "base_ph_ms": [
+    18.743,
+    5.383,
+    3.223
+   ],
+   "upwait_ms": 0.005,
+   "result": "193 frames, 25 fps | 194 frames, 26 fps | 194 frames, 26 fps",
+   "pwr": 67.4,
+   "gtemp": 91.0,
+   "sm": 90.8,
+   "mem": 68.8,
+   "enc": 25.2,
+   "dec": 13.8,
+   "pclk": 2004.0,
+   "pviol": 100.0,
+   "tviol": 0.0,
+   "pclk_min": 1965.0
+  }
+ ]
+}

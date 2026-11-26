@@ -1,0 +1,278 @@
+# Altera Nios II (R1, "Nios II classic") -- 32-bit, little endian.
+#
+# Encodings mirror the GNU binutils R1 opcode table (opcodes/nios2-opc.c,
+# include/opcode/nios2r1.h).  Field constraints use the same match/mask
+# values as binutils, so a word that objdump prints as an undefined
+# ("0x........") word is also undefined here.  The pseudo-ops objdump
+# prefers (nop, mov, movi, movui, movhi) are given as more specific
+# constructors so the listing reads the same.
+#
+# Register r0 ("zero") reads as the constant 0 through the src* subtables;
+# writes to it go to the (never read) zero register and are dead code.
+
+define endian=little;
+define alignment=4;
+
+define space ram      type=ram_space      size=4 default;
+define space register type=register_space size=4;
+
+# General purpose registers (names as printed by binutils; r30 is "ba",
+# objdump calls it "sstatus").
+define register offset=0x0 size=4 [
+    zero at   r2   r3   r4   r5   r6   r7
+    r8   r9   r10  r11  r12  r13  r14  r15
+    r16  r17  r18  r19  r20  r21  r22  r23
+    et   bt   gp   sp   fp   ea   ba   ra
+];
+
+define register offset=0x80 size=4 [ pc ];
+
+# Control registers ctl0..ctl31.
+define register offset=0x100 size=4 [
+    status   estatus  bstatus  ienable  ipending cpuid    ctl6     exception
+    pteaddr  tlbacc   tlbmisc  eccinj   badaddr  config   mpubase  mpuacc
+    ctl16    ctl17    ctl18    ctl19    ctl20    ctl21    ctl22    ctl23
+    ctl24    ctl25    ctl26    ctl27    ctl28    ctl29    ctl30    ctl31
+];
+
+# Custom-instruction (coprocessor) registers c0..c31 (only used by "custom").
+define register offset=0x200 size=4 [
+    c0  c1  c2  c3  c4  c5  c6  c7  c8  c9  c10 c11 c12 c13 c14 c15
+    c16 c17 c18 c19 c20 c21 c22 c23 c24 c25 c26 c27 c28 c29 c30 c31
+];
+
+define token instr(32)
+    op      = (0,5)
+    imm5    = (6,10)
+    ctlreg  = (6,10)
+    opx     = (11,16)
+    imm16   = (6,21)
+    simm16  = (6,21) signed
+    imm26   = (6,31)
+    rC      = (17,21)
+    rB      = (22,26)
+    rA      = (27,31)
+    # custom instruction fields
+    cN      = (6,13)
+    readc   = (14,14)
+    readb   = (15,15)
+    reada   = (16,16)
+    cC      = (17,21)
+    cB      = (22,26)
+    cA      = (27,31)
+;
+
+attach variables [ rA rB rC ] [
+    zero at   r2   r3   r4   r5   r6   r7
+    r8   r9   r10  r11  r12  r13  r14  r15
+    r16  r17  r18  r19  r20  r21  r22  r23
+    et   bt   gp   sp   fp   ea   ba   ra
+];
+
+attach variables [ ctlreg ] [
+    status   estatus  bstatus  ienable  ipending cpuid    ctl6     exception
+    pteaddr  tlbacc   tlbmisc  eccinj   badaddr  config   mpubase  mpuacc
+    ctl16    ctl17    ctl18    ctl19    ctl20    ctl21    ctl22    ctl23
+    ctl24    ctl25    ctl26    ctl27    ctl28    ctl29    ctl30    ctl31
+];
+
+attach variables [ cA cB cC ] [
+    c0  c1  c2  c3  c4  c5  c6  c7  c8  c9  c10 c11 c12 c13 c14 c15
+    c16 c17 c18 c19 c20 c21 c22 c23 c24 c25 c26 c27 c28 c29 c30 c31
+];
+
+# ---------------------------------------------------------------------------
+# P-code ops for things with no clean C equivalent
+# ---------------------------------------------------------------------------
+define pcodeop trap;            # r2 = trap(n, r3=syscall nr, r4..r7 args) -- uClinux syscall
+define pcodeop breakpoint;
+define pcodeop custom;
+define pcodeop flushd;
+define pcodeop flushda;
+define pcodeop flushi;
+define pcodeop flushp;
+define pcodeop initd;
+define pcodeop initda;
+define pcodeop initi;
+define pcodeop sync;
+define pcodeop rdprs;
+define pcodeop wrprs;
+
+# ---------------------------------------------------------------------------
+# Operand subtables
+# ---------------------------------------------------------------------------
+srcA: rA is rA        { export rA; }
+srcA: rA is rA & rA=0 { export 0:4; }
+srcB: rB is rB        { export rB; }
+srcB: rB is rB & rB=0 { export 0:4; }
+
+# simm16(rA) memory operand -- exports the effective address
+mem: simm16(rA) is simm16 & rA & srcA { local addr:4 = srcA + simm16; export addr; }
+
+# Branch target = pc + 4 + simm16
+brtarget: dest is simm16 [ dest = inst_next + simm16; ] { export *:4 dest; }
+
+# call/jmpi target = (pc & 0xF0000000) | (imm26 << 2)
+jtarget: dest is imm26 [ dest = (inst_start & 0xF0000000) | (imm26 << 2); ] { export *:4 dest; }
+
+# Custom instruction operands: readX=1 -> general register, readX=0 -> cN
+custC: rC is readc=1 & rC { export rC; }
+custC: cC is readc=0 & cC { export cC; }
+custA: srcA is reada=1 & srcA { export srcA; }
+custA: cA is reada=0 & cA { export cA; }
+custB: srcB is readb=1 & srcB { export srcB; }
+custB: cB is readb=0 & cB { export cB; }
+
+# ---------------------------------------------------------------------------
+# I-type arithmetic / logic
+# ---------------------------------------------------------------------------
+:addi   rB, srcA, simm16  is op=0x04 & rB & srcA & simm16 { rB = srcA + simm16; }
+:movi   rB, simm16        is op=0x04 & rA=0 & rB & simm16 { rB = simm16; }
+:andi   rB, srcA, imm16   is op=0x0c & rB & srcA & imm16  { rB = srcA & imm16; }
+:ori    rB, srcA, imm16   is op=0x14 & rB & srcA & imm16  { rB = srcA | imm16; }
+:movui  rB, imm16         is op=0x14 & rA=0 & rB & imm16  { rB = imm16; }
+:xori   rB, srcA, imm16   is op=0x1c & rB & srcA & imm16  { rB = srcA ^ imm16; }
+:andhi  rB, srcA, imm16   is op=0x2c & rB & srcA & imm16  { rB = srcA & (imm16 << 16); }
+:orhi   rB, srcA, imm16   is op=0x34 & rB & srcA & imm16  { rB = srcA | (imm16 << 16); }
+:movhi  rB, imm16         is op=0x34 & rA=0 & rB & imm16  { rB = imm16 << 16; }
+:xorhi  rB, srcA, imm16   is op=0x3c & rB & srcA & imm16  { rB = srcA ^ (imm16 << 16); }
+:muli   rB, srcA, simm16  is op=0x24 & rB & srcA & simm16 { rB = srcA * simm16; }
+
+:cmpeqi  rB, srcA, simm16 is op=0x20 & rB & srcA & simm16 { rB = zext(srcA == simm16); }
+:cmpnei  rB, srcA, simm16 is op=0x18 & rB & srcA & simm16 { rB = zext(srcA != simm16); }
+:cmpgei  rB, srcA, simm16 is op=0x08 & rB & srcA & simm16 { rB = zext(srcA s>= simm16); }
+:cmplti  rB, srcA, simm16 is op=0x10 & rB & srcA & simm16 { rB = zext(srcA s< simm16); }
+:cmpgeui rB, srcA, imm16  is op=0x28 & rB & srcA & imm16  { rB = zext(srcA >= imm16); }
+:cmpltui rB, srcA, imm16  is op=0x30 & rB & srcA & imm16  { rB = zext(srcA < imm16); }
+
+# ---------------------------------------------------------------------------
+# Loads / stores
+# ---------------------------------------------------------------------------
+:ldb    rB, mem is op=0x07 & rB & mem { rB = sext(*:1 mem); }
+:ldbu   rB, mem is op=0x03 & rB & mem { rB = zext(*:1 mem); }
+:ldh    rB, mem is op=0x0f & rB & mem { rB = sext(*:2 mem); }
+:ldhu   rB, mem is op=0x0b & rB & mem { rB = zext(*:2 mem); }
+:ldw    rB, mem is op=0x17 & rB & mem { rB = *:4 mem; }
+:ldbio  rB, mem is op=0x27 & rB & mem { rB = sext(*:1 mem); }
+:ldbuio rB, mem is op=0x23 & rB & mem { rB = zext(*:1 mem); }
+:ldhio  rB, mem is op=0x2f & rB & mem { rB = sext(*:2 mem); }
+:ldhuio rB, mem is op=0x2b & rB & mem { rB = zext(*:2 mem); }
+:ldwio  rB, mem is op=0x37 & rB & mem { rB = *:4 mem; }
+
+:stb    srcB, mem is op=0x05 & srcB & mem { *:1 mem = srcB:1; }
+:sth    srcB, mem is op=0x0d & srcB & mem { *:2 mem = srcB:2; }
+:stw    srcB, mem is op=0x15 & srcB & mem { *:4 mem = srcB; }
+:stbio  srcB, mem is op=0x25 & srcB & mem { *:1 mem = srcB:1; }
+:sthio  srcB, mem is op=0x2d & srcB & mem { *:2 mem = srcB:2; }
+:stwio  srcB, mem is op=0x35 & srcB & mem { *:4 mem = srcB; }
+
+# Cache maintenance (B field must be 0)
+:flushd  mem is op=0x3b & rB=0 & mem { flushd(mem); }
+:flushda mem is op=0x1b & rB=0 & mem { flushda(mem); }
+:initd   mem is op=0x33 & rB=0 & mem { initd(mem); }
+:initda  mem is op=0x13 & rB=0 & mem { initda(mem); }
+
+:rdprs  rB, rA, simm16 is op=0x38 & rB & rA & simm16 { rB = rdprs(rA, simm16:2); }
+
+# ---------------------------------------------------------------------------
+# Branches / jumps
+# ---------------------------------------------------------------------------
+:br   brtarget               is op=0x06 & rA=0 & rB=0 & brtarget { goto brtarget; }
+:beq  srcA, srcB, brtarget   is op=0x26 & srcA & srcB & brtarget { if (srcA == srcB) goto brtarget; }
+:bne  srcA, srcB, brtarget   is op=0x1e & srcA & srcB & brtarget { if (srcA != srcB) goto brtarget; }
+:bge  srcA, srcB, brtarget   is op=0x0e & srcA & srcB & brtarget { if (srcA s>= srcB) goto brtarget; }
+:blt  srcA, srcB, brtarget   is op=0x16 & srcA & srcB & brtarget { if (srcA s< srcB) goto brtarget; }
+:bgeu srcA, srcB, brtarget   is op=0x2e & srcA & srcB & brtarget { if (srcA >= srcB) goto brtarget; }
+:bltu srcA, srcB, brtarget   is op=0x36 & srcA & srcB & brtarget { if (srcA < srcB) goto brtarget; }
+
+:call jtarget is op=0x00 & jtarget { ra = inst_next; call jtarget; }
+:jmpi jtarget is op=0x01 & jtarget { goto jtarget; }
+
+# ---------------------------------------------------------------------------
+# Custom instruction
+# ---------------------------------------------------------------------------
+:custom cN, custC, custA, custB is op=0x32 & cN & custC & custA & custB {
+    custC = custom(cN:1, custA, custB);
+}
+
+# ---------------------------------------------------------------------------
+# R-type (op = 0x3a, OPX)
+# ---------------------------------------------------------------------------
+# 3-register forms (IMM5 must be 0)
+:add    rC, srcA, srcB is op=0x3a & opx=0x31 & imm5=0 & rC & srcA & srcB { rC = srcA + srcB; }
+:mov    rC, srcA       is op=0x3a & opx=0x31 & imm5=0 & rB=0 & rC & srcA  { rC = srcA; }
+:nop                   is op=0x3a & opx=0x31 & imm5=0 & rA=0 & rB=0 & rC=0 { }
+:sub    rC, srcA, srcB is op=0x3a & opx=0x39 & imm5=0 & rC & srcA & srcB { rC = srcA - srcB; }
+:and    rC, srcA, srcB is op=0x3a & opx=0x0e & imm5=0 & rC & srcA & srcB { rC = srcA & srcB; }
+:or     rC, srcA, srcB is op=0x3a & opx=0x16 & imm5=0 & rC & srcA & srcB { rC = srcA | srcB; }
+:xor    rC, srcA, srcB is op=0x3a & opx=0x1e & imm5=0 & rC & srcA & srcB { rC = srcA ^ srcB; }
+:nor    rC, srcA, srcB is op=0x3a & opx=0x06 & imm5=0 & rC & srcA & srcB { rC = ~(srcA | srcB); }
+
+:mul    rC, srcA, srcB is op=0x3a & opx=0x27 & imm5=0 & rC & srcA & srcB { rC = srcA * srcB; }
+:mulxss rC, srcA, srcB is op=0x3a & opx=0x1f & imm5=0 & rC & srcA & srcB {
+    local p:8 = sext(srcA) * sext(srcB); rC = p(4);
+}
+:mulxsu rC, srcA, srcB is op=0x3a & opx=0x17 & imm5=0 & rC & srcA & srcB {
+    local p:8 = sext(srcA) * zext(srcB); rC = p(4);
+}
+:mulxuu rC, srcA, srcB is op=0x3a & opx=0x07 & imm5=0 & rC & srcA & srcB {
+    local p:8 = zext(srcA) * zext(srcB); rC = p(4);
+}
+:div    rC, srcA, srcB is op=0x3a & opx=0x25 & imm5=0 & rC & srcA & srcB { rC = srcA s/ srcB; }
+:divu   rC, srcA, srcB is op=0x3a & opx=0x24 & imm5=0 & rC & srcA & srcB { rC = srcA / srcB; }
+
+:cmpeq  rC, srcA, srcB is op=0x3a & opx=0x20 & imm5=0 & rC & srcA & srcB { rC = zext(srcA == srcB); }
+:cmpne  rC, srcA, srcB is op=0x3a & opx=0x18 & imm5=0 & rC & srcA & srcB { rC = zext(srcA != srcB); }
+:cmpge  rC, srcA, srcB is op=0x3a & opx=0x08 & imm5=0 & rC & srcA & srcB { rC = zext(srcA s>= srcB); }
+:cmplt  rC, srcA, srcB is op=0x3a & opx=0x10 & imm5=0 & rC & srcA & srcB { rC = zext(srcA s< srcB); }
+:cmpgeu rC, srcA, srcB is op=0x3a & opx=0x28 & imm5=0 & rC & srcA & srcB { rC = zext(srcA >= srcB); }
+:cmpltu rC, srcA, srcB is op=0x3a & opx=0x30 & imm5=0 & rC & srcA & srcB { rC = zext(srcA < srcB); }
+
+# Shifts / rotates by register
+:sll    rC, srcA, srcB is op=0x3a & opx=0x13 & imm5=0 & rC & srcA & srcB { rC = srcA << (srcB & 0x1f); }
+:srl    rC, srcA, srcB is op=0x3a & opx=0x1b & imm5=0 & rC & srcA & srcB { rC = srcA >> (srcB & 0x1f); }
+:sra    rC, srcA, srcB is op=0x3a & opx=0x3b & imm5=0 & rC & srcA & srcB { rC = srcA s>> (srcB & 0x1f); }
+:rol    rC, srcA, srcB is op=0x3a & opx=0x03 & imm5=0 & rC & srcA & srcB {
+    local sh:4 = srcB & 0x1f; rC = (srcA << sh) | (srcA >> (32 - sh));
+}
+:ror    rC, srcA, srcB is op=0x3a & opx=0x0b & imm5=0 & rC & srcA & srcB {
+    local sh:4 = srcB & 0x1f; rC = (srcA >> sh) | (srcA << (32 - sh));
+}
+
+# Shifts / rotates by immediate (B must be 0)
+:slli   rC, srcA, imm5 is op=0x3a & opx=0x12 & rB=0 & rC & srcA & imm5 { rC = srcA << imm5; }
+:srli   rC, srcA, imm5 is op=0x3a & opx=0x1a & rB=0 & rC & srcA & imm5 { rC = srcA >> imm5; }
+:srai   rC, srcA, imm5 is op=0x3a & opx=0x3a & rB=0 & rC & srcA & imm5 { rC = srcA s>> imm5; }
+:roli   rC, srcA, imm5 is op=0x3a & opx=0x02 & rB=0 & rC & srcA & imm5 {
+    rC = (srcA << imm5) | (srcA >> (32 - imm5));
+}
+
+# Control flow
+:ret        is op=0x3a & opx=0x05 & imm5=0 & rA=31 & rB=0 & rC=0 { return [ra]; }
+:jmp  rA    is op=0x3a & opx=0x0d & imm5=0 & rB=0 & rC=0 & rA & srcA { goto [srcA]; }
+:jmp  rA    is op=0x3a & opx=0x0d & imm5=0 & rB=0 & rC=0 & rA & rA=31 { return [ra]; }
+:callr rA   is op=0x3a & opx=0x1d & imm5=0 & rB=0 & rC=31 & rA & srcA {
+    local t:4 = srcA; ra = inst_next; call [t];
+}
+:nextpc rC  is op=0x3a & opx=0x1c & imm5=0 & rA=0 & rB=0 & rC { rC = inst_next; }
+:eret       is op=0x3a & opx=0x01 & imm5=0 & rA=0x1d & rB=0x1e & rC=0 { status = estatus; return [ea]; }
+:bret       is op=0x3a & opx=0x09 & imm5=0 & rA=0x1e & rB=0 & rC=0 { status = bstatus; return [ba]; }
+
+# uClinux (2.6 nios2nommu) syscall: r3 = number, r4.. = args, result in r2.
+:trap  imm5 is op=0x3a & opx=0x2d & rA=0 & rB=0 & rC=0x1d & imm5 {
+    r2 = trap(imm5:1, r3, r4, r5, r6, r7);
+}
+:break imm5 is op=0x3a & opx=0x34 & rA=0 & rB=0 & rC=0x1e & imm5 { breakpoint(imm5:1); }
+
+# Control registers
+:rdctl rC, ctlreg is op=0x3a & opx=0x26 & rA=0 & rB=0 & rC & ctlreg { rC = ctlreg; }
+:wrctl ctlreg, srcA is op=0x3a & opx=0x2e & rB=0 & rC=0 & srcA & ctlreg { ctlreg = srcA; }
+
+# Shadow register sets
+:wrprs rC, rA is op=0x3a & opx=0x14 & imm5=0 & rB=0 & rC & rA & srcA { wrprs(rC, srcA); }
+
+# Cache / sync
+:flushi rA  is op=0x3a & opx=0x0c & imm5=0 & rB=0 & rC=0 & rA & srcA { flushi(srcA); }
+:initi  rA  is op=0x3a & opx=0x29 & imm5=0 & rB=0 & rC=0 & rA & srcA { initi(srcA); }
+:flushp     is op=0x3a & opx=0x04 & imm5=0 & rA=0 & rB=0 & rC=0 { flushp(); }
+:sync       is op=0x3a & opx=0x36 & imm5=0 & rA=0 & rB=0 & rC=0 { sync(); }

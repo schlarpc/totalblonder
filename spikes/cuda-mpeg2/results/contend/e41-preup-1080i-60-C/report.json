@@ -1,0 +1,116 @@
+{
+ "dir": "results/contend/e41-preup-1080i-60-C",
+ "hdr": "fmt 1080i n 60",
+ "period_ms": 33.36666666666667,
+ "other_active_s": 13,
+ "rows": [
+  {
+   "comp": "(alone)",
+   "ticks": 80,
+   "base_ms": 25.1675,
+   "med_ms": 25.1675,
+   "p95_ms": 25.702,
+   "max_ms": 25.795,
+   "ratio": 1.0,
+   "added_ms": 0.0,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    18.673000000000002,
+    3.2445000000000004,
+    2.7775
+   ],
+   "base_ph_ms": [
+    18.673000000000002,
+    3.2445000000000004,
+    2.7775
+   ],
+   "upwait_ms": 0.005,
+   "result": "",
+   "pwr": 64.75,
+   "gtemp": 89.0,
+   "sm": 75.5,
+   "mem": 58.75,
+   "enc": 0.0,
+   "dec": 0.25,
+   "pclk": 2085.0,
+   "pviol": 79.0,
+   "tviol": 0.0,
+   "pclk_min": 2025.0
+  },
+  {
+   "comp": "tonemap_re",
+   "ticks": 60,
+   "base_ms": 25.132,
+   "med_ms": 28.6,
+   "p95_ms": 29.656,
+   "max_ms": 29.824,
+   "ratio": 1.1379914053795956,
+   "added_ms": 3.468,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    20.746499999999997,
+    3.6885000000000003,
+    2.957
+   ],
+   "base_ph_ms": [
+    18.572,
+    3.244,
+    2.779
+   ],
+   "upwait_ms": 0.005,
+   "result": "206 frames, 25 fps",
+   "pwr": 67.0,
+   "gtemp": 90.0,
+   "sm": 89.66666666666667,
+   "mem": 64.83333333333333,
+   "enc": 26.166666666666668,
+   "dec": 13.333333333333334,
+   "pclk": 1975.0,
+   "pviol": 99.0,
+   "tviol": 0.0,
+   "pclk_min": 1890.0
+  },
+  {
+   "comp": "(plex)",
+   "ticks": 41,
+   "base_ms": 25.1675,
+   "med_ms": 25.297,
+   "p95_ms": 25.969,
+   "max_ms": 26.418,
+   "ratio": 1.0051455249826164,
+   "added_ms": 0.12950000000000017,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    18.801,
+    3.239,
+    2.778
+   ],
+   "base_ph_ms": [
+    18.673000000000002,
+    3.2445000000000004,
+    2.7775
+   ],
+   "upwait_ms": 0.006,
+   "result": "",
+   "pwr": null,
+   "gtemp": null,
+   "sm": null,
+   "mem": null,
+   "enc": null,
+   "dec": null,
+   "pclk": null,
+   "pviol": null,
+   "tviol": null,
+   "pclk_min": null
+  }
+ ]
+}

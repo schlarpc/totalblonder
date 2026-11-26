@@ -1,0 +1,19 @@
+[package]
+name = "tb-m2v-syntax"
+description = "MPEG-2 video syntax written on the host: bit writer, sequence/GOP/picture headers, caption user data, all-skipped slices, the tables of H.262"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-kernel-abi.workspace = true
+bytemuck.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tb-golden.workspace = true
+
+[lints]
+workspace = true

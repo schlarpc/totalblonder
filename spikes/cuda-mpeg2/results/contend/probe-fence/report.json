@@ -1,0 +1,80 @@
+{
+ "dir": "results/contend/probe-fence",
+ "hdr": "fmt 480i n 300",
+ "period_ms": 33.36666666666667,
+ "other_active_s": 0,
+ "rows": [
+  {
+   "comp": "(alone)",
+   "ticks": 189,
+   "base_ms": 21.789,
+   "med_ms": 21.789,
+   "p95_ms": 22.433,
+   "max_ms": 23.172,
+   "ratio": 1.0,
+   "added_ms": 0.0,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    14.17,
+    4.323,
+    2.606
+   ],
+   "base_ph_ms": [
+    14.17,
+    4.323,
+    2.606
+   ],
+   "upwait_ms": 0.008,
+   "result": "",
+   "pwr": 58.0,
+   "gtemp": 69.0,
+   "sm": 66.25,
+   "mem": 52.25,
+   "enc": 0.0,
+   "dec": 0.0,
+   "pclk": 2400.0,
+   "pviol": 0.0,
+   "tviol": 0.0,
+   "pclk_min": 2310.0
+  },
+  {
+   "comp": "cuda_tinycont",
+   "ticks": 134,
+   "base_ms": 21.7905,
+   "med_ms": 24.219,
+   "p95_ms": 25.279,
+   "max_ms": 26.057,
+   "ratio": 1.1114476492049288,
+   "added_ms": 2.4284999999999997,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    15.810500000000001,
+    4.7105,
+    2.8895
+   ],
+   "base_ph_ms": [
+    14.1815,
+    4.323,
+    2.605
+   ],
+   "upwait_ms": 0.008,
+   "result": "56060 launches, round trip p50 0.040 p99 2.291 max 2.860 ms",
+   "pwr": 61.0,
+   "gtemp": 72.0,
+   "sm": 74.66666666666667,
+   "mem": 53.666666666666664,
+   "enc": 0.0,
+   "dec": 0.0,
+   "pclk": 2280.0,
+   "pviol": 0.0,
+   "tviol": 0.0,
+   "pclk_min": 2265.0
+  }
+ ]
+}

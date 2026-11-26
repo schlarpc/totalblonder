@@ -1,0 +1,7 @@
+Downloaded 2026-11-24 (untrusted data; checksums in SHA256SUMS).
+
+ANSI_SCTE-128-1-2020-1586877225672.pdf  https://www.scte.org/documents/373/ANSI_SCTE-128-1-2020-1586877225672.pdf
+ANSI_SCTE20128-2202018.pdf              https://www.scte.org/documents/705/ANSI_SCTE20128-2202018.pdf
+SCTE_54_2024.pdf                        https://www.scte.org/documents/6941/SCTE_54_2024.pdf
+
+Not obtained: SCTE 43 2015 (catalog page exposes no download link to scripted fetches).

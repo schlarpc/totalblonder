@@ -1,0 +1,2 @@
+label,fmt,kind,n,frames,rt,mb_per_s,tick_mean_ms,tick_p50_ms,tick_p99_ms,tick_p999_ms,tick_max_ms,ontime_frac,late_deadline,cpu_cores,mbps_per_session,underflows,dev_mb,sm_mean,mem_mean,watts_mean,watts_max,temp_start,temp_max,pclk_min,load_before,load_after,contaminated
+load-1080i-after,1080i,paced,16,1798,0.9983,3906364,6.9698,6.9469,7.2283,7.3941,7.4122,1.0,0,0.04552,15.0249,0,983.5,20.0,14.4,27.3,28.0,53.0,62.0,2130.0,4.35,2.18,False

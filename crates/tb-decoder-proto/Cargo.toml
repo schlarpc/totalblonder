@@ -1,0 +1,15 @@
+[package]
+name = "tb-decoder-proto"
+description = "Sans-io core of the sandboxed decoder: the versioned wire protocol, ring and slot accounting, validation of what the worker says, the supervisor's restart and watchdog policy"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-media.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

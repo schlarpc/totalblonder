@@ -1,0 +1,58 @@
+122 ticks found, 82 used (the last two thirds)
+per tick: length 33.366 ms; GPU busy 24.711 ms (74.1 %), idle 8.655 ms (25.9 %)
+          kernels and memsets alone busy 23.381 ms (70.1 %); tick length min 29.481, median 33.367, max 37.234 ms
+          tick lengths, ms: 37.2 29.5 33.4 33.4 33.3 33.3 33.4 33.4 33.4 37.1 29.6 33.4 33.4 33.4 33.4 33.3 33.4 33.4 33.4 33.4 33.4 33.4 37.0 29.7 33.4 33.4 33.3 33.4 33.4 33.4 33.4 33.4 33.4 33.4 33.4 33.4 33.4 33.4 33.4 33.4 33.4 33.4 33.4 33.4 33.4 33.3 33.4 33.4 33.4 33.4 33.3 33.4 33.3 33.4 33.4 33.4 33.3 33.4 33.3 33.4 33.4 33.4 33.3 33.4 33.4 33.4 33.4 33.4 33.4 33.4 36.8 29.9 33.4 33.4 33.3 33.4 36.9 29.9 33.4 37.0 29.6 33.4
+          host: in cudaStreamSynchronize 0.004 ms, in other CUDA API calls 1.025 ms, outside CUDA 32.337 ms; 17 kernel launches, 305 copies and memsets
+launch latency when the GPU is idle (API call to start on the GPU): median 72.0 us, 90th percentile 161.8 us (403 activities)
+API calls per tick (count, total ms, mean us):
+  cudaMemcpyAsync              304.3    0.891      2.9
+  cudaLaunchKernel              16.6    0.112      6.7
+  cudaMemsetAsync                1.0    0.016     16.2
+  cuKernelGetName               16.6    0.006      0.4
+  cudaStreamSynchronize          1.0    0.004      4.4
+GPU idle time before an activity, per tick (count, total ms):
+  memcpy H2D                    30.9    0.850
+  k_quant                        1.0    0.016
+  memcpy D2H                     3.0    0.013
+  k_pyr                          1.9    0.009
+  k_xf                           0.7    0.003
+  memset                         1.0    0.002
+  k_set_mode                     1.0    0.002
+  k_ent_scatter                  1.0    0.001
+  k_recon                        1.0    0.001
+  k_ent_picsum                   1.0    0.001
+  k_ent_pack                     1.0    0.001
+  k_ent_rowsum                   1.0    0.001
+
+timeline of a median tick (33.367 ms): start offset ms, duration ms, idle gap before ms, activity
+     0.086    0.012    0.086  memcpy H2D x3
+     0.098    0.007    0.001  k_set_mode
+     0.112    0.001    0.007  memcpy H2D
+     0.118    0.664    0.005  k_pyr
+     0.130    0.684    0.000  memcpy H2D x15
+     0.784    5.615    0.000  k_me
+     0.815    5.624    0.000  memcpy H2D x137
+     6.400    1.600    0.000  k_mvsmooth
+     6.440    1.571    0.000  memcpy H2D x38
+     8.000    0.618    0.000  k_mbstat
+     8.015    0.612    0.000  memcpy H2D x14
+     8.619    7.316    0.000  k_xf
+     8.628    3.964    0.000  memcpy H2D x96
+    15.935    0.274    0.001  k_rowstat
+    16.211    0.055    0.002  memcpy D2H
+    16.862    0.003    0.596  memcpy H2D x2
+    16.867    0.054    0.001  k_xf
+    16.929    0.002    0.009  memcpy H2D
+    16.933    2.616    0.002  k_quant
+    19.550    0.229    0.001  k_ent_resolve
+    19.779    1.404    0.001  k_ent_pack
+    21.184    0.026    0.001  k_ent_rowsum
+    21.211    0.008    0.001  k_ent_picsum
+    21.223    0.001    0.004  memcpy D2H
+    21.372    0.000    0.148  memcpy H2D
+    21.374    0.008    0.001  memset
+    21.383    0.314    0.001  k_ent_scatter
+    21.698    0.000    0.002  memcpy H2D
+    21.699    1.713    0.001  k_recon
+    23.412    0.546    0.001  k_pyr
+    23.963    0.382    0.005  memcpy D2H

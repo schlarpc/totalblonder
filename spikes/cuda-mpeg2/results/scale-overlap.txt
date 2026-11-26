@@ -1,0 +1,22 @@
+# 2026-11-25T09:36:09Z load 0.79 1.12 1.20
+1080i crowd_run n=28 fps_per_session=40.425 rt=1.349 late=1 p99_ms=27.219 cpu_per_session=0.0005 mbps=14.998
+1080i crowd_run n=32 fps_per_session=34.999 rt=1.168 late=2 p99_ms=31.235 cpu_per_session=0.0004 mbps=14.997
+1080i crowd_run n=36 fps_per_session=31.005 rt=1.035 late=185 p99_ms=35.079 cpu_per_session=0.0004 mbps=14.997
+1080i crowd_run n=40 fps_per_session=27.794 rt=0.927 late=250 p99_ms=38.961 cpu_per_session=0.0003 mbps=14.997
+720p crowd_run n=28 fps_per_session=92.235 rt=1.539 late=1 p99_ms=15.336 cpu_per_session=0.0011 mbps=12.017
+720p crowd_run n=32 fps_per_session=80.843 rt=1.349 late=8 p99_ms=17.344 cpu_per_session=0.0010 mbps=12.018
+720p crowd_run n=36 fps_per_session=71.560 rt=1.194 late=19 p99_ms=19.240 cpu_per_session=0.0008 mbps=12.019
+720p crowd_run n=40 fps_per_session=64.360 rt=1.074 late=31 p99_ms=21.388 cpu_per_session=0.0007 mbps=12.019
+480i crowd_run n=160 fps_per_session=40.624 rt=1.355 late=1 p99_ms=27.690 cpu_per_session=0.0003 mbps=4.000
+480i crowd_run n=192 fps_per_session=33.673 rt=1.124 late=5 p99_ms=33.473 cpu_per_session=0.0002 mbps=4.000
+480i crowd_run n=208 fps_per_session=30.861 rt=1.030 late=162 p99_ms=36.359 cpu_per_session=0.0002 mbps=4.000
+480i crowd_run n=224 fps_per_session=28.565 rt=0.953 late=233 p99_ms=39.215 cpu_per_session=0.0002 mbps=4.000
+1080i crowd_run n=28 fps_per_session=38.625 rt=1.289 late=1 p99_ms=28.560 cpu_per_session=0.0006 mbps=14.998
+1080i crowd_run n=32 fps_per_session=33.699 rt=1.124 late=2 p99_ms=32.476 cpu_per_session=0.0005 mbps=14.997
+1080i crowd_run n=36 fps_per_session=29.966 rt=1.000 late=200 p99_ms=36.313 cpu_per_session=0.0004 mbps=14.997
+1080i crowd_run n=40 fps_per_session=26.960 rt=0.900 late=276 p99_ms=40.457 cpu_per_session=0.0004 mbps=14.997
+720p crowd_run n=32 fps_per_session=78.877 rt=1.316 late=10 p99_ms=17.745 cpu_per_session=0.0009 mbps=12.018
+720p crowd_run n=36 fps_per_session=69.974 rt=1.167 late=20 p99_ms=19.788 cpu_per_session=0.0008 mbps=12.019
+480i crowd_run n=192 fps_per_session=33.116 rt=1.105 late=27 p99_ms=34.010 cpu_per_session=0.0002 mbps=4.000
+480i crowd_run n=208 fps_per_session=30.453 rt=1.016 late=176 p99_ms=37.095 cpu_per_session=0.0002 mbps=4.000
+# 2026-11-25T09:38:56Z load 0.19 0.74 1.04

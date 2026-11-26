@@ -1,0 +1,27 @@
+[package]
+name = "tb-device-cuda"
+description = "CUDA adapter: executes device plans through the CUDA driver API with the kernel image built by Nix"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-device.workspace = true
+tb-kernel-abi.workspace = true
+libloading.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tb-device-ref.workspace = true
+tb-golden.workspace = true
+bytemuck.workspace = true
+
+[[bench]]
+name = "protocol"
+harness = false
+
+[lints]
+workspace = true

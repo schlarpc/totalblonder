@@ -1,0 +1,14 @@
+[package]
+name = "tb-ts"
+description = "MPEG-2 transport stream primitives (H.222.0): packets, adaptation fields, PCR, PES headers, PSI sections, CRC-32/MPEG-2"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,15 @@
+[package]
+name = "tb-tsin"
+description = "Sans-io MPEG transport stream input: RTP (RFC 3550, RFC 2250) or raw UDP datagrams, an input demuxer (PAT, PMT, PES) into tb-media input events"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-media.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,15 @@
+[package]
+name = "tb-rtmp"
+description = "Sans-io RTMP server for publishers: handshake, chunk streams, AMF0, the publish command flow, FLV tag payloads into tb-media input events"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-media.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

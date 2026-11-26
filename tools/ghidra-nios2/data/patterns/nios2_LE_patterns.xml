@@ -1,0 +1,29 @@
+<!--
+  Function-start patterns for gcc-generated Nios II R1 code (little endian).
+  Byte order is memory order: byte0 holds bits 0..7 of the instruction word.
+
+    ret                 = 0xf800283a      -> 3a 28 00 f8
+    br    xyz           op=0x06, A=B=0    -> ..000110 ........ 00...... 0x00
+    addi  sp,sp,-N      op=0x04, A=B=sp, imm<0
+                                          -> ..000100 ........ 111..... 0xde
+    stw   ra,N(sp)      op=0x15, A=sp, B=ra
+                                          -> ..010101 ........ 11...... 0xdf
+-->
+<patternlist>
+  <patternpairs totalbits="32" postbits="16">
+    <prepatterns>
+      <data>0x3a2800f8</data>                                   <!-- ret -->
+      <data>..000110 ........ 00...... 0x00</data>              <!-- br xyz -->
+    </prepatterns>
+    <postpatterns>
+      <data>..000100 ........ 111..... 0xde</data>              <!-- addi sp,sp,-N -->
+      <funcstart/>
+    </postpatterns>
+  </patternpairs>
+
+  <pattern>
+    <data>..000100 ........ 111..... 0xde   ..010101 ........ 11...... 0xdf</data>
+    <!-- addi sp,sp,-N ; stw ra,N(sp) -->
+    <funcstart validcode="4" contiguous="true"/>
+  </pattern>
+</patternlist>

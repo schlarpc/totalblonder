@@ -1,0 +1,10 @@
+group 0: 704x480i 29.97 fps, coded 704x480, GOP 15 M 3 staggered, f_code 4, search +-35 pel, field pred 1, aq 1, sessions 400, frames 839, mean 4.013 Mbit/s
+upload overlapped (+1 frame delay), paced; device memory 3970.5 MB allocated (9.9 MB/session), context total 4004.0 MB
+wall 37.446 s, 0.75x real time, 11830239 macroblocks/s, 335600 pictures
+tick ms: mean 44.486 p50 49.029 p99 53.154 p99.9 61.350 max 61.350, period 33.367, late 582 (deadline 809) of 809
+host cpu 8.241 s = 0.220 cores total, 0.0006 per session; pcie up 4542.8 MB/s down 150.01 MB/s
+session 0 I: 56 pictures, mean 36969 bytes, mean quantiser_scale 30.4
+session 0 P: 280 pictures, mean 23509 bytes, mean quantiser_scale 35.6
+session 0 B: 503 pictures, mean 10701 bytes, mean quantiser_scale 44.5
+rate control: buffer violations 0, least room 39.7% of vbv_buffer_size, extra passes 223 (0.001 per picture), repeated transforms 1251 (0.0037 per picture), ladder pictures 0, skipped pictures 0, I replaced by P 0
+loadavg before 1.06 after 1.37

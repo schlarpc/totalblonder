@@ -1,0 +1,16 @@
+[package]
+name = "tb-mux"
+description = "Clock-driven constant-rate MPTS multiplexer: slot clock, PCR, PES packetization, T-STD admission, table carousel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-ts.workspace = true
+tb-psip.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

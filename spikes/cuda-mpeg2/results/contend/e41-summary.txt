@@ -1,0 +1,126 @@
+# experiment 41: single competitors, before (preup) and after (fence) the upload fence
+## results/contend/e41-preup-480i-300-*: pooled alone median 22.70 ms from 3 runs
+  e41-preup-480i-300-A     cuda_tinycont                                n= 106 med  36.07 ratio  1.62 pooled  1.59 p95  36.93 max   37.9 ontime    0.0% slow   0 W  63 MHz  2310 | 51051 launches, round trip p50 0.048 p99 2.267 max 3.280 ms
+  e41-preup-480i-300-A     scale_max                                    n= 146 med  39.08 ratio  1.69 pooled  1.72 p95  39.73 max   40.7 ontime    0.0% slow   0 W  65 MHz  2166 | 5547 frames, 690 fps
+  e41-preup-480i-300-B     scale_re                                     n= 166 med  24.10 ratio  1.07 pooled  1.06 p95  34.20 max   34.7 ontime   75.9% slow  41 W  62 MHz  2148 | 206 frames, 26 fps
+  e41-preup-480i-300-B     tonemap_max                                  n= 152 med  42.67 ratio  1.84 pooled  1.88 p95  47.84 max   51.5 ontime    2.0% slow   0 W  65 MHz  2095 | 552 frames, 66 fps
+  e41-preup-480i-300-C     tonemap_re                                   n= 185 med  29.26 ratio  1.29 pooled  1.29 p95  38.30 max   41.9 ontime   64.3% slow  43 W  65 MHz  2178 | 206 frames, 25 fps
+## results/contend/e41-preup-480i-400-*: pooled alone median 31.09 ms from 3 runs
+  e41-preup-480i-400-A     cuda_tinycont                                n=  93 med  48.65 ratio  1.57 pooled  1.56 p95  49.56 max   59.4 ontime    0.0% slow   0 W  62 MHz  2164 | 49118 launches, round trip p50 0.056 p99 2.270 max 3.752 ms
+  e41-preup-480i-400-A     scale_max                                    n=  88 med  52.38 ratio   nan pooled  1.68 p95  52.98 max   57.7 ontime    0.0% slow   0 W  64 MHz  2196 | 5371 frames, 665 fps
+  e41-preup-480i-400-B     scale_re                                     n= 129 med  31.80 ratio  1.02 pooled  1.02 p95  46.53 max   47.3 ontime   89.9% slow  12 W  67 MHz  1956 | 206 frames, 26 fps
+  e41-preup-480i-400-B     tonemap_max                                  n= 127 med  47.88 ratio  1.53 pooled  1.54 p95  59.07 max   65.9 ontime    0.0% slow   4 W  65 MHz  2060 | 498 frames, 59 fps
+  e41-preup-480i-400-C     tonemap_re                                   n= 156 med  36.85 ratio  1.19 pooled  1.19 p95  50.42 max   56.0 ontime    0.6% slow  41 W  66 MHz  2030 | 206 frames, 25 fps
+## results/contend/e41-preup-1080i-60-*: pooled alone median 25.18 ms from 2 runs
+  e41-preup-1080i-60-A     cuda_tinycont                                n= 134 med  28.05 ratio  1.11 pooled  1.11 p95  28.72 max   29.1 ontime  100.0% slow   0 W  66 MHz  2130 | 29530 launches, round trip p50 0.045 p99 2.324 max 2.616 ms
+  e41-preup-1080i-60-A     scale_max                                    n= 171 med  31.80 ratio  1.27 pooled  1.26 p95  32.30 max   32.5 ontime  100.0% slow   0 W  68 MHz  1938 | 5056 frames, 628 fps
+  e41-preup-1080i-60-B     scale_re                                     n=   0 med    nan ratio   nan pooled   nan p95    nan max    0.0 ontime   -1.0% slow   0 W  66 MHz  2006 | 206 frames, 26 fps
+  e41-preup-1080i-60-B     tonemap_max                                  n= 132 med  35.64 ratio  1.42 pooled  1.42 p95  38.05 max   39.3 ontime   12.1% slow   0 W  68 MHz  1855 | 557 frames, 67 fps
+  e41-preup-1080i-60-C     tonemap_re                                   n=  60 med  28.60 ratio  1.14 pooled  1.14 p95  29.66 max   29.8 ontime  100.0% slow   0 W  67 MHz  1975 | 206 frames, 25 fps
+## results/contend/e41-fence-480i-300-*: pooled alone median 22.38 ms from 2 runs
+  e41-fence-480i-300-A     cuda_tinycont                                n= 133 med  25.21 ratio  1.14 pooled  1.13 p95  25.91 max   28.0 ontime  100.0% slow   0 W  64 MHz  2122 | 48507 launches, round trip p50 0.041 p99 2.300 max 3.673 ms
+  e41-fence-480i-300-A     scale_max                                    n= 169 med  27.78 ratio  1.23 pooled  1.24 p95  28.25 max   28.8 ontime  100.0% slow   0 W  67 MHz  2104 | 5363 frames, 667 fps
+  e41-fence-480i-300-B     scale_re                                     n= 168 med  22.73 ratio  1.01 pooled  1.02 p95  23.34 max   23.6 ontime  100.0% slow   0 W  62 MHz  2148 | 206 frames, 26 fps
+  e41-fence-480i-300-B     tonemap_max                                  n= 150 med  31.47 ratio   nan pooled  1.41 p95  34.91 max   35.5 ontime   84.0% slow   0 W  67 MHz  2022 | 569 frames, 68 fps
+  e41-fence-480i-300-C     tonemap_re                                   n=  38 med  24.98 ratio   nan pooled  1.12 p95  27.26 max   27.4 ontime  100.0% slow   0 W  64 MHz  2133 | 206 frames, 25 fps
+## results/contend/e41-fence-480i-400-*: pooled alone median 30.93 ms from 3 runs
+  e41-fence-480i-400-A     cuda_tinycont                                n= 132 med  34.25 ratio  1.11 pooled  1.11 p95  34.81 max   35.2 ontime    0.0% slow   0 W  68 MHz  2002 | 11841 launches, round trip p50 0.050 p99 2.328 max 2.530 ms
+  e41-fence-480i-400-A     scale_max                                    n= 119 med  38.15 ratio  1.21 pooled  1.23 p95  39.52 max   40.6 ontime    0.0% slow   0 W  68 MHz  1968 | 5046 frames, 627 fps
+  e41-fence-480i-400-B     scale_re                                     n= 172 med  31.13 ratio  1.01 pooled  1.01 p95  31.64 max   31.9 ontime  100.0% slow   0 W  67 MHz  2051 | 206 frames, 26 fps
+  e41-fence-480i-400-B     tonemap_max                                  n= 157 med  40.72 ratio  1.31 pooled  1.32 p95  44.55 max   46.2 ontime    0.6% slow   0 W  68 MHz  1892 | 544 frames, 65 fps
+  e41-fence-480i-400-C     tonemap_re                                   n=  58 med  34.90 ratio  1.13 pooled  1.13 p95  35.72 max   36.5 ontime   13.8% slow   0 W  68 MHz  1938 | 206 frames, 25 fps
+## results/contend/e41-fence-1080i-60-*: pooled alone median 25.12 ms from 3 runs
+  e41-fence-1080i-60-A     cuda_tinycont                                n=  86 med  27.92 ratio  1.11 pooled  1.11 p95  28.87 max   29.1 ontime  100.0% slow   0 W  66 MHz  2066 | 26647 launches, round trip p50 0.049 p99 2.331 max 2.569 ms
+  e41-fence-1080i-60-A     scale_max                                    n= 124 med  31.85 ratio  1.27 pooled  1.27 p95  34.19 max   34.9 ontime   91.1% slow   0 W  68 MHz  2016 | 5007 frames, 622 fps
+  e41-fence-1080i-60-B     scale_re                                     n=  21 med  25.18 ratio  1.00 pooled  1.00 p95  26.25 max   26.3 ontime  100.0% slow   0 W  65 MHz  2058 | 206 frames, 26 fps
+  e41-fence-1080i-60-B     tonemap_max                                  n=  30 med  35.85 ratio  1.42 pooled  1.43 p95  40.07 max   40.9 ontime    3.3% slow   0 W  68 MHz  1852 | 558 frames, 67 fps
+  e41-fence-1080i-60-C     tonemap_re                                   n=  35 med  28.33 ratio  1.12 pooled  1.13 p95  29.73 max   29.9 ontime  100.0% slow   0 W  67 MHz  1995 | 206 frames, 25 fps
+
+# experiment 41: several competitors at once, after the fence (e41m first series, e41r repeats of cells lost to Plex activity)
+## results/contend/e41[mr]-1080i-60-*: pooled alone median 25.29 ms from 7 runs
+  e41m-1080i-60-1          scale_re+scale_re                            n= 176 med  25.57 ratio  1.02 pooled  1.01 p95  26.37 max   26.8 ontime  100.0% slow   0 W  65 MHz  2055 | 206 frames, 26 fps | 206 frames, 26 fps
+  e41m-1080i-60-1          scale_re+scale_re+scale_re                   n=  30 med  25.78 ratio  1.03 pooled  1.02 p95  26.90 max   27.0 ontime  100.0% slow   0 W  65 MHz  2148 | 194 frames, 26 fps | 194 frames, 26 fps | 194 frames, 26 fps
+  e41m-1080i-60-2          scale_max+scale_max                          n= 115 med  32.10 ratio  1.28 pooled  1.27 p95  32.95 max   34.4 ontime   97.4% slow   0 W  68 MHz  1956 | 2441 frames, 302 fps | 2442 frames, 302 fps
+  e41m-1080i-60-2          scale_max+scale_max+scale_max                n= 131 med  31.86 ratio  1.27 pooled  1.26 p95  32.43 max   32.8 ontime  100.0% slow   0 W  68 MHz  1950 | 1576 frames, 207 fps | 1572 frames, 206 fps | 1572 frames, 206 fps
+  e41m-1080i-60-3          scale_re+scale_re+x4k_re                     n=   0 med    nan ratio   nan pooled   nan p95    nan max    0.0 ontime   -1.0% slow   0 W  66 MHz  2022 | 206 frames, 25 fps | 206 frames, 25 fps | 206 frames, 25 fps
+  e41m-1080i-60-3          scale_max+scale_max+x4k_max                  n= 130 med  37.52 ratio  1.47 pooled  1.48 p95  39.31 max   41.1 ontime    0.8% slow   0 W  68 MHz  1918 | 1491 frames, 195 fps | 1511 frames, 198 fps | 1091 frames, 132 fps
+  e41m-1080i-60-4          scale_re+x4k_re+x4k_re                       n=  22 med  28.20 ratio  1.12 pooled  1.12 p95  33.06 max   41.6 ontime   95.5% slow   1 W  66 MHz  1969 | 206 frames, 25 fps | 206 frames, 25 fps | 206 frames, 25 fps
+  e41m-1080i-60-4          scale_max+x4k_max+x4k_max                    n=  23 med  44.30 ratio  1.77 pooled  1.75 p95  45.57 max   53.7 ontime    0.0% slow   0 W  68 MHz  1956 | 1551 frames, 191 fps | 1017 frames, 124 fps | 1021 frames, 124 fps
+  e41m-1080i-60-5          x4k_re+x4k_re+tonemap_re                     n=   2 med  30.80 ratio  1.22 pooled  1.22 p95  32.47 max   32.5 ontime  100.0% slow   0 W  68 MHz  1912 | 206 frames, 25 fps | 206 frames, 25 fps | 193 frames, 25 fps
+  e41m-1080i-60-5          x4k_max+x4k_max+tonemap_max                  n=   0 med    nan ratio   nan pooled   nan p95    nan max    0.0 ontime   -1.0% slow   0 W  68 MHz  1884 | 476 frames, 60 fps | 476 frames, 60 fps | 437 frames, 54 fps
+  e41m-1080i-60-6          tonemap_re+scale_re+scale_re                 n=  46 med  29.36 ratio  1.16 pooled  1.16 p95  33.50 max   33.9 ontime   91.3% slow   0 W  67 MHz  1985 | 192 frames, 25 fps | 194 frames, 26 fps | 194 frames, 26 fps
+  e41m-1080i-60-6          tonemap_max+scale_max+scale_max              n= 114 med  40.88 ratio  1.61 pooled  1.62 p95  44.09 max   49.0 ontime    0.0% slow   0 W  68 MHz  1885 | 456 frames, 58 fps | 1807 frames, 237 fps | 1784 frames, 234 fps
+  e41m-1080i-60-7          x4k_re                                       n=  21 med  26.02 ratio  1.03 pooled  1.03 p95  27.68 max   28.0 ontime  100.0% slow   0 W  66 MHz  2081 | 206 frames, 25 fps
+  e41m-1080i-60-7          x4k_max                                      n=  76 med  49.90 ratio  1.95 pooled  1.97 p95  51.60 max   52.7 ontime    0.0% slow   0 W  68 MHz  1917 | 2715 frames, 335 fps
+  e41r-1080i-60-1          scale_re+scale_re+x4k_re                     n=   0 med    nan ratio   nan pooled   nan p95    nan max    0.0 ontime   -1.0% slow   0 W  67 MHz  1995 | 194 frames, 26 fps | 194 frames, 26 fps | 201 frames, 25 fps
+  e41r-1080i-60-1          x4k_re+x4k_re+tonemap_re                     n= 167 med  33.52 ratio   nan pooled  1.33 p95  39.84 max   49.7 ontime   47.3% slow   2 W  68 MHz  1958 | 194 frames, 25 fps | 194 frames, 25 fps | 180 frames, 24 fps
+  e41r-1080i-60-2          x4k_max+x4k_max+tonemap_max                  n=  22 med  45.45 ratio   nan pooled  1.80 p95  50.59 max   53.3 ontime    0.0% slow   0 W  68 MHz  1932 | 520 frames, 66 fps | 516 frames, 65 fps | 461 frames, 57 fps
+  e41r-1080i-60-2          scale_re+x4k_re+x4k_re                       n=   0 med    nan ratio   nan pooled   nan p95    nan max    0.0 ontime   -1.0% slow   0 W  68 MHz  1958 | 194 frames, 26 fps | 194 frames, 25 fps | 194 frames, 25 fps
+## results/contend/e41[mr]-480i-300-*: pooled alone median 22.65 ms from 8 runs
+  e41m-480i-300-1          scale_re+scale_re                            n=  86 med  23.30 ratio  1.03 pooled  1.03 p95  24.10 max   27.2 ontime  100.0% slow   0 W  62 MHz  2046 | 206 frames, 26 fps | 206 frames, 26 fps
+  e41m-480i-300-1          scale_re+scale_re+scale_re                   n=  30 med  23.24 ratio  1.03 pooled  1.03 p95  23.88 max   23.9 ontime  100.0% slow   0 W  62 MHz  2156 | 194 frames, 26 fps | 194 frames, 26 fps | 194 frames, 26 fps
+  e41m-480i-300-2          scale_max+scale_max                          n=  60 med  28.18 ratio  1.25 pooled  1.24 p95  29.04 max   29.4 ontime  100.0% slow   0 W  66 MHz  2125 | 2656 frames, 329 fps | 2650 frames, 328 fps
+  e41m-480i-300-2          scale_max+scale_max+scale_max                n= 120 med  28.20 ratio  1.25 pooled  1.24 p95  29.24 max   29.6 ontime  100.0% slow   0 W  67 MHz  2034 | 1654 frames, 218 fps | 1653 frames, 218 fps; [in#0/matroska,webm @ 0x5f253b335f00] Error during demuxing: Immediate | 1655 frames, 218 fps
+  e41m-480i-300-3          scale_re+scale_re+x4k_re                     n= 122 med  24.02 ratio  1.06 pooled  1.06 p95  25.04 max   31.2 ontime  100.0% slow   1 W  64 MHz  2182 | 194 frames, 26 fps | 206 frames, 26 fps | 206 frames, 26 fps
+  e41m-480i-300-3          scale_max+scale_max+x4k_max                  n=   0 med    nan ratio   nan pooled   nan p95    nan max    0.0 ontime   -1.0% slow   0 W  68 MHz  1995 | 1424 frames, 186 fps | 1425 frames, 186 fps | 1056 frames, 128 fps
+  e41m-480i-300-4          scale_re+x4k_re+x4k_re                       n=   0 med    nan ratio   nan pooled   nan p95    nan max    0.0 ontime   -1.0% slow   0 W  66 MHz  2072 | 194 frames, 26 fps | 206 frames, 25 fps | 194 frames, 26 fps
+  e41m-480i-300-4          scale_max+x4k_max+x4k_max                    n= 128 med  40.11 ratio   nan pooled  1.77 p95  42.06 max   50.3 ontime    0.0% slow   1 W  68 MHz  1968 | 1596 frames, 196 fps | 1055 frames, 129 fps | 1053 frames, 129 fps
+  e41m-480i-300-5          x4k_re+x4k_re+tonemap_re                     n=   0 med    nan ratio   nan pooled   nan p95    nan max    0.0 ontime   -1.0% slow   0 W  66 MHz  2070 | 206 frames, 25 fps | 206 frames, 25 fps | 194 frames, 25 fps
+  e41m-480i-300-5          x4k_max+x4k_max+tonemap_max                  n=  25 med  40.27 ratio  1.77 pooled  1.78 p95  45.63 max   46.1 ontime    0.0% slow   0 W  68 MHz  1967 | 567 frames, 68 fps | 552 frames, 66 fps | 473 frames, 60 fps
+  e41m-480i-300-6          tonemap_re+scale_re+scale_re                 n=  30 med  24.97 ratio  1.10 pooled  1.10 p95  27.27 max   27.6 ontime  100.0% slow   0 W  65 MHz  2031 | 193 frames, 25 fps | 206 frames, 26 fps | 194 frames, 26 fps
+  e41m-480i-300-6          tonemap_max+scale_max+scale_max              n= 173 med  36.24 ratio  1.59 pooled  1.60 p95  39.23 max   42.8 ontime   12.1% slow   0 W  68 MHz  1941 | 482 frames, 61 fps | 1872 frames, 246 fps | 1844 frames, 242 fps
+  e41m-480i-300-7          x4k_re                                       n= 144 med  23.54 ratio  1.05 pooled  1.04 p95  24.53 max   25.1 ontime  100.0% slow   0 W  63 MHz  2169 | 206 frames, 26 fps
+  e41m-480i-300-7          x4k_max                                      n=  98 med  44.98 ratio  1.93 pooled  1.99 p95  46.44 max   47.4 ontime    0.0% slow   0 W  68 MHz  2013 | 2795 frames, 345 fps
+  e41r-480i-300-1          scale_max+scale_max+x4k_max                  n= 154 med  33.29 ratio  1.47 pooled  1.47 p95  34.96 max   39.7 ontime   52.6% slow   0 W  68 MHz  1989 | 1546 frames, 203 fps | 1715 frames, 213 fps | 1115 frames, 137 fps
+  e41r-480i-300-1          scale_re+x4k_re+x4k_re                       n=   0 med    nan ratio   nan pooled   nan p95    nan max    0.0 ontime   -1.0% slow   0 W  65 MHz  2130 | 206 frames, 25 fps | 206 frames, 25 fps | 206 frames, 25 fps
+  e41r-480i-300-2          x4k_re+x4k_re+tonemap_re                     n=  30 med  26.65 ratio  1.18 pooled  1.18 p95  30.94 max   31.8 ontime  100.0% slow   0 W  66 MHz  2010 | 206 frames, 25 fps | 206 frames, 25 fps | 194 frames, 25 fps
+  e41r-480i-300-2          x4k_max+x4k_max+tonemap_max                  n=  25 med  39.49 ratio   nan pooled  1.74 p95  44.45 max   45.8 ontime    0.0% slow   0 W  68 MHz  1960 | 572 frames, 69 fps | 568 frames, 68 fps | 473 frames, 60 fps
+## results/contend/e41[mr]-mixed-17-*: pooled alone median 8.62 ms from 8 runs
+  e41m-mixed-17-1          scale_re+scale_re                            n= 268 med   8.80 ratio  1.01 pooled  1.02 p95   9.60 max   10.1 ontime  100.0% slow   0 W  59 MHz  2242 | 206 frames, 26 fps | 206 frames, 26 fps
+  e41m-mixed-17-1          scale_re+scale_re+scale_re                   n= 356 med   8.80 ratio  1.02 pooled  1.02 p95   9.85 max   12.8 ontime  100.0% slow   1 W  59 MHz  2238 | 206 frames, 26 fps | 206 frames, 26 fps | 206 frames, 26 fps
+  e41m-mixed-17-2          scale_max+scale_max                          n= 346 med  10.82 ratio  1.27 pooled  1.25 p95  11.72 max   12.2 ontime  100.0% slow   0 W  66 MHz  2139 | 2945 frames, 365 fps | 2944 frames, 365 fps
+  e41m-mixed-17-2          scale_max+scale_max+scale_max                n= 360 med  10.90 ratio  1.27 pooled  1.26 p95  11.86 max   13.0 ontime  100.0% slow   0 W  65 MHz  2130 | 1954 frames, 242 fps | 1953 frames, 241 fps | 1951 frames, 241 fps
+  e41m-mixed-17-3          scale_re+scale_re+x4k_re                     n= 352 med   9.02 ratio  1.06 pooled  1.05 p95  10.35 max   17.4 ontime   99.7% slow   1 W  60 MHz  2352 | 206 frames, 26 fps | 206 frames, 26 fps | 206 frames, 26 fps
+  e41m-mixed-17-3          scale_max+scale_max+x4k_max                  n=  60 med  13.43 ratio  1.57 pooled  1.56 p95  14.74 max   18.8 ontime   98.3% slow   1 W  68 MHz  2122 | 1652 frames, 204 fps | 1647 frames, 203 fps | 1095 frames, 134 fps
+  e41m-mixed-17-4          scale_re+x4k_re+x4k_re                       n= 196 med   9.64 ratio  1.13 pooled  1.12 p95  11.85 max   12.6 ontime  100.0% slow   5 W  61 MHz  2306 | 206 frames, 26 fps | 206 frames, 25 fps | 206 frames, 25 fps
+  e41m-mixed-17-4          scale_max+x4k_max+x4k_max                    n=  90 med  16.00 ratio  1.85 pooled  1.86 p95  17.90 max   18.8 ontime   72.2% slow   0 W  68 MHz  2072 | 1606 frames, 198 fps | 1055 frames, 129 fps | 1055 frames, 129 fps
+  e41m-mixed-17-5          x4k_re+x4k_re+tonemap_re                     n= 115 med  10.99 ratio  1.28 pooled  1.27 p95  13.63 max   15.7 ontime  100.0% slow   4 W  64 MHz  2155 | 206 frames, 25 fps | 206 frames, 25 fps | 194 frames, 25 fps
+  e41m-mixed-17-5          x4k_max+x4k_max+tonemap_max                  n= 385 med  17.14 ratio   nan pooled  1.99 p95  23.47 max   29.0 ontime   41.8% slow  42 W  68 MHz  2022 | 579 frames, 73 fps | 568 frames, 72 fps | 463 frames, 58 fps
+  e41m-mixed-17-6          tonemap_re+scale_re+scale_re                 n=   0 med    nan ratio   nan pooled   nan p95    nan max    0.0 ontime   -1.0% slow   0 W  66 MHz  2130 | 194 frames, 25 fps | 194 frames, 26 fps | 194 frames, 25 fps
+  e41m-mixed-17-6          tonemap_max+scale_max+scale_max              n=  25 med  16.23 ratio   nan pooled  1.88 p95  18.96 max   19.6 ontime   56.0% slow   0 W  67 MHz  2022 | 586 frames, 73 fps | 1478 frames, 193 fps | 1452 frames, 189 fps
+  e41m-mixed-17-7          x4k_re                                       n=  11 med   9.10 ratio  0.76 pooled  1.06 p95  11.03 max   11.0 ontime  100.0% slow   0 W  64 MHz  2130 | 206 frames, 26 fps
+  e41m-mixed-17-7          x4k_max                                      n=  58 med  16.92 ratio  1.42 pooled  1.96 p95  19.82 max   21.1 ontime   43.1% slow   0 W  69 MHz  2016 | 2500 frames, 308 fps
+  e41r-mixed-17-1          tonemap_re+scale_re+scale_re                 n=   0 med    nan ratio   nan pooled   nan p95    nan max    0.0 ontime   -1.0% slow   0 W  65 MHz  2130 | 194 frames, 25 fps | 206 frames, 25 fps | 206 frames, 25 fps
+  e41r-mixed-17-1          tonemap_max+scale_max+scale_max              n= 273 med  14.97 ratio  1.71 pooled  1.74 p95  17.56 max   18.9 ontime   87.2% slow   4 W  68 MHz  2042 | 484 frames, 61 fps | 2145 frames, 266 fps | 2178 frames, 269 fps
+  e41r-mixed-17-2          x4k_re                                       n=  60 med   8.95 ratio  1.03 pooled  1.04 p95  10.24 max   10.3 ontime  100.0% slow   0 W  60 MHz  2229 | 206 frames, 26 fps
+  e41r-mixed-17-2          x4k_max                                      n= 316 med  18.03 ratio  2.07 pooled  2.09 p95  19.52 max   20.5 ontime   15.5% slow   0 W  69 MHz  2021 | 2816 frames, 348 fps
+
+# late ticks at the planning point (alone about 83 % of the period; mixed 73 %)
+## e41w-1080i-65-1 period 33.37 ms, alone before: median 27.57 ms (83 % of period)
+  x4k_re+x4k_re+tonemap_re                 ticks  253 median  34.29 ms (1.03 of period) late  71.9 % late runs 32 longest 22 ticks (0.73 s), repeat share 2 %, backlog at most 0.25 s
+  tonemap_re+scale_re+scale_re             ticks  256 median  32.29 ms (0.97 of period) late  15.2 % late runs 17 longest 14 ticks (0.47 s), repeat share 0 %, backlog at most 0.06 s
+## e41w-1080i-65-2 period 33.37 ms, alone before: median 27.90 ms (84 % of period)
+  x4k_max+x4k_max+tonemap_max              ticks  197 median  46.68 ms (1.40 of period) late  87.3 % late runs 2 longest 171 ticks (5.71 s), repeat share 26 %, backlog at most 2.41 s
+  x4k_max                                  ticks  155 median  53.61 ms (1.61 of period) late 100.0 % late runs 1 longest 155 ticks (5.17 s), repeat share 36 %, backlog at most 5.21 s
+## e41w-480i-360-1 period 33.37 ms, alone before: median 27.72 ms (83 % of period)
+  x4k_re+x4k_re+tonemap_re                 ticks  251 median  34.71 ms (1.04 of period) late  68.1 % late runs 28 longest 31 ticks (1.03 s), repeat share 4 %, backlog at most 0.44 s
+  tonemap_re+scale_re+scale_re             ticks  251 median  31.83 ms (0.95 of period) late   5.2 % late runs 5 longest 4 ticks (0.13 s), repeat share 0 %, backlog at most 0.01 s
+## e41w-480i-360-2 period 33.37 ms, alone before: median 27.76 ms (83 % of period)
+  x4k_max+x4k_max+tonemap_max              ticks  196 median  46.32 ms (1.39 of period) late  88.3 % late runs 2 longest 172 ticks (5.74 s), repeat share 26 %, backlog at most 2.38 s
+  x4k_max                                  ticks  156 median  52.37 ms (1.57 of period) late 100.0 % late runs 1 longest 156 ticks (5.21 s), repeat share 35 %, backlog at most 4.71 s
+## e41w-mixed-23-1 period 16.68 ms, alone before: median 12.14 ms (73 % of period)
+  x4k_re+x4k_re+tonemap_re                 ticks  511 median  14.76 ms (0.88 of period) late  26.6 % late runs 127 longest 4 ticks (0.07 s), repeat share 0 %, backlog at most 0.03 s
+  tonemap_re+scale_re+scale_re             ticks  505 median  13.81 ms (0.83 of period) late   2.6 % late runs 8 longest 3 ticks (0.05 s), repeat share 0 %, backlog at most 0.00 s
+## e41w-mixed-23-2 period 16.68 ms, alone before: median 12.13 ms (73 % of period)
+  x4k_max+x4k_max+tonemap_max              ticks  395 median  22.65 ms (1.36 of period) late  86.3 % late runs 2 longest 340 ticks (5.67 s), repeat share 24 %, backlog at most 2.30 s
+  x4k_max                                  ticks  330 median  24.47 ms (1.47 of period) late  98.8 % late runs 1 longest 326 ticks (5.44 s), repeat share 31 %, backlog at most 3.59 s
+
+# probes (300 x 480i, cuda_tinycont): upload modes before and after the fence
+## results/contend/probe-*: pooled alone median 21.79 ms from 7 runs
+  probe-batch              cuda_tinycont                                n=  48 med  34.86 ratio  1.59 pooled  1.60 p95  35.31 max   35.4 ontime   18.8% slow   0 W  63 MHz  2359 | 42159 launches, round trip p50 0.057 p99 2.292 max 5.403 ms
+  probe-each               cuda_tinycont                                n=  82 med  35.30 ratio  1.61 pooled  1.62 p95  35.69 max   36.1 ontime    0.0% slow   0 W  61 MHz  2351 | 52826 launches, round trip p50 0.048 p99 2.263 max 2.759 ms
+  probe-fence              cuda_tinycont                                n= 134 med  24.22 ratio  1.11 pooled  1.11 p95  25.28 max   26.1 ontime  100.0% slow   0 W  61 MHz  2280 | 56060 launches, round trip p50 0.040 p99 2.291 max 2.860 ms
+  probe-fence-batch        cuda_tinycont                                n=  93 med  24.26 ratio  1.11 pooled  1.11 p95  24.89 max   27.9 ontime  100.0% slow   0 W  62 MHz  2321 | 55774 launches, round trip p50 0.038 p99 2.294 max 5.169 ms
+  probe-fence-nogather     cuda_tinycont                                n=  68 med  14.35 ratio  1.03 pooled  0.66 p95  14.73 max   14.8 ontime  100.0% slow   0 W  45 MHz  2430 | 92296 launches, round trip p50 0.043 p99 1.760 max 5.943 ms
+  probe-nogather           cuda_tinycont                                n= 132 med  25.23 ratio  1.78 pooled  1.16 p95  25.49 max   25.7 ontime  100.0% slow   0 W  46 MHz  2430 | 69641 launches, round trip p50 0.057 p99 2.236 max 3.082 ms
+  probe-staged             cuda_tinycont                                n= 134 med  31.80 ratio  0.98 pooled  1.46 p95  41.68 max   45.0 ontime   67.2% slow  17 W  63 MHz  2330 | 37552 launches, round trip p50 0.063 p99 2.293 max 4.146 ms

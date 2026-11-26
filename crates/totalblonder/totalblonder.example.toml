@@ -1,0 +1,131 @@
+# totalblonder: example configuration listing every key (docs/SPEC.md §13.2).
+# Unknown keys are refused. Values shown are the defaults where a default exists.
+
+[output]
+ts_rate = 38_800_000          # bit/s per carrier; must stay below 38,810,701 (256-QAM Annex B)
+null_floor = 0.02             # fraction of the rate kept free of programs
+packets_per_datagram = 7      # 1..=7
+framing = "udp"               # udp | rtp (for udp:// destinations; rtp:// always uses RTP)
+pcr_interval_ms = 30          # at most 100
+mux_lead_ms = 20              # how far the mux runs ahead of the pacer
+delay_ms = 1100               # Δ: encode budget + decoder buffer delay + margin (SPEC §5.2)
+self_check = true             # tb-ts-verify on every carrier's output; findings in /api/metrics
+
+[[output.interface]]          # one pacer thread each; carriers not listed share a default one
+name = "gige1"
+address = "127.0.0.1"         # local address: multicast interface or unicast source
+carriers = [1, 2]
+multicast_ttl = 1
+
+[psip]
+gps_utc_offset = 18
+dst_rule = "us"               # us | none
+eit_windows = 8               # 1..=128 three-hour windows (8 = 24 hours)
+ett_unique_extension = true
+service_location = true
+placeholders = true           # windows without events get one titled with the channel name
+# schedule = "/var/lib/totalblonder/schedule.json"   # guide events per service, re-read every 10 s
+
+[video]
+device = "cuda"               # cuda | ref (the reference kernels on the CPU: tests only)
+gpu = 0
+
+[control]
+bind = "127.0.0.1:8090"
+
+[statmux]                     # divide each carrier's video pool by complexity (SPEC §8.4)
+enabled = false               # off: every program gets its max_kbps
+alpha = 0.85
+max_step = 0.15
+hysteresis = 0.03
+
+[device]                      # the modulator's supervisor; omit the section to run without one
+base_url = "http://10.42.0.184"
+credentials_file = "/run/credentials/totalblonder/eqam"   # two lines: user, password
+reconcile = "report"          # report | apply (writes only the stream table and RF plan forms)
+status_interval_s = 30
+level_dbmv = 40
+defect_d_limit_h = 24         # alarm when the box has run this long since its tables were reset
+
+  [[device.rf_module]]        # exactly four; the box's current plan (notes/device.md §4)
+  module = 1
+  first_channel = 2
+  qam = "256B"
+  plan = "STD"
+  carriers_on = [true, true, true, true]
+  [[device.rf_module]]
+  module = 2
+  first_channel = 10
+  [[device.rf_module]]
+  module = 3
+  first_channel = 6
+  [[device.rf_module]]
+  module = 4
+  first_channel = 140
+
+[persistence]
+versions = "/var/lib/totalblonder/versions.json"   # table versions kept across restarts
+
+[[carrier]]
+id = 1                        # the modulator's input slot, 1..=16
+tsid = 0x0101                 # default 0x0100 + id
+destination = "udp://239.10.0.1:5000"   # udp://, rtp://, or file:/path.ts
+
+  [[carrier.program]]
+  number = 1                  # 1..=6; PMT PID 0x30 + 0x10·(n−1), video +1, audio +4..+6
+  service = "wall"
+  video = { format = "720p59.94", max_kbps = 12000, min_kbps = 3000, weight = 1.0, priority = 0 }
+  audio = [ { language = "eng", layout = "stereo", kbps = 192 } ]
+  captions = false            # caption service descriptors for captions the source carries
+  # subtitles = "/srv/subs/wall.srt"   # SubRip/WebVTT sent as CEA-608 CC1 + CEA-708 service 1
+  live = "studio"           # an [[input]] id; without one the program shows its slate
+  standby = "loop"            # an input shown while the live one is away (live → standby → slate)
+  film = "off"                # auto: 24p sources coded as film with 3:2 display flags (check on your TVs first)
+
+  [[carrier.program]]
+  number = 2
+  service = "bars"
+  video = { format = "480i29.97", max_kbps = 4000 }
+  audio = [ { language = "eng", layout = "stereo", kbps = 192 },
+            { language = "spa", layout = "stereo", kbps = 192 } ]
+
+[[carrier]]
+id = 2
+destination = "file:/tmp/carrier2.ts"
+
+  [[carrier.program]]
+  number = 1
+  service = "slate"
+  video = { format = "1080i29.97", max_kbps = 15000 }
+  audio = [ { language = "eng", layout = "5.1", kbps = 384 } ]
+
+[[service]]
+id = "wall"
+name = "WALL"                 # short_name, at most 7 characters
+long_name = "Live Wall"
+channel = "20.1"              # two-part, unique across the plant
+source_id = 1                 # 1..=4095, unique, never reused
+
+[[service]]
+id = "bars"
+name = "BARS"
+channel = "20.2"
+source_id = 2
+
+[[service]]
+id = "slate"
+name = "SLATE"
+channel = "21.1"
+source_id = 3
+
+[[input]]
+id = "loop"
+kind = "file"                 # an MPEG-TS file, looped, paced by its own time stamps
+path = "/srv/totalblonder/standby.ts"
+
+[[input]]
+id = "studio"
+kind = "rtmp"                 # rtmp | ts_udp | file
+bind = "127.0.0.1:1935"
+app = "live"
+key = "wall"

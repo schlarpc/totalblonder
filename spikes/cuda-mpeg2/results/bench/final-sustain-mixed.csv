@@ -1,0 +1,2 @@
+label,fmt,kind,n,frames,rt,mb_per_s,tick_mean_ms,tick_p50_ms,tick_p99_ms,tick_p999_ms,tick_max_ms,ontime_frac,late_deadline,cpu_cores,mbps_per_session,underflows,dev_mb,sm_mean,mem_mean,watts_mean,watts_max,temp_start,temp_max,pclk_min,load_before,load_after,contaminated
+final-sustain-mixed,mixed,paced,24,5394,0.9996,14840926,14.3177,14.3109,15.0556,15.4251,25.0688,0.999161,9,0.17932,7.1707,0,3080.8,83.7,55.3,66.7,67.0,81.0,91.0,2040.0,0.23,0.28,False

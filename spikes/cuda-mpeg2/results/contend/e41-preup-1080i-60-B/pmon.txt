@@ -1,0 +1,109 @@
+#Time         gpu         pid   type     sm    mem    enc    dec    jpg    ofa     fb   ccpm    command 
+#HH:MM:SS     Idx           #    C/G      %      %      %      %      %      %     MB     MB    name 
+ 17:30:25       0    1757505     C     13      4      0      0      -      -    165      0    Plex Transcoder
+ 17:30:25       0    1792093     C      0      0      -      -      -      -     10      0    m2venc-preup   
+ 17:30:26       0    1757505     C      -      -      0      0      -      -    165      0    Plex Transcoder
+ 17:30:26       0    1792093     C     62     43      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:26       0    1792114     C      -      -     40     21      -      -    210      0    Plex Transcoder
+ 17:30:27       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:27       0    1792093     C     65     47      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:27       0    1792114     C     33     23     80     43      -      -    210      0    Plex Transcoder
+ 17:30:28       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:28       0    1792093     C     42     30      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:28       0    1792114     C     56     40     77     39      -      -    210      0    Plex Transcoder
+ 17:30:29       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:29       0    1792093     C     84     60      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:29       0    1792114     C     13     10     67     36      -      -    210      0    Plex Transcoder
+ 17:30:30       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:30       0    1792093     C     98     70      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:30       0    1792114     C      -      -     70     38      -      -    210      0    Plex Transcoder
+ 17:30:31       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:31       0    1792093     C     98     70      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:31       0    1792114     C      -      -     75     40      -      -    210      0    Plex Transcoder
+ 17:30:32       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:32       0    1792093     C     86     61      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:32       0    1792114     C     12      8     75     43      -      -    210      0    Plex Transcoder
+ 17:30:32       0    1792165     C      -      -      -      -      -      -    203      0    ffmpeg         
+ 17:30:33       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:33       0    1792093     C     86     61      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:33       0    1792114     C     12      8     75     45      -      -    210      0    Plex Transcoder
+ 17:30:33       0    1792165     C      -      -      -      -      -      -    203      0    ffmpeg         
+ 17:30:34       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:34       0    1792093     C     69     51      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:34       0    1792114     C     12      8     26     16      -      -    210      0    Plex Transcoder
+ 17:30:34       0    1792165     C     11      8      4      3      -      -    203      0    ffmpeg         
+ 17:30:35       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:35       0    1792093     C     85     64      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:35       0    1792114     C      -      -     17      9      -      -    210      0    Plex Transcoder
+ 17:30:35       0    1792165     C      -      -      0      2      -      -    203      0    ffmpeg         
+ 17:30:36       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:36       0    1792093     C     83     62      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:36       0    1792114     C      -      -     29     17      -      -    210      0    Plex Transcoder
+ 17:30:36       0    1792165     C      -      -      0      1      -      -    203      0    ffmpeg         
+ 17:30:37       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:37       0    1792093     C     76     57      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:37       0    1792114     C     10      7     37     22      -      -    210      0    Plex Transcoder
+ 17:30:37       0    1792165     C      -      -      0      1      -      -    203      0    ffmpeg         
+#Time         gpu         pid   type     sm    mem    enc    dec    jpg    ofa     fb   ccpm    command 
+#HH:MM:SS     Idx           #    C/G      %      %      %      %      %      %     MB     MB    name 
+ 17:30:38       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:38       0    1792093     C     64     48      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:38       0    1792114     C     19     14     19     16      -      -    210      0    Plex Transcoder
+ 17:30:38       0    1792165     C      -      -      8      1      -      -    203      0    ffmpeg         
+ 17:30:39       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:39       0    1792093     C     78     58      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:39       0    1792114     C      9      6     27     21      -      -    210      0    Plex Transcoder
+ 17:30:39       0    1792165     C      -      -      9      -      -      -    121      0    ffmpeg         
+ 17:30:41       0    1757505     C      -      -      -      0      -      -    165      0    Plex Transcoder
+ 17:30:41       0    1792093     C     63     49      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:41       0    1792114     C     19     14     26     14      -      -    210      0    Plex Transcoder
+ 17:30:42       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:42       0    1792093     C     79     60      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:42       0    1792114     C      -      -     14      7      -      -    210      0    Plex Transcoder
+ 17:30:43       0    1757505     C      -      -      -      0      -      -    165      0    Plex Transcoder
+ 17:30:43       0    1792093     C     73     57      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:43       0    1792114     C      -      -      0      0      -      -    210      0    Plex Transcoder
+ 17:30:44       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:44       0    1792093     C     61     47      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:44       0    1792114     C      -      -      0      0      -      -    210      0    Plex Transcoder
+ 17:30:44       0    1792255     C     15     11      0      1      -      -   1171      0    ffmpeg         
+ 17:30:45       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:45       0    1792093     C     63     48      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:45       0    1792114     C      -      -      -      -      -      -    210      0    Plex Transcoder
+ 17:30:45       0    1792255     C     32     24     57     20      -      -   1171      0    ffmpeg         
+ 17:30:46       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:46       0    1792093     C     65     49      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:46       0    1792114     C      -      -      -      -      -      -    210      0    Plex Transcoder
+ 17:30:46       0    1792255     C     32     23     70     21      -      -   1171      0    ffmpeg         
+ 17:30:47       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:47       0    1792093     C     65     48      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:47       0    1792114     C      -      -     14     14      -      -    210      0    Plex Transcoder
+ 17:30:47       0    1792255     C     32     23     68     15      -      -   1171      0    ffmpeg         
+ 17:30:48       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:48       0    1792093     C     84     62      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:48       0    1792114     C      -      -      -      -      -      -    210      0    Plex Transcoder
+ 17:30:48       0    1792255     C     14     10     76     23      -      -   1171      0    ffmpeg         
+ 17:30:49       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:49       0    1792093     C     84     62      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:49       0    1792114     C      -      -      -      -      -      -    210      0    Plex Transcoder
+ 17:30:49       0    1792255     C     14     10     71     20      -      -   1171      0    ffmpeg         
+ 17:30:50       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:50       0    1792093     C     84     62      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:50       0    1792114     C      -      -      -      -      -      -    210      0    Plex Transcoder
+#Time         gpu         pid   type     sm    mem    enc    dec    jpg    ofa     fb   ccpm    command 
+#HH:MM:SS     Idx           #    C/G      %      %      %      %      %      %     MB     MB    name 
+ 17:30:50       0    1792255     C     14     10     71     20      -      -   1171      0    ffmpeg         
+ 17:30:51       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:30:51       0    1792093     C     83     62      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:51       0    1792114     C      -      -      -      -      -      -    210      0    Plex Transcoder
+ 17:30:51       0    1792255     C     14     10     71     21      -      -   1171      0    ffmpeg         
+ 17:30:52       0    1757505     C      -      -      0      0      -      -    165      0    Plex Transcoder
+ 17:30:52       0    1792093     C     97     72      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:52       0    1792114     C      -      -      -      0      -      -    210      0    Plex Transcoder
+ 17:30:53       0    1757505     C      -      -      0      0      -      -    165      0    Plex Transcoder
+ 17:30:53       0    1792093     C     97     72      -      -      -      -   3784      0    m2venc-preup   
+ 17:30:53       0    1792114     C      -      -      0      0      -      -    210      0    Plex Transcoder
+ 17:30:54       0    1757505     C      7      2      0      0      -      -    165      0    Plex Transcoder
+ 17:30:54       0    1792114     C     16     11      0      0      -      -    210      0    Plex Transcoder
+ 17:30:55       0    1757505     C      -      -      0      0      -      -    165      0    Plex Transcoder
+ 17:30:55       0    1792114     C      0      0      4      2      -      -    210      0    Plex Transcoder

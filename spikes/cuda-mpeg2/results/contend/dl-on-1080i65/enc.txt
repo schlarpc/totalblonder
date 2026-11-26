@@ -1,0 +1,11 @@
+group 0: 1920x1080i 29.97 fps, coded 1920x1088, GOP 15 M 3 staggered, f_code 4, search +-35 pel, field pred 1, aq 1, sessions 65, frames 2037, mean 14.516 Mbit/s
+input from pinned host memory, upload overlapped (+1 frame delay), paced; device memory 3986.4 MB allocated (61.3 MB/session), context total 4135.3 MB
+wall 68.068 s, 1.00x real time, 13752747 macroblocks/s, 132405 pictures
+tick ms: mean 28.758 p50 28.499 p99 34.198 p99.9 41.833 max 43.920, period 33.367, late 40 (deadline 83) of 2007
+host cpu 11.412 s = 0.168 cores total, 0.0026 per session; pcie up 6050.3 MB/s down 117.77 MB/s
+repeated pictures (made on the host) 17684 of 132405 = 13.36%, of them by the deadline policy 16181; key frames missed 322
+session 0 I: 133 pictures, mean 129574 bytes, mean quantiser_scale 51.3
+session 0 P: 685 pictures, mean 111349 bytes, mean quantiser_scale 36.9
+session 0 B: 1219 pictures, mean 21212 bytes, mean quantiser_scale 28.3
+rate control: buffer violations 0, least room 14.4% of vbv_buffer_size, extra passes 62 (0.000 per picture), repeated transforms 1615 (0.0122 per picture), ladder pictures 0, skipped pictures 0, I replaced by P 0
+loadavg before 4.45 after 4.07

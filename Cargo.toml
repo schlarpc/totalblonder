@@ -1,0 +1,89 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+tb-kernel-abi = { path = "crates/tb-kernel-abi" }
+tb-m2v-syntax = { path = "crates/tb-m2v-syntax" }
+tb-m2v-rate = { path = "crates/tb-m2v-rate" }
+tb-device = { path = "crates/tb-device" }
+tb-m2v-encoder = { path = "crates/tb-m2v-encoder" }
+tb-timeline = { path = "crates/tb-timeline" }
+tb-convert = { path = "crates/tb-convert" }
+tb-device-ref = { path = "crates/tb-device-ref" }
+tb-device-cuda = { path = "crates/tb-device-cuda" }
+tb-golden = { path = "crates/tb-golden" }
+tb-decode = { path = "crates/tb-decode" }
+tb-engine = { path = "crates/tb-engine" }
+tb-m2v-verify = { path = "crates/tb-m2v-verify" }
+tb-media = { path = "crates/tb-media" }
+tb-ts = { path = "crates/tb-ts" }
+tb-psip = { path = "crates/tb-psip" }
+tb-mux = { path = "crates/tb-mux" }
+tb-statmux = { path = "crates/tb-statmux" }
+tb-probe = { path = "crates/tb-probe" }
+tb-output = { path = "crates/tb-output" }
+totalblonder = { path = "crates/totalblonder" }
+tb-rtmp = { path = "crates/tb-rtmp" }
+tb-tsin = { path = "crates/tb-tsin" }
+tb-eqam = { path = "crates/tb-eqam" }
+tb-audio = { path = "crates/tb-audio" }
+tb-ac3 = { path = "crates/tb-ac3" }
+tb-captions = { path = "crates/tb-captions" }
+tb-ts-verify = { path = "crates/tb-ts-verify" }
+tb-decoder-proto = { path = "crates/tb-decoder-proto" }
+tb-sandbox = { path = "crates/tb-sandbox" }
+tb-decoder-client = { path = "crates/tb-decoder-client" }
+
+bytemuck = { version = "1", features = ["derive", "min_const_generics"] }
+thiserror = "2"
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+serde = { version = "1", features = ["derive"] }
+# float_roundtrip: the default float parser is not correctly rounded, and golden vectors are
+# compared for exact equality of doubles.
+serde_json = { version = "1", features = ["float_roundtrip"] }
+libloading = "0.9"
+libc = "0.2"
+# tb-sandbox: the safe system-call layer (raw syscalls, no allocation for &CStr paths, which the
+# child between clone and execve relies on), Landlock, and seccomp-bpf filters.
+rustix = { version = "1.1", features = [
+    "fs",
+    "mm",
+    "mount",
+    "net",
+    "pipe",
+    "process",
+    "event",
+    "system",
+    "thread",
+    "time",
+] }
+landlock = "0.4.8"
+seccompiler = "0.5"
+tempfile = "3"
+# libavformat / libavcodec / libswscale for tb-decode (the version's suffix names the FFmpeg
+# release its safe layer follows; the -sys crate runs bindgen on the headers Nix provides).
+ffmpeg-the-third = { version = "6.0.0", default-features = false, features = [
+    "codec",
+    "format",
+    "software-scaling",
+] }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+undocumented_unsafe_blocks = "deny"
+dbg_macro = "deny"
+print_stdout = "warn"

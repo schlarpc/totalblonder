@@ -1,0 +1,11 @@
+Downloaded 2026-11-24 (untrusted data; checksums in SHA256SUMS).
+Public.Resource.Org copy on archive.org (collection publicsafetycode), posted because
+47 CFR 76.602 incorporates the standard by reference.
+
+CTA-542-D-2013.pdf  https://archive.org/download/pub.cfr.cta.542-d.2013/cta.542-d.2013.pdf
+                    (item page: https://archive.org/details/pub.cfr.cta.542-d.2013)
+                    CTA-542-D (formerly CEA-542-D), June 2013, 18 pages (Public Resource cover + CTA text).
+                    CTA currently sells the same document as CTA-542-D S-2023 (stabilized) for $0.
+
+Searched but not on archive.org or law.resource.org/pub/us/cfr/ibr/ (manifest.txt checked):
+CEA/CTA-608, CEA/EIA-708 (any edition), CEA-766 (any edition), SCTE 43.

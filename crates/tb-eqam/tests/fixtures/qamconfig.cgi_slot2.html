@@ -1,0 +1,1049 @@
+<html>
+  <head>
+    <title>QAM Config - RF Module 2 - Ball Holdings</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+    <link rel="stylesheet" type="text/css" href="../eqam.css">
+    <script language="JavaScript">
+      <!-- Begin
+      function logout()
+      {
+        var temp;
+        temp = "qamconfig.cgi?logout=1&session_id=" + document.configForm.session_id.value;
+        document.location = temp;
+        return 0;
+      }
+      function golink(field)
+      {
+        var temp;
+        temp = field + "?session_id=" + document.configForm.session_id.value;
+        document.location = temp;
+        return 0;
+      }
+
+      function gobox(field1, field2)
+      {
+        var temp;
+        temp = field1 + "?session_id=" + document.configForm.session_id.value + "&boxNumber=" + field2;
+        document.location = temp;
+        return 0;
+      }
+
+      function goslot(field1, field2)
+      {
+        var temp;
+        temp = field1 + "?session_id=" + document.configForm.session_id.value + "&slotNumber=" + field2;
+        document.location = temp;
+        return 0;
+      }
+
+      var cable_channel_table_after = new Array(3,   4,   5,   6,   95,  8,   9,   10,  11,  12,  13,  23,  15,  16,  17,  18,  19,  20,  21,  22,  7,   24,  25,  26,
+                                                27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40,  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51,  52,
+                                                53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  75,  76,  77,  78,
+                                                79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  100, 96,  97,  98,  99,  14,  101, 102, 103, 104,
+                                                105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130,
+                                                131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156,
+                                                157, 158, 0);
+
+      function validate_qam()
+      {
+        var result;
+        result = check_duplicates();
+        if(result == 1)
+        {
+          alert("Duplicate RF Output channels have been detected.  Settings will not be saved.");
+        }
+        else
+        {
+          document.configForm.qam_saved.value = 1;
+          document.configForm.submit();
+        }
+      }
+
+      function check_duplicates()
+      {
+        var data = new Array();
+        //setup initial values
+        data[0] = 2;
+        data[1] = cable_channel_table_after[data[0]];
+        data[2] = cable_channel_table_after[data[1]];
+        data[3] = cable_channel_table_after[data[2]];
+        //setup initial values
+        data[4] = 10;
+        data[5] = cable_channel_table_after[data[4]];
+        data[6] = cable_channel_table_after[data[5]];
+        data[7] = cable_channel_table_after[data[6]];
+        //setup initial values
+        data[8] = 6;
+        data[9] = cable_channel_table_after[data[8]];
+        data[10] = cable_channel_table_after[data[9]];
+        data[11] = cable_channel_table_after[data[10]];
+        //setup initial values
+        data[12] = 140;
+        data[13] = cable_channel_table_after[data[12]];
+        data[14] = cable_channel_table_after[data[13]];
+        data[15] = cable_channel_table_after[data[14]];
+
+        //correct for user input
+        data[4] = parseInt(document.configForm.outputChannelA.value);
+        data[5] = cable_channel_table_after[data[4]];
+        data[6] = cable_channel_table_after[data[5]];
+        data[7] = cable_channel_table_after[data[6]];
+
+        //only check the QAM settings to be submitted
+        for(j = 0; j < 16; j++)
+        {
+          if((data[4] > 0) && (data[j] > 0) && (data[4] == data[j]) && (4 != j))
+            return 1;
+        }
+        for(j = 0; j < 16; j++)
+        {
+          if((data[5] > 0) && (data[j] > 0) && (data[5] == data[j]) && (5 != j))
+            return 1;
+        }
+        for(j = 0; j < 16; j++)
+        {
+          if((data[6] > 0) && (data[j] > 0) && (data[6] == data[j]) && (6 != j))
+            return 1;
+        }
+        for(j = 0; j < 16; j++)
+        {
+          if((data[7] > 0) && (data[j] > 0) && (data[7] == data[j]) && (7 != j))
+            return 1;
+        }
+        return 0;
+      }
+
+      function updateChannel()
+      {
+        var data = new Array();
+        document.configForm.outputChannelB.selectedIndex = cable_channel_table_after[document.configForm.outputChannelA.selectedIndex] - 2;
+        document.configForm.outputChannelC.selectedIndex = cable_channel_table_after[document.configForm.outputChannelB.selectedIndex] - 2;
+        document.configForm.outputChannelD.selectedIndex = cable_channel_table_after[document.configForm.outputChannelC.selectedIndex] - 2;
+      }
+
+      function change_output_control()
+      {
+        if(document.configForm.chkCW1.checked == true)
+        {
+          document.configForm.outputChannelControlA.selectedIndex = 1;
+          document.configForm.outputChannelControlB.selectedIndex = 1;
+          document.configForm.outputChannelControlC.selectedIndex = 1;
+          document.configForm.outputChannelControlD.selectedIndex = 1;
+          document.configForm.outputChannelControlA.disabled = true;
+          document.configForm.outputChannelControlB.disabled = true;
+          document.configForm.outputChannelControlC.disabled = true;
+          document.configForm.outputChannelControlD.disabled = true;
+        }
+        else
+        {
+          document.configForm.outputChannelControlA.disabled = false;
+          document.configForm.outputChannelControlB.disabled = false;
+          document.configForm.outputChannelControlC.disabled = false;
+          document.configForm.outputChannelControlD.disabled = false;
+        }
+      }
+
+
+      function getCookie(c_name)
+      {
+        if(document.cookie.length > 0)
+        {
+          c_start = document.cookie.indexOf(c_name + "=");
+          if(c_start != -1)
+          {
+            c_start = c_start + c_name.length + 1;
+            c_end = document.cookie.indexOf(";", c_start);
+            if(c_end == -1) c_end = document.cookie.length;
+            document.configForm.session_id.value = document.cookie.substring(c_start, c_end);
+          }
+        }
+        return "";
+      }
+
+    //  End -->
+    </script>
+  </head>
+  <body onload="getCookie('session_id')">
+    <form name="configForm" action="qamconfig.cgi" method="post">
+      <div align="center">
+        <table style="border-collapse: collapse;" width="1000" bgcolor="#FFFFFF" border="0" cellpadding="0">
+          <tbody>
+          <tr>
+            <td>
+            <a href="http://www.blondertongue.com"><img border="0" src="../images/logo.png" alt="Blonder Tongue Laboratories, Inc."></a></td>
+          </tr>
+          <tr>
+            <td bgcolor="#66CEF6" align="center"><font size="6">EQAM-420B-4-64</font></td>
+          </tr>
+          <tr>
+            <td bgcolor="#66CEF6" align="center">
+              <table>
+                <tbody>
+                  <tr>
+                    <td></td>
+                    <td width="25%">ESN: 2013090274</td>
+                    <td></td>
+                    <td width="25%">Temperature: 81.1ºF</td>
+                    <td></td>
+                    <td width="25%">Uptime: 6d 17h 52m 50s</td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td>Headend Name: Ball Holdings</td>
+                    <td></td>
+                    <td>Mode: MPTS</td>
+                    <td></td>
+                    <td>Location: </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="left" style="font-size: medium; background-color: #66CEF6;">
+              <table style="width: 700px; background-color: #000000;" cellpadding="4" cellspacing="1">
+                <tbody>
+                  <tr>
+                    <td style="width: 100px; text-align: center; background-color: #FFFFFF;">
+                    <a href="javascript:golink('status.cgi')">Main</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('network.cgi')">Network</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('time.cgi')">Time</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('errorlog.cgi')">Event Log</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('config.cgi')">Config</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:logout()">Logout</a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+            <tr>
+              <td valign="top" align="center">
+                <br>
+                <table width="800px" cellpadding="0" cellspacing="0">
+                  <tbody>
+                <tr>
+                  <td>
+                    <table style="width: 600px; background-color: #000000;" cellpadding="4" cellspacing="1">
+                      <tbody>
+                        <tr>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('status.cgi')">Status</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('streaminfo.cgi')">Stream Info</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #FFFFFF;">
+                          <a href="javascript:goslot('qamconfig.cgi', 1)">QAM Config</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('diagnostic.cgi')">Diagnostics</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('mode.cgi')">Mode</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:golink('eas.cgi')">EAS</a></td>
+                          <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                          <a href="javascript:goslot('qamconfig.cgi', document.configForm.slotNumber.value)">Refresh</a></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+                    <tr>
+                      <td style="border: 1px solid #000000; background-color: #FFFFFF; text-align: center;" valign="top" align="center">
+                        <br>
+                        <table align="center" cellspacing="0" cellpadding="0" width="750px">
+                          <tr>
+                            <td>
+                              <table style="width: 300px; background-color: #000000;" cellpadding="4" cellspacing="1">
+                                <tr>
+                                  <td style="width: 200px; text-align: center; background-color: #3366FF;"><font color="white">RF Module #:</font>
+                                    <select size="1" name="slotNumber" onchange="goslot('qamconfig.cgi', document.configForm.slotNumber.value)">
+                                      <option value="1">1</option>
+                                      <option selected value="2">2</option>
+                                      <option value="3">3</option>
+                                      <option value="4">4</option>
+                                    </select>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="border: 1px solid #000000; background-color: #FFFFFF; text-align: center;" align="center" valign="top">
+                              <table cellpadding="4" style="border-style: none; border-width: 0;">
+                                <br>
+                                <table border="1" width="90%" align="center">
+                                  <tr>
+                                    <td colspan="5" bgcolor="#3366FF">
+                                    <p align="center"><b><font size="4" color="white">QAM Module 2</font></b></td>
+                                  </tr>
+                                  <tr>
+                                    <td width="25%" bgcolor="#C0C0C0">Output Channel/Frequency</td>
+                                    <td bgcolor="#C0C0C0" align="center">
+                                      <select  size="1" name="outputChannelA">
+                                        <option value="2">2 / 57MHz</option>
+                                        <option value="3">3 / 63MHz</option>
+                                        <option value="4">4 / 69MHz</option>
+                                        <option value="5">5 / 79MHz</option>
+                                        <option value="6">6 / 85MHz</option>
+                                        <option value="7">7 / 177MHz</option>
+                                        <option value="8">8 / 183MHz</option>
+                                        <option value="9">9 / 189MHz</option>
+                                        <option selected value="10">10 / 195MHz</option>
+                                        <option value="11">11 / 201MHz</option>
+                                        <option value="12">12 / 207MHz</option>
+                                        <option value="13">13 / 213MHz</option>
+                                        <option value="14">14 / 123MHz</option>
+                                        <option value="15">15 / 129MHz</option>
+                                        <option value="16">16 / 135MHz</option>
+                                        <option value="17">17 / 141MHz</option>
+                                        <option value="18">18 / 147MHz</option>
+                                        <option value="19">19 / 153MHz</option>
+                                        <option value="20">20 / 159MHz</option>
+                                        <option value="21">21 / 165MHz</option>
+                                        <option value="22">22 / 171MHz</option>
+                                        <option value="23">23 / 219MHz</option>
+                                        <option value="24">24 / 225MHz</option>
+                                        <option value="25">25 / 231MHz</option>
+                                        <option value="26">26 / 237MHz</option>
+                                        <option value="27">27 / 243MHz</option>
+                                        <option value="28">28 / 249MHz</option>
+                                        <option value="29">29 / 255MHz</option>
+                                        <option value="30">30 / 261MHz</option>
+                                        <option value="31">31 / 267MHz</option>
+                                        <option value="32">32 / 273MHz</option>
+                                        <option value="33">33 / 279MHz</option>
+                                        <option value="34">34 / 285MHz</option>
+                                        <option value="35">35 / 291MHz</option>
+                                        <option value="36">36 / 297MHz</option>
+                                        <option value="37">37 / 303MHz</option>
+                                        <option value="38">38 / 309MHz</option>
+                                        <option value="39">39 / 315MHz</option>
+                                        <option value="40">40 / 321MHz</option>
+                                        <option value="41">41 / 327MHz</option>
+                                        <option value="42">42 / 333MHz</option>
+                                        <option value="43">43 / 339MHz</option>
+                                        <option value="44">44 / 345MHz</option>
+                                        <option value="45">45 / 351MHz</option>
+                                        <option value="46">46 / 357MHz</option>
+                                        <option value="47">47 / 363MHz</option>
+                                        <option value="48">48 / 369MHz</option>
+                                        <option value="49">49 / 375MHz</option>
+                                        <option value="50">50 / 381MHz</option>
+                                        <option value="51">51 / 387MHz</option>
+                                        <option value="52">52 / 393MHz</option>
+                                        <option value="53">53 / 399MHz</option>
+                                        <option value="54">54 / 405MHz</option>
+                                        <option value="55">55 / 411MHz</option>
+                                        <option value="56">56 / 417MHz</option>
+                                        <option value="57">57 / 423MHz</option>
+                                        <option value="58">58 / 429MHz</option>
+                                        <option value="59">59 / 435MHz</option>
+                                        <option value="60">60 / 441MHz</option>
+                                        <option value="61">61 / 447MHz</option>
+                                        <option value="62">62 / 453MHz</option>
+                                        <option value="63">63 / 459MHz</option>
+                                        <option value="64">64 / 465MHz</option>
+                                        <option value="65">65 / 471MHz</option>
+                                        <option value="66">66 / 477MHz</option>
+                                        <option value="67">67 / 483MHz</option>
+                                        <option value="68">68 / 489MHz</option>
+                                        <option value="69">69 / 495MHz</option>
+                                        <option value="70">70 / 501MHz</option>
+                                        <option value="71">71 / 507MHz</option>
+                                        <option value="72">72 / 513MHz</option>
+                                        <option value="73">73 / 519MHz</option>
+                                        <option value="74">74 / 525MHz</option>
+                                        <option value="75">75 / 531MHz</option>
+                                        <option value="76">76 / 537MHz</option>
+                                        <option value="77">77 / 543MHz</option>
+                                        <option value="78">78 / 549MHz</option>
+                                        <option value="79">79 / 555MHz</option>
+                                        <option value="80">80 / 561MHz</option>
+                                        <option value="81">81 / 567MHz</option>
+                                        <option value="82">82 / 573MHz</option>
+                                        <option value="83">83 / 579MHz</option>
+                                        <option value="84">84 / 585MHz</option>
+                                        <option value="85">85 / 591MHz</option>
+                                        <option value="86">86 / 597MHz</option>
+                                        <option value="87">87 / 603MHz</option>
+                                        <option value="88">88 / 609MHz</option>
+                                        <option value="89">89 / 615MHz</option>
+                                        <option value="90">90 / 621MHz</option>
+                                        <option value="91">91 / 627MHz</option>
+                                        <option value="92">92 / 633MHz</option>
+                                        <option value="93">93 / 639MHz</option>
+                                        <option value="94">94 / 645MHz</option>
+                                        <option value="95">95 / 93MHz</option>
+                                        <option value="96">96 / 99MHz</option>
+                                        <option value="97">97 / 105MHz</option>
+                                        <option value="98">98 / 111MHz</option>
+                                        <option value="99">99 / 117MHz</option>
+                                        <option value="100">100 / 651MHz</option>
+                                        <option value="101">101 / 657MHz</option>
+                                        <option value="102">102 / 663MHz</option>
+                                        <option value="103">103 / 669MHz</option>
+                                        <option value="104">104 / 675MHz</option>
+                                        <option value="105">105 / 681MHz</option>
+                                        <option value="106">106 / 687MHz</option>
+                                        <option value="107">107 / 693MHz</option>
+                                        <option value="108">108 / 699MHz</option>
+                                        <option value="109">109 / 705MHz</option>
+                                        <option value="110">110 / 711MHz</option>
+                                        <option value="111">111 / 717MHz</option>
+                                        <option value="112">112 / 723MHz</option>
+                                        <option value="113">113 / 729MHz</option>
+                                        <option value="114">114 / 735MHz</option>
+                                        <option value="115">115 / 741MHz</option>
+                                        <option value="116">116 / 747MHz</option>
+                                        <option value="117">117 / 753MHz</option>
+                                        <option value="118">118 / 759MHz</option>
+                                        <option value="119">119 / 765MHz</option>
+                                        <option value="120">120 / 771MHz</option>
+                                        <option value="121">121 / 777MHz</option>
+                                        <option value="122">122 / 783MHz</option>
+                                        <option value="123">123 / 789MHz</option>
+                                        <option value="124">124 / 795MHz</option>
+                                        <option value="125">125 / 801MHz</option>
+                                        <option value="126">126 / 807MHz</option>
+                                        <option value="127">127 / 813MHz</option>
+                                        <option value="128">128 / 819MHz</option>
+                                        <option value="129">129 / 825MHz</option>
+                                        <option value="130">130 / 831MHz</option>
+                                        <option value="131">131 / 837MHz</option>
+                                        <option value="132">132 / 843MHz</option>
+                                        <option value="133">133 / 849MHz</option>
+                                        <option value="134">134 / 855MHz</option>
+                                        <option value="135">135 / 861MHz</option>
+                                        <option value="136">136 / 867MHz</option>
+                                        <option value="137">137 / 873MHz</option>
+                                        <option value="138">138 / 879MHz</option>
+                                        <option value="139">139 / 885MHz</option>
+                                        <option value="140">140 / 891MHz</option>
+                                        <option value="141">141 / 897MHz</option>
+                                        <option value="142">142 / 903MHz</option>
+                                        <option value="143">143 / 909MHz</option>
+                                        <option value="144">144 / 915MHz</option>
+                                        <option value="145">145 / 921MHz</option>
+                                        <option value="146">146 / 927MHz</option>
+                                        <option value="147">147 / 933MHz</option>
+                                        <option value="148">148 / 939MHz</option>
+                                        <option value="149">149 / 945MHz</option>
+                                        <option value="150">150 / 951MHz</option>
+                                        <option value="151">151 / 957MHz</option>
+                                        <option value="152">152 / 963MHz</option>
+                                        <option value="153">153 / 969MHz</option>
+                                        <option value="154">154 / 975MHz</option>
+                                        <option value="155">155 / 981MHz</option>
+                                      </select>
+                                    </td>
+                                    <td bgcolor="#C0C0C0" align="center">
+                                      <select disabled size="1" name="outputChannelB">
+                                        <option value="2">2 / 57MHz</option>
+                                        <option value="3">3 / 63MHz</option>
+                                        <option value="4">4 / 69MHz</option>
+                                        <option value="5">5 / 79MHz</option>
+                                        <option value="6">6 / 85MHz</option>
+                                        <option value="7">7 / 177MHz</option>
+                                        <option value="8">8 / 183MHz</option>
+                                        <option value="9">9 / 189MHz</option>
+                                        <option value="10">10 / 195MHz</option>
+                                        <option selected value="11">11 / 201MHz</option>
+                                        <option value="12">12 / 207MHz</option>
+                                        <option value="13">13 / 213MHz</option>
+                                        <option value="14">14 / 123MHz</option>
+                                        <option value="15">15 / 129MHz</option>
+                                        <option value="16">16 / 135MHz</option>
+                                        <option value="17">17 / 141MHz</option>
+                                        <option value="18">18 / 147MHz</option>
+                                        <option value="19">19 / 153MHz</option>
+                                        <option value="20">20 / 159MHz</option>
+                                        <option value="21">21 / 165MHz</option>
+                                        <option value="22">22 / 171MHz</option>
+                                        <option value="23">23 / 219MHz</option>
+                                        <option value="24">24 / 225MHz</option>
+                                        <option value="25">25 / 231MHz</option>
+                                        <option value="26">26 / 237MHz</option>
+                                        <option value="27">27 / 243MHz</option>
+                                        <option value="28">28 / 249MHz</option>
+                                        <option value="29">29 / 255MHz</option>
+                                        <option value="30">30 / 261MHz</option>
+                                        <option value="31">31 / 267MHz</option>
+                                        <option value="32">32 / 273MHz</option>
+                                        <option value="33">33 / 279MHz</option>
+                                        <option value="34">34 / 285MHz</option>
+                                        <option value="35">35 / 291MHz</option>
+                                        <option value="36">36 / 297MHz</option>
+                                        <option value="37">37 / 303MHz</option>
+                                        <option value="38">38 / 309MHz</option>
+                                        <option value="39">39 / 315MHz</option>
+                                        <option value="40">40 / 321MHz</option>
+                                        <option value="41">41 / 327MHz</option>
+                                        <option value="42">42 / 333MHz</option>
+                                        <option value="43">43 / 339MHz</option>
+                                        <option value="44">44 / 345MHz</option>
+                                        <option value="45">45 / 351MHz</option>
+                                        <option value="46">46 / 357MHz</option>
+                                        <option value="47">47 / 363MHz</option>
+                                        <option value="48">48 / 369MHz</option>
+                                        <option value="49">49 / 375MHz</option>
+                                        <option value="50">50 / 381MHz</option>
+                                        <option value="51">51 / 387MHz</option>
+                                        <option value="52">52 / 393MHz</option>
+                                        <option value="53">53 / 399MHz</option>
+                                        <option value="54">54 / 405MHz</option>
+                                        <option value="55">55 / 411MHz</option>
+                                        <option value="56">56 / 417MHz</option>
+                                        <option value="57">57 / 423MHz</option>
+                                        <option value="58">58 / 429MHz</option>
+                                        <option value="59">59 / 435MHz</option>
+                                        <option value="60">60 / 441MHz</option>
+                                        <option value="61">61 / 447MHz</option>
+                                        <option value="62">62 / 453MHz</option>
+                                        <option value="63">63 / 459MHz</option>
+                                        <option value="64">64 / 465MHz</option>
+                                        <option value="65">65 / 471MHz</option>
+                                        <option value="66">66 / 477MHz</option>
+                                        <option value="67">67 / 483MHz</option>
+                                        <option value="68">68 / 489MHz</option>
+                                        <option value="69">69 / 495MHz</option>
+                                        <option value="70">70 / 501MHz</option>
+                                        <option value="71">71 / 507MHz</option>
+                                        <option value="72">72 / 513MHz</option>
+                                        <option value="73">73 / 519MHz</option>
+                                        <option value="74">74 / 525MHz</option>
+                                        <option value="75">75 / 531MHz</option>
+                                        <option value="76">76 / 537MHz</option>
+                                        <option value="77">77 / 543MHz</option>
+                                        <option value="78">78 / 549MHz</option>
+                                        <option value="79">79 / 555MHz</option>
+                                        <option value="80">80 / 561MHz</option>
+                                        <option value="81">81 / 567MHz</option>
+                                        <option value="82">82 / 573MHz</option>
+                                        <option value="83">83 / 579MHz</option>
+                                        <option value="84">84 / 585MHz</option>
+                                        <option value="85">85 / 591MHz</option>
+                                        <option value="86">86 / 597MHz</option>
+                                        <option value="87">87 / 603MHz</option>
+                                        <option value="88">88 / 609MHz</option>
+                                        <option value="89">89 / 615MHz</option>
+                                        <option value="90">90 / 621MHz</option>
+                                        <option value="91">91 / 627MHz</option>
+                                        <option value="92">92 / 633MHz</option>
+                                        <option value="93">93 / 639MHz</option>
+                                        <option value="94">94 / 645MHz</option>
+                                        <option value="95">95 / 93MHz</option>
+                                        <option value="96">96 / 99MHz</option>
+                                        <option value="97">97 / 105MHz</option>
+                                        <option value="98">98 / 111MHz</option>
+                                        <option value="99">99 / 117MHz</option>
+                                        <option value="100">100 / 651MHz</option>
+                                        <option value="101">101 / 657MHz</option>
+                                        <option value="102">102 / 663MHz</option>
+                                        <option value="103">103 / 669MHz</option>
+                                        <option value="104">104 / 675MHz</option>
+                                        <option value="105">105 / 681MHz</option>
+                                        <option value="106">106 / 687MHz</option>
+                                        <option value="107">107 / 693MHz</option>
+                                        <option value="108">108 / 699MHz</option>
+                                        <option value="109">109 / 705MHz</option>
+                                        <option value="110">110 / 711MHz</option>
+                                        <option value="111">111 / 717MHz</option>
+                                        <option value="112">112 / 723MHz</option>
+                                        <option value="113">113 / 729MHz</option>
+                                        <option value="114">114 / 735MHz</option>
+                                        <option value="115">115 / 741MHz</option>
+                                        <option value="116">116 / 747MHz</option>
+                                        <option value="117">117 / 753MHz</option>
+                                        <option value="118">118 / 759MHz</option>
+                                        <option value="119">119 / 765MHz</option>
+                                        <option value="120">120 / 771MHz</option>
+                                        <option value="121">121 / 777MHz</option>
+                                        <option value="122">122 / 783MHz</option>
+                                        <option value="123">123 / 789MHz</option>
+                                        <option value="124">124 / 795MHz</option>
+                                        <option value="125">125 / 801MHz</option>
+                                        <option value="126">126 / 807MHz</option>
+                                        <option value="127">127 / 813MHz</option>
+                                        <option value="128">128 / 819MHz</option>
+                                        <option value="129">129 / 825MHz</option>
+                                        <option value="130">130 / 831MHz</option>
+                                        <option value="131">131 / 837MHz</option>
+                                        <option value="132">132 / 843MHz</option>
+                                        <option value="133">133 / 849MHz</option>
+                                        <option value="134">134 / 855MHz</option>
+                                        <option value="135">135 / 861MHz</option>
+                                        <option value="136">136 / 867MHz</option>
+                                        <option value="137">137 / 873MHz</option>
+                                        <option value="138">138 / 879MHz</option>
+                                        <option value="139">139 / 885MHz</option>
+                                        <option value="140">140 / 891MHz</option>
+                                        <option value="141">141 / 897MHz</option>
+                                        <option value="142">142 / 903MHz</option>
+                                        <option value="143">143 / 909MHz</option>
+                                        <option value="144">144 / 915MHz</option>
+                                        <option value="145">145 / 921MHz</option>
+                                        <option value="146">146 / 927MHz</option>
+                                        <option value="147">147 / 933MHz</option>
+                                        <option value="148">148 / 939MHz</option>
+                                        <option value="149">149 / 945MHz</option>
+                                        <option value="150">150 / 951MHz</option>
+                                        <option value="151">151 / 957MHz</option>
+                                        <option value="152">152 / 963MHz</option>
+                                        <option value="153">153 / 969MHz</option>
+                                        <option value="154">154 / 975MHz</option>
+                                        <option value="155">155 / 981MHz</option>
+                                        <option value="156">156 / 987MHz</option>
+                                        <option value="157">157 / 993MHz</option>
+                                        <option value="158">158 / 999MHz</option>
+                                      </select>
+                                    </td>
+                                    <td bgcolor="#C0C0C0" align="center">
+                                      <select disabled size="1" name="outputChannelC">
+                                        <option value="2">2 / 57MHz</option>
+                                        <option value="3">3 / 63MHz</option>
+                                        <option value="4">4 / 69MHz</option>
+                                        <option value="5">5 / 79MHz</option>
+                                        <option value="6">6 / 85MHz</option>
+                                        <option value="7">7 / 177MHz</option>
+                                        <option value="8">8 / 183MHz</option>
+                                        <option value="9">9 / 189MHz</option>
+                                        <option value="10">10 / 195MHz</option>
+                                        <option value="11">11 / 201MHz</option>
+                                        <option selected value="12">12 / 207MHz</option>
+                                        <option value="13">13 / 213MHz</option>
+                                        <option value="14">14 / 123MHz</option>
+                                        <option value="15">15 / 129MHz</option>
+                                        <option value="16">16 / 135MHz</option>
+                                        <option value="17">17 / 141MHz</option>
+                                        <option value="18">18 / 147MHz</option>
+                                        <option value="19">19 / 153MHz</option>
+                                        <option value="20">20 / 159MHz</option>
+                                        <option value="21">21 / 165MHz</option>
+                                        <option value="22">22 / 171MHz</option>
+                                        <option value="23">23 / 219MHz</option>
+                                        <option value="24">24 / 225MHz</option>
+                                        <option value="25">25 / 231MHz</option>
+                                        <option value="26">26 / 237MHz</option>
+                                        <option value="27">27 / 243MHz</option>
+                                        <option value="28">28 / 249MHz</option>
+                                        <option value="29">29 / 255MHz</option>
+                                        <option value="30">30 / 261MHz</option>
+                                        <option value="31">31 / 267MHz</option>
+                                        <option value="32">32 / 273MHz</option>
+                                        <option value="33">33 / 279MHz</option>
+                                        <option value="34">34 / 285MHz</option>
+                                        <option value="35">35 / 291MHz</option>
+                                        <option value="36">36 / 297MHz</option>
+                                        <option value="37">37 / 303MHz</option>
+                                        <option value="38">38 / 309MHz</option>
+                                        <option value="39">39 / 315MHz</option>
+                                        <option value="40">40 / 321MHz</option>
+                                        <option value="41">41 / 327MHz</option>
+                                        <option value="42">42 / 333MHz</option>
+                                        <option value="43">43 / 339MHz</option>
+                                        <option value="44">44 / 345MHz</option>
+                                        <option value="45">45 / 351MHz</option>
+                                        <option value="46">46 / 357MHz</option>
+                                        <option value="47">47 / 363MHz</option>
+                                        <option value="48">48 / 369MHz</option>
+                                        <option value="49">49 / 375MHz</option>
+                                        <option value="50">50 / 381MHz</option>
+                                        <option value="51">51 / 387MHz</option>
+                                        <option value="52">52 / 393MHz</option>
+                                        <option value="53">53 / 399MHz</option>
+                                        <option value="54">54 / 405MHz</option>
+                                        <option value="55">55 / 411MHz</option>
+                                        <option value="56">56 / 417MHz</option>
+                                        <option value="57">57 / 423MHz</option>
+                                        <option value="58">58 / 429MHz</option>
+                                        <option value="59">59 / 435MHz</option>
+                                        <option value="60">60 / 441MHz</option>
+                                        <option value="61">61 / 447MHz</option>
+                                        <option value="62">62 / 453MHz</option>
+                                        <option value="63">63 / 459MHz</option>
+                                        <option value="64">64 / 465MHz</option>
+                                        <option value="65">65 / 471MHz</option>
+                                        <option value="66">66 / 477MHz</option>
+                                        <option value="67">67 / 483MHz</option>
+                                        <option value="68">68 / 489MHz</option>
+                                        <option value="69">69 / 495MHz</option>
+                                        <option value="70">70 / 501MHz</option>
+                                        <option value="71">71 / 507MHz</option>
+                                        <option value="72">72 / 513MHz</option>
+                                        <option value="73">73 / 519MHz</option>
+                                        <option value="74">74 / 525MHz</option>
+                                        <option value="75">75 / 531MHz</option>
+                                        <option value="76">76 / 537MHz</option>
+                                        <option value="77">77 / 543MHz</option>
+                                        <option value="78">78 / 549MHz</option>
+                                        <option value="79">79 / 555MHz</option>
+                                        <option value="80">80 / 561MHz</option>
+                                        <option value="81">81 / 567MHz</option>
+                                        <option value="82">82 / 573MHz</option>
+                                        <option value="83">83 / 579MHz</option>
+                                        <option value="84">84 / 585MHz</option>
+                                        <option value="85">85 / 591MHz</option>
+                                        <option value="86">86 / 597MHz</option>
+                                        <option value="87">87 / 603MHz</option>
+                                        <option value="88">88 / 609MHz</option>
+                                        <option value="89">89 / 615MHz</option>
+                                        <option value="90">90 / 621MHz</option>
+                                        <option value="91">91 / 627MHz</option>
+                                        <option value="92">92 / 633MHz</option>
+                                        <option value="93">93 / 639MHz</option>
+                                        <option value="94">94 / 645MHz</option>
+                                        <option value="95">95 / 93MHz</option>
+                                        <option value="96">96 / 99MHz</option>
+                                        <option value="97">97 / 105MHz</option>
+                                        <option value="98">98 / 111MHz</option>
+                                        <option value="99">99 / 117MHz</option>
+                                        <option value="100">100 / 651MHz</option>
+                                        <option value="101">101 / 657MHz</option>
+                                        <option value="102">102 / 663MHz</option>
+                                        <option value="103">103 / 669MHz</option>
+                                        <option value="104">104 / 675MHz</option>
+                                        <option value="105">105 / 681MHz</option>
+                                        <option value="106">106 / 687MHz</option>
+                                        <option value="107">107 / 693MHz</option>
+                                        <option value="108">108 / 699MHz</option>
+                                        <option value="109">109 / 705MHz</option>
+                                        <option value="110">110 / 711MHz</option>
+                                        <option value="111">111 / 717MHz</option>
+                                        <option value="112">112 / 723MHz</option>
+                                        <option value="113">113 / 729MHz</option>
+                                        <option value="114">114 / 735MHz</option>
+                                        <option value="115">115 / 741MHz</option>
+                                        <option value="116">116 / 747MHz</option>
+                                        <option value="117">117 / 753MHz</option>
+                                        <option value="118">118 / 759MHz</option>
+                                        <option value="119">119 / 765MHz</option>
+                                        <option value="120">120 / 771MHz</option>
+                                        <option value="121">121 / 777MHz</option>
+                                        <option value="122">122 / 783MHz</option>
+                                        <option value="123">123 / 789MHz</option>
+                                        <option value="124">124 / 795MHz</option>
+                                        <option value="125">125 / 801MHz</option>
+                                        <option value="126">126 / 807MHz</option>
+                                        <option value="127">127 / 813MHz</option>
+                                        <option value="128">128 / 819MHz</option>
+                                        <option value="129">129 / 825MHz</option>
+                                        <option value="130">130 / 831MHz</option>
+                                        <option value="131">131 / 837MHz</option>
+                                        <option value="132">132 / 843MHz</option>
+                                        <option value="133">133 / 849MHz</option>
+                                        <option value="134">134 / 855MHz</option>
+                                        <option value="135">135 / 861MHz</option>
+                                        <option value="136">136 / 867MHz</option>
+                                        <option value="137">137 / 873MHz</option>
+                                        <option value="138">138 / 879MHz</option>
+                                        <option value="139">139 / 885MHz</option>
+                                        <option value="140">140 / 891MHz</option>
+                                        <option value="141">141 / 897MHz</option>
+                                        <option value="142">142 / 903MHz</option>
+                                        <option value="143">143 / 909MHz</option>
+                                        <option value="144">144 / 915MHz</option>
+                                        <option value="145">145 / 921MHz</option>
+                                        <option value="146">146 / 927MHz</option>
+                                        <option value="147">147 / 933MHz</option>
+                                        <option value="148">148 / 939MHz</option>
+                                        <option value="149">149 / 945MHz</option>
+                                        <option value="150">150 / 951MHz</option>
+                                        <option value="151">151 / 957MHz</option>
+                                        <option value="152">152 / 963MHz</option>
+                                        <option value="153">153 / 969MHz</option>
+                                        <option value="154">154 / 975MHz</option>
+                                        <option value="155">155 / 981MHz</option>
+                                        <option value="156">156 / 987MHz</option>
+                                        <option value="157">157 / 993MHz</option>
+                                        <option value="158">158 / 999MHz</option>
+                                      </select>
+                                    </td>
+                                    <td bgcolor="#C0C0C0" align="center">
+                                      <select disabled size="1" name="outputChannelD">
+                                        <option value="2">2 / 57MHz</option>
+                                        <option value="3">3 / 63MHz</option>
+                                        <option value="4">4 / 69MHz</option>
+                                        <option value="5">5 / 79MHz</option>
+                                        <option value="6">6 / 85MHz</option>
+                                        <option value="7">7 / 177MHz</option>
+                                        <option value="8">8 / 183MHz</option>
+                                        <option value="9">9 / 189MHz</option>
+                                        <option value="10">10 / 195MHz</option>
+                                        <option value="11">11 / 201MHz</option>
+                                        <option value="12">12 / 207MHz</option>
+                                        <option selected value="13">13 / 213MHz</option>
+                                        <option value="14">14 / 123MHz</option>
+                                        <option value="15">15 / 129MHz</option>
+                                        <option value="16">16 / 135MHz</option>
+                                        <option value="17">17 / 141MHz</option>
+                                        <option value="18">18 / 147MHz</option>
+                                        <option value="19">19 / 153MHz</option>
+                                        <option value="20">20 / 159MHz</option>
+                                        <option value="21">21 / 165MHz</option>
+                                        <option value="22">22 / 171MHz</option>
+                                        <option value="23">23 / 219MHz</option>
+                                        <option value="24">24 / 225MHz</option>
+                                        <option value="25">25 / 231MHz</option>
+                                        <option value="26">26 / 237MHz</option>
+                                        <option value="27">27 / 243MHz</option>
+                                        <option value="28">28 / 249MHz</option>
+                                        <option value="29">29 / 255MHz</option>
+                                        <option value="30">30 / 261MHz</option>
+                                        <option value="31">31 / 267MHz</option>
+                                        <option value="32">32 / 273MHz</option>
+                                        <option value="33">33 / 279MHz</option>
+                                        <option value="34">34 / 285MHz</option>
+                                        <option value="35">35 / 291MHz</option>
+                                        <option value="36">36 / 297MHz</option>
+                                        <option value="37">37 / 303MHz</option>
+                                        <option value="38">38 / 309MHz</option>
+                                        <option value="39">39 / 315MHz</option>
+                                        <option value="40">40 / 321MHz</option>
+                                        <option value="41">41 / 327MHz</option>
+                                        <option value="42">42 / 333MHz</option>
+                                        <option value="43">43 / 339MHz</option>
+                                        <option value="44">44 / 345MHz</option>
+                                        <option value="45">45 / 351MHz</option>
+                                        <option value="46">46 / 357MHz</option>
+                                        <option value="47">47 / 363MHz</option>
+                                        <option value="48">48 / 369MHz</option>
+                                        <option value="49">49 / 375MHz</option>
+                                        <option value="50">50 / 381MHz</option>
+                                        <option value="51">51 / 387MHz</option>
+                                        <option value="52">52 / 393MHz</option>
+                                        <option value="53">53 / 399MHz</option>
+                                        <option value="54">54 / 405MHz</option>
+                                        <option value="55">55 / 411MHz</option>
+                                        <option value="56">56 / 417MHz</option>
+                                        <option value="57">57 / 423MHz</option>
+                                        <option value="58">58 / 429MHz</option>
+                                        <option value="59">59 / 435MHz</option>
+                                        <option value="60">60 / 441MHz</option>
+                                        <option value="61">61 / 447MHz</option>
+                                        <option value="62">62 / 453MHz</option>
+                                        <option value="63">63 / 459MHz</option>
+                                        <option value="64">64 / 465MHz</option>
+                                        <option value="65">65 / 471MHz</option>
+                                        <option value="66">66 / 477MHz</option>
+                                        <option value="67">67 / 483MHz</option>
+                                        <option value="68">68 / 489MHz</option>
+                                        <option value="69">69 / 495MHz</option>
+                                        <option value="70">70 / 501MHz</option>
+                                        <option value="71">71 / 507MHz</option>
+                                        <option value="72">72 / 513MHz</option>
+                                        <option value="73">73 / 519MHz</option>
+                                        <option value="74">74 / 525MHz</option>
+                                        <option value="75">75 / 531MHz</option>
+                                        <option value="76">76 / 537MHz</option>
+                                        <option value="77">77 / 543MHz</option>
+                                        <option value="78">78 / 549MHz</option>
+                                        <option value="79">79 / 555MHz</option>
+                                        <option value="80">80 / 561MHz</option>
+                                        <option value="81">81 / 567MHz</option>
+                                        <option value="82">82 / 573MHz</option>
+                                        <option value="83">83 / 579MHz</option>
+                                        <option value="84">84 / 585MHz</option>
+                                        <option value="85">85 / 591MHz</option>
+                                        <option value="86">86 / 597MHz</option>
+                                        <option value="87">87 / 603MHz</option>
+                                        <option value="88">88 / 609MHz</option>
+                                        <option value="89">89 / 615MHz</option>
+                                        <option value="90">90 / 621MHz</option>
+                                        <option value="91">91 / 627MHz</option>
+                                        <option value="92">92 / 633MHz</option>
+                                        <option value="93">93 / 639MHz</option>
+                                        <option value="94">94 / 645MHz</option>
+                                        <option value="95">95 / 93MHz</option>
+                                        <option value="96">96 / 99MHz</option>
+                                        <option value="97">97 / 105MHz</option>
+                                        <option value="98">98 / 111MHz</option>
+                                        <option value="99">99 / 117MHz</option>
+                                        <option value="100">100 / 651MHz</option>
+                                        <option value="101">101 / 657MHz</option>
+                                        <option value="102">102 / 663MHz</option>
+                                        <option value="103">103 / 669MHz</option>
+                                        <option value="104">104 / 675MHz</option>
+                                        <option value="105">105 / 681MHz</option>
+                                        <option value="106">106 / 687MHz</option>
+                                        <option value="107">107 / 693MHz</option>
+                                        <option value="108">108 / 699MHz</option>
+                                        <option value="109">109 / 705MHz</option>
+                                        <option value="110">110 / 711MHz</option>
+                                        <option value="111">111 / 717MHz</option>
+                                        <option value="112">112 / 723MHz</option>
+                                        <option value="113">113 / 729MHz</option>
+                                        <option value="114">114 / 735MHz</option>
+                                        <option value="115">115 / 741MHz</option>
+                                        <option value="116">116 / 747MHz</option>
+                                        <option value="117">117 / 753MHz</option>
+                                        <option value="118">118 / 759MHz</option>
+                                        <option value="119">119 / 765MHz</option>
+                                        <option value="120">120 / 771MHz</option>
+                                        <option value="121">121 / 777MHz</option>
+                                        <option value="122">122 / 783MHz</option>
+                                        <option value="123">123 / 789MHz</option>
+                                        <option value="124">124 / 795MHz</option>
+                                        <option value="125">125 / 801MHz</option>
+                                        <option value="126">126 / 807MHz</option>
+                                        <option value="127">127 / 813MHz</option>
+                                        <option value="128">128 / 819MHz</option>
+                                        <option value="129">129 / 825MHz</option>
+                                        <option value="130">130 / 831MHz</option>
+                                        <option value="131">131 / 837MHz</option>
+                                        <option value="132">132 / 843MHz</option>
+                                        <option value="133">133 / 849MHz</option>
+                                        <option value="134">134 / 855MHz</option>
+                                        <option value="135">135 / 861MHz</option>
+                                        <option value="136">136 / 867MHz</option>
+                                        <option value="137">137 / 873MHz</option>
+                                        <option value="138">138 / 879MHz</option>
+                                        <option value="139">139 / 885MHz</option>
+                                        <option value="140">140 / 891MHz</option>
+                                        <option value="141">141 / 897MHz</option>
+                                        <option value="142">142 / 903MHz</option>
+                                        <option value="143">143 / 909MHz</option>
+                                        <option value="144">144 / 915MHz</option>
+                                        <option value="145">145 / 921MHz</option>
+                                        <option value="146">146 / 927MHz</option>
+                                        <option value="147">147 / 933MHz</option>
+                                        <option value="148">148 / 939MHz</option>
+                                        <option value="149">149 / 945MHz</option>
+                                        <option value="150">150 / 951MHz</option>
+                                        <option value="151">151 / 957MHz</option>
+                                        <option value="152">152 / 963MHz</option>
+                                        <option value="153">153 / 969MHz</option>
+                                        <option value="154">154 / 975MHz</option>
+                                        <option value="155">155 / 981MHz</option>
+                                        <option value="156">156 / 987MHz</option>
+                                        <option value="157">157 / 993MHz</option>
+                                        <option value="158">158 / 999MHz</option>
+                                      </select>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td bgcolor="#C0C0C0">Output Control</td>
+                                    <td bgcolor="#C0C0C0" align="center">
+                                      <select  size="1" name="outputChannelControlA">
+                                        <option value="0">Off</option>
+                                        <option selected value="1">On</option>
+                                      </select>
+                                    </td>
+                                    <td bgcolor="#C0C0C0" align="center">
+                                      <select  size="1" name="outputChannelControlB">
+                                        <option value="0">Off</option>
+                                        <option selected value="1">On</option>
+                                      </select>
+                                    </td>
+                                    <td bgcolor="#C0C0C0" align="center">
+                                      <select  size="1" name="outputChannelControlC">
+                                        <option value="0">Off</option>
+                                        <option selected value="1">On</option>
+                                      </select>
+                                    </td>
+                                    <td bgcolor="#C0C0C0" align="center">
+                                      <select  size="1" name="outputChannelControlD">
+                                        <option value="0">Off</option>
+                                        <option selected value="1">On</option>
+                                      </select>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td bgcolor="#C0C0C0">CW Control</td>
+                                    <td colspan="4" bgcolor="#C0C0C0" align="center">
+                                      <input name="chkCW1" type="checkbox" onclick="change_output_control()">Enable CW for QAM Module
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td bgcolor="#C0C0C0">Final Output Level</td>
+                                    <td colspan="4" bgcolor="#C0C0C0" align="center">
+                                      <select disabled size="1" name="outputLevel">
+                                        <option value="28">28</option>
+                                        <option value="29">29</option>
+                                        <option value="30">30</option>
+                                        <option value="31">31</option>
+                                        <option value="32">32</option>
+                                        <option value="33">33</option>
+                                        <option value="34">34</option>
+                                        <option value="35">35</option>
+                                        <option value="36">36</option>
+                                        <option value="37">37</option>
+                                        <option value="38">38</option>
+                                        <option value="39">39</option>
+                                        <option selected value="40">40</option>
+                                        <option value="41">41</option>
+                                      </select>dBmV
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td bgcolor="#C0C0C0">Output QAM Mode</td>
+                                    <td colspan="4" bgcolor="#C0C0C0" align="center">
+                                      <select  size="1" name="QAMModeA">
+                                        <option  value="0">64B</option>
+                                        <option selected  value="1">256B</option>
+                                        <option  value="2">16A</option>
+                                        <option  value="3">32A</option>
+                                        <option  value="4">64A</option>
+                                        <option  value="5">128A</option>
+                                        <option  value="6">256A</option>
+                                      </select>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td bgcolor="#C0C0C0">Output QAM Map</td>
+                                    <td colspan="4" bgcolor="#C0C0C0" align="center">
+                                      <select  size="1" name="QAMMap">
+                                        <option selected  value="10">STD</option>
+                                        <option  value="11">IRC</option>
+                                        <option  value="12">HRC</option>
+                                      </select>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td bgcolor="#C0C0C0">Output QAM Data Rate</td>
+                                    <td colspan="4" bgcolor="#C0C0C0" align="center">
+                                    5.360500 Mbaud</td>
+                                  </tr>
+                                  <tr>
+                                    <td bgcolor="#C0C0C0">Output QAM Interleaver</td>
+                                    <td colspan="4" bgcolor="#C0C0C0" align="center">128-1</td>
+                                  </tr>
+                                  <tr>
+                                    <td bgcolor="#C0C0C0">Output QAM Alpha</td>
+                                    <td colspan="4" bgcolor="#C0C0C0" align="center">12%</td>
+                                  </tr>
+                                  <tr>
+                                    <td bgcolor="#C0C0C0">QAM Lock State</td>
+                                    <td colspan="4" bgcolor="#C0C0C0" align="center">Lock</td>
+                                  </tr>
+                                </table>
+                                <br>
+                              </table>
+                              <br>
+                              <input type="button"  value="Save" style="width: 85px;" name="btnQAMSave" onclick="validate_qam()">
+                              <br>
+                              <br>
+                            </td>
+                          </tr>
+                        </table>
+                        <br>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <input name="qam_saved" value="0" type="hidden">
+                <input name="session_id" value="" type="hidden">
+                <br>
+                <br>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </form>
+  </body>
+</html>

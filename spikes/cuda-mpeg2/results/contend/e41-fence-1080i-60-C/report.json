@@ -1,0 +1,116 @@
+{
+ "dir": "results/contend/e41-fence-1080i-60-C",
+ "hdr": "fmt 1080i n 60",
+ "period_ms": 33.36666666666667,
+ "other_active_s": 6,
+ "rows": [
+  {
+   "comp": "(alone)",
+   "ticks": 112,
+   "base_ms": 25.125,
+   "med_ms": 25.125,
+   "p95_ms": 25.61,
+   "max_ms": 25.817,
+   "ratio": 1.0,
+   "added_ms": 0.0,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    18.7455,
+    3.2395,
+    2.7785
+   ],
+   "base_ph_ms": [
+    18.7455,
+    3.2395,
+    2.7785
+   ],
+   "upwait_ms": 0.006,
+   "result": "",
+   "pwr": 64.5,
+   "gtemp": 90.0,
+   "sm": 75.75,
+   "mem": 58.5,
+   "enc": 0.0,
+   "dec": 0.5,
+   "pclk": 2051.25,
+   "pviol": 68.0,
+   "tviol": 0.0,
+   "pclk_min": 2010.0
+  },
+  {
+   "comp": "tonemap_re",
+   "ticks": 35,
+   "base_ms": 25.191,
+   "med_ms": 28.327,
+   "p95_ms": 29.73,
+   "max_ms": 29.871,
+   "ratio": 1.124488904767576,
+   "added_ms": 3.136000000000003,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    20.451,
+    3.513,
+    2.963
+   ],
+   "base_ph_ms": [
+    18.803,
+    3.249,
+    2.78
+   ],
+   "upwait_ms": 0.005,
+   "result": "206 frames, 25 fps",
+   "pwr": 66.6,
+   "gtemp": 90.0,
+   "sm": 88.4,
+   "mem": 64.8,
+   "enc": 28.8,
+   "dec": 8.0,
+   "pclk": 1995.0,
+   "pviol": 100.0,
+   "tviol": 0.0,
+   "pclk_min": 1950.0
+  },
+  {
+   "comp": "(plex)",
+   "ticks": 26,
+   "base_ms": 25.125,
+   "med_ms": 25.0415,
+   "p95_ms": 25.463,
+   "max_ms": 25.491,
+   "ratio": 0.9966766169154229,
+   "added_ms": -0.0835000000000008,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    18.761,
+    3.2335000000000003,
+    2.78
+   ],
+   "base_ph_ms": [
+    18.7455,
+    3.2395,
+    2.7785
+   ],
+   "upwait_ms": 0.005,
+   "result": "",
+   "pwr": null,
+   "gtemp": null,
+   "sm": null,
+   "mem": null,
+   "enc": null,
+   "dec": null,
+   "pclk": null,
+   "pviol": null,
+   "tviol": null,
+   "pclk_min": null
+  }
+ ]
+}

@@ -1,0 +1,29 @@
+[package]
+name = "tb-device-ref"
+description = "CPU reference adapter: executes device plans with the kernel source compiled for the host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+build = "build.rs"
+links = "tbkernels_ref"
+
+[features]
+# Link the kernels built with AddressSanitizer (TB_KERNELS_REF_ASAN); for the flake's `asan`
+# variant, which runs this crate's tests with them.
+asan = []
+
+[dependencies]
+tb-device.workspace = true
+tb-kernel-abi.workspace = true
+bytemuck.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tb-golden.workspace = true
+tb-convert.workspace = true
+
+[lints]
+workspace = true

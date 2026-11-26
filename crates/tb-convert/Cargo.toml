@@ -1,0 +1,18 @@
+[package]
+name = "tb-convert"
+description = "Conversion planning: which scale, deinterlace, color and compose operations a tick needs, and their filter taps"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-kernel-abi.workspace = true
+tb-device.workspace = true
+bytemuck.workspace = true
+thiserror.workspace = true
+tb-golden.workspace = true
+
+[lints]
+workspace = true

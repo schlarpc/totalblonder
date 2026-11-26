@@ -1,0 +1,25 @@
+# 2026-11-25T09:42:35Z load 0.53 0.78 1.00
+== soak: 1080i N=28 paced for 60 s, nvidia-smi dmon -s pucm every 5 s
+tick ms: mean 30.082 p50 31.169 p99 33.393 max 40.243, period 33.367, late 21 of 1802
+host cpu 0.762 s = 0.013 cores total, 0.0005 cores per session at this pace; 0.015 cpu-ms per session-frame
+rate control: target 15000000 bit/s, vbv 7487488 bits, occupancy min 3927234 max 6116226, underflows 0, stuffing 0 bytes, requant retries 398 (0.01 per picture)
+loadavg before 0.53 after 0.37
+RESULT n=28 fps_per_session=29.941 rt=0.999 late=21 p99_ms=33.393 cpu_per_session=0.0005 mbps=15.000
+# gpu    pwr  gtemp  mtemp     sm    mem    enc    dec    jpg    ofa   mclk   pclk     fb   bar1   ccpm 
+# Idx      W      C      C      %      %      %      %      %      %    MHz    MHz     MB     MB     MB 
+    0     52     78      -      0      0      0      0      0      0   7001   2430     19      4      0 
+    0     64     85      -     93     31      0      0      0      0   6801   2355   1698      4      0 
+    0     62     84      -     92     31      0      0      0      0   6801   2430   1698      4      0 
+    0     65     85      -     91     30      0      0      0      0   6801   2325   1698      4      0 
+    0     64     86      -     91     31      0      0      0      0   6801   2220   1698      4      0 
+    0     63     87      -     94     30      0      0      0      0   6801   2250   1698      4      0 
+    0     65     87      -     93     31      0      0      0      0   6801   2280   1698      4      0 
+    0     64     86      -     92     31      0      0      0      0   6801   2340   1698      4      0 
+    0     63     86      -     92     30      0      0      0      0   6801   2175   1698      4      0 
+    0     65     88      -     92     31      0      0      0      0   6801   2280   1698      4      0 
+    0     64     88      -     92     29      0      0      0      0   6801   2355   1698      4      0 
+    0     63     88      -     92     30      0      0      0      0   6801   2130   1698      4      0 
+    0     65     87      -     92     30      0      0      0      0   6801   2130   1698      4      0 
+    0     17     76      -      0      0      0      0      0      0   5001    345      4      2      0 
+    0      8     73      -      0      0      0      0      0      0    405    210      4      2      0 
+# 2026-11-25T09:43:45Z load 0.32 0.66 0.94

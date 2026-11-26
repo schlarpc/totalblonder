@@ -1,0 +1,19 @@
+[package]
+name = "tb-decoder-client"
+description = "The server's side of the sandboxed decoder: start and supervise tb-avworker processes, feed them packets without blocking, take decoded frames zero-copy from shared memory, validate everything they say"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustix.workspace = true
+tb-decoder-proto.workspace = true
+tb-media.workspace = true
+tb-sandbox.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

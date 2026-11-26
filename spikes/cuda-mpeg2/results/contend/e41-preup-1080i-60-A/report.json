@@ -1,0 +1,116 @@
+{
+ "dir": "results/contend/e41-preup-1080i-60-A",
+ "hdr": "fmt 1080i n 60",
+ "period_ms": 33.36666666666667,
+ "other_active_s": 0,
+ "rows": [
+  {
+   "comp": "(alone)",
+   "ticks": 219,
+   "base_ms": 25.186,
+   "med_ms": 25.186,
+   "p95_ms": 25.783,
+   "max_ms": 26.301,
+   "ratio": 1.0,
+   "added_ms": 0.0,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    18.732,
+    3.243,
+    2.779
+   ],
+   "base_ph_ms": [
+    18.732,
+    3.243,
+    2.779
+   ],
+   "upwait_ms": 0.006,
+   "result": "",
+   "pwr": 64.0,
+   "gtemp": 89.0,
+   "sm": 73.66666666666667,
+   "mem": 58.0,
+   "enc": 0.0,
+   "dec": 0.0,
+   "pclk": 2115.0,
+   "pviol": 81.0,
+   "tviol": 0.0,
+   "pclk_min": 2100.0
+  },
+  {
+   "comp": "cuda_tinycont",
+   "ticks": 134,
+   "base_ms": 25.238999999999997,
+   "med_ms": 28.0505,
+   "p95_ms": 28.717,
+   "max_ms": 29.06,
+   "ratio": 1.1113950631958478,
+   "added_ms": 2.8115000000000023,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    20.880499999999998,
+    3.673,
+    3.103
+   ],
+   "base_ph_ms": [
+    18.868000000000002,
+    3.245,
+    2.778
+   ],
+   "upwait_ms": 0.005,
+   "result": "29530 launches, round trip p50 0.045 p99 2.324 max 2.616 ms",
+   "pwr": 66.5,
+   "gtemp": 91.0,
+   "sm": 86.0,
+   "mem": 59.75,
+   "enc": 0.0,
+   "dec": 0.25,
+   "pclk": 2130.0,
+   "pviol": 100.0,
+   "tviol": 0.0,
+   "pclk_min": 2130.0
+  },
+  {
+   "comp": "scale_max",
+   "ticks": 171,
+   "base_ms": 25.108,
+   "med_ms": 31.798,
+   "p95_ms": 32.304,
+   "max_ms": 32.522,
+   "ratio": 1.2664489405767085,
+   "added_ms": 6.689999999999998,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    23.934,
+    3.971,
+    3.571
+   ],
+   "base_ph_ms": [
+    18.685,
+    3.24,
+    2.779
+   ],
+   "upwait_ms": 0.005,
+   "result": "5056 frames, 628 fps",
+   "pwr": 67.8,
+   "gtemp": 91.0,
+   "sm": 91.4,
+   "mem": 66.8,
+   "enc": 25.6,
+   "dec": 80.0,
+   "pclk": 1938.0,
+   "pviol": 100.0,
+   "tviol": 0.0,
+   "pclk_min": 1905.0
+  }
+ ]
+}

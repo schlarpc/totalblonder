@@ -1,0 +1,35 @@
+[package]
+name = "tb-m2venc"
+description = "Command-line driver of the Rust encoder for the correctness gate and the benchmarks (the counterpart of the C++ spike's m2venc)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-device.workspace = true
+tb-device-ref.workspace = true
+tb-device-cuda.workspace = true
+tb-m2v-encoder.workspace = true
+tb-engine.workspace = true
+tb-m2v-syntax.workspace = true
+tb-m2v-rate.workspace = true
+# captions from a SubRip or WebVTT file (--cc-text)
+tb-captions.workspace = true
+bytemuck.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+anyhow = "1"
+# The subscriber that prints the adapters' and the driver's tracing events on stderr.
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }
+
+[dev-dependencies]
+tb-device = { workspace = true, features = ["golden"] }
+tb-golden.workspace = true
+tb-kernel-abi.workspace = true
+# the conformance verifier, on the streams the tests encode
+tb-m2v-verify.workspace = true
+
+[lints]
+workspace = true

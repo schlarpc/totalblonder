@@ -1,0 +1,153 @@
+<html>
+  <head>
+    <title>Event Log - Ball Holdings</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+    <link rel="stylesheet" type="text/css" href="../eqam.css">
+    <script language="JavaScript">
+      <!-- Begin
+      function logout()
+      {
+        var temp;
+        temp = "errorlog.cgi?logout=1&session_id=" + document.configForm.session_id.value;
+        document.location = temp;
+        return 0;
+      }
+      function golink(field)
+      {
+        var temp;
+        temp = field + "?session_id=" + document.configForm.session_id.value;
+        document.location = temp;
+        return 0;
+      }
+
+      function validate()
+      {
+        var temp;
+        temp = parseInt(document.configForm.showLines.value);
+        if((temp <= 0) || (temp > 65535))
+          alert("The number of log entries to be displayed is outside the valid range.  Valid range: 1-65535.");
+        else
+          document.configForm.submit();
+      }
+      function getCookie(c_name)
+      {
+        if(document.cookie.length > 0)
+        {
+          c_start = document.cookie.indexOf(c_name + "=");
+          if(c_start != -1)
+          {
+            c_start = c_start + c_name.length + 1;
+            c_end = document.cookie.indexOf(";", c_start);
+            if(c_end == -1) c_end = document.cookie.length;
+            document.configForm.session_id.value = document.cookie.substring(c_start, c_end);
+          }
+        }
+        return "";
+      }
+
+    //  End -->
+    </script>
+  </head>
+  <body onload="getCookie('session_id')">
+    <form name="configForm" action="errorlog.cgi" method="post">
+      <div align="center">
+        <table border="0" cellpadding="0" bgcolor="#FFFFFF" style="border-collapse: collapse" width="1000">
+          <tr>
+            <td>
+            <a href="http://www.blondertongue.com"><img border="0" src="../images/logo.png" alt="Blonder Tongue Laboratories, Inc."></a></td>
+          </tr>
+          <tr>
+            <td bgcolor="#66CEF6" align="center"><font size="6">EQAM-420B-4-64</font></td>
+          </tr>
+          <tr>
+            <td bgcolor="#66CEF6" align="center">
+              <table>
+                <tbody>
+                  <tr>
+                    <td></td>
+                    <td width="25%">ESN: 2013090274</td>
+                    <td></td>
+                    <td width="25%">Temperature: 80.8ºF</td>
+                    <td></td>
+                    <td width="25%">Uptime: 6d 17h 50m 26s</td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td>Headend Name: Ball Holdings</td>
+                    <td></td>
+                    <td>Mode: MPTS</td>
+                    <td></td>
+                    <td>Location: </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="left" style="font-size: medium; background-color: #66CEF6;">
+              <table style="width: 700px; background-color: #000000;" cellpadding="4" cellspacing="1">
+                <tbody>
+                  <tr>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('status.cgi')">Main</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('network.cgi')">Network</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('time.cgi')">Time</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #FFFFFF;">
+                    <a href="javascript:golink('errorlog.cgi')">Event Log</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('config.cgi')">Config</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:logout()">Logout</a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #000000; background-color: #FFFFFF; text-align: center;" align="center" valign="top">
+              <table cellpadding="4" style="border-style: none; border-width: 0;">
+                <tr>
+                  <td width="30%">Event Log Destination:</td>
+                  <td>10.42.0.53</td>
+                </tr>
+                <tr>
+                  <td>Log Destination Port #:</td>
+                  <td>514</td>
+                </tr>
+                <tr>
+                  <td><input  type="submit" value="Clear Log" style="width: 85px" name="btnClearLog"></td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td>Lines to Display:</td>
+                  <td><input  type="text" name="showLines" maxlength="5" size="10" value="1000"></td>
+                </tr>
+                <tr>
+                  <td><input  type="button" value="Save Number of Displayed Lines" style="width: 225px" name="btnSave" onclick="validate()"></td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td colspan="2"><hr size="3" width="800px" color="#99CCFF"></td>
+                </tr>
+                      <tr>
+                        <td colspan="2"><font color="#FF0000">Thu Jan  1 00:00:20 1970 : ERROR: Difference detected in Config File versus current system settings.  Correcting differences.
+</font></td>
+                      </tr>
+                      <tr>
+                        <td colspan="2"><font color="#0000FF">Thu Jan  1 00:00:20 1970 : Power Up Started
+</font></td>
+                      </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+        <input type="hidden" name="session_id" value="">
+        <br>
+      </div>
+    </form>
+  </body>
+</html>

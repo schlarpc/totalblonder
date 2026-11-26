@@ -1,0 +1,58 @@
+# 2026-11-25T09:40:49Z load 1.30 0.96 1.08
+== paced overlap 1080i crowd_run N=32 rep 1
+device memory: 1810.5 MB allocated by encoder (56.6 MB/session), context total 1820.0 MB
+tick ms: mean 27.429 p50 28.850 p99 30.950 max 48.513, period 33.367, late 2 of 303
+host cpu 0.140 s = 0.014 cores total, 0.0004 cores per session at this pace; 0.015 cpu-ms per session-frame
+pcie: upload 2955.7 MB/s, download 59.42 MB/s at this pace; per session at real time: up 93.2 MB/s, down 1.87 MB/s
+loadavg before 1.20 after 1.01
+nvidia-smi dmon: 11 busy samples, mean sm 78%, mean mem 32%, peak fb 1922 MB
+== paced overlap 1080i crowd_run N=32 rep 2
+device memory: 1810.5 MB allocated by encoder (56.6 MB/session), context total 1820.0 MB
+tick ms: mean 27.425 p50 28.807 p99 31.067 max 48.404, period 33.367, late 2 of 303
+host cpu 0.141 s = 0.014 cores total, 0.0004 cores per session at this pace; 0.015 cpu-ms per session-frame
+pcie: upload 2955.5 MB/s, download 59.42 MB/s at this pace; per session at real time: up 93.2 MB/s, down 1.87 MB/s
+loadavg before 1.01 after 0.86
+nvidia-smi dmon: 11 busy samples, mean sm 64%, mean mem 32%, peak fb 1922 MB
+== paced overlap 1080i crowd_run N=34 rep 1
+device memory: 1923.7 MB allocated by encoder (56.6 MB/session), context total 1964.0 MB
+tick ms: mean 29.711 p50 31.284 p99 33.199 max 51.180, period 33.367, late 2 of 303
+host cpu 0.154 s = 0.015 cores total, 0.0004 cores per session at this pace; 0.015 cpu-ms per session-frame
+pcie: upload 3139.6 MB/s, download 63.12 MB/s at this pace; per session at real time: up 93.2 MB/s, down 1.87 MB/s
+loadavg before 0.79 after 0.74
+nvidia-smi dmon: 12 busy samples, mean sm 84%, mean mem 34%, peak fb 2066 MB
+== paced overlap 1080i crowd_run N=34 rep 2
+device memory: 1923.7 MB allocated by encoder (56.6 MB/session), context total 1964.0 MB
+tick ms: mean 29.813 p50 31.515 p99 33.241 max 51.164, period 33.367, late 2 of 303
+host cpu 0.140 s = 0.014 cores total, 0.0004 cores per session at this pace; 0.014 cpu-ms per session-frame
+pcie: upload 3139.5 MB/s, download 63.12 MB/s at this pace; per session at real time: up 93.2 MB/s, down 1.87 MB/s
+loadavg before 0.76 after 0.64
+nvidia-smi dmon: 11 busy samples, mean sm 93%, mean mem 37%, peak fb 2066 MB
+== paced overlap 720p crowd_run N=32 rep 1
+device memory: 799.4 MB allocated by encoder (25.0 MB/session), context total 850.0 MB
+tick ms: mean 11.514 p50 11.661 p99 15.794 max 23.780, period 16.683, late 1 of 503
+host cpu 0.211 s = 0.025 cores total, 0.0008 cores per session at this pace; 0.013 cpu-ms per session-frame
+pcie: upload 2636.8 MB/s, download 47.63 MB/s at this pace; per session at real time: up 82.9 MB/s, down 1.50 MB/s
+loadavg before 0.64 after 0.78
+nvidia-smi dmon: 9 busy samples, mean sm 67%, mean mem 28%, peak fb 952 MB
+== paced overlap 720p crowd_run N=32 rep 2
+device memory: 799.4 MB allocated by encoder (25.0 MB/session), context total 850.0 MB
+tick ms: mean 11.510 p50 11.632 p99 15.666 max 23.736, period 16.683, late 1 of 503
+host cpu 0.201 s = 0.024 cores total, 0.0007 cores per session at this pace; 0.013 cpu-ms per session-frame
+pcie: upload 2636.8 MB/s, download 47.63 MB/s at this pace; per session at real time: up 82.9 MB/s, down 1.50 MB/s
+loadavg before 0.72 after 0.66
+nvidia-smi dmon: 9 busy samples, mean sm 68%, mean mem 31%, peak fb 952 MB
+== paced overlap 480i crowd_run N=192 rep 1
+device memory: 1798.6 MB allocated by encoder (9.4 MB/session), context total 1816.0 MB
+tick ms: mean 28.243 p50 29.444 p99 32.389 max 51.104, period 33.367, late 2 of 303
+host cpu 0.443 s = 0.044 cores total, 0.0002 cores per session at this pace; 0.008 cpu-ms per session-frame
+pcie: upload 2955.0 MB/s, download 94.99 MB/s at this pace; per session at real time: up 15.5 MB/s, down 0.50 MB/s
+loadavg before 0.69 after 0.58
+nvidia-smi dmon: 10 busy samples, mean sm 73%, mean mem 36%, peak fb 1918 MB
+== paced overlap 480i crowd_run N=192 rep 2
+device memory: 1798.6 MB allocated by encoder (9.4 MB/session), context total 1816.0 MB
+tick ms: mean 28.308 p50 29.721 p99 32.450 max 51.294, period 33.367, late 2 of 303
+host cpu 0.456 s = 0.045 cores total, 0.0002 cores per session at this pace; 0.008 cpu-ms per session-frame
+pcie: upload 2954.8 MB/s, download 94.98 MB/s at this pace; per session at real time: up 15.5 MB/s, down 0.50 MB/s
+loadavg before 0.54 after 0.53
+nvidia-smi dmon: 10 busy samples, mean sm 88%, mean mem 35%, peak fb 1918 MB
+# 2026-11-25T09:42:35Z load 0.53 0.78 1.00

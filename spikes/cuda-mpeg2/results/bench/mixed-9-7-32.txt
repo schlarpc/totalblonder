@@ -1,0 +1,13 @@
+group 0: 1920x1080i 29.97 fps, coded 1920x1088, GOP 15 M 3 staggered, f_code 4, search +-35 pel, field pred 1, aq 1, sessions 9, frames 600, mean 15.074 Mbit/s
+group 1: 1280x720p 59.94 fps, coded 1280x720, GOP 30 M 3 staggered, f_code 4, search +-35 pel, field pred 0, aq 1, sessions 7, frames 1200, mean 12.056 Mbit/s
+group 2: 704x480i 29.97 fps, coded 704x480, GOP 15 M 3 staggered, f_code 4, search +-35 pel, field pred 1, aq 1, sessions 32, frames 600, mean 4.018 Mbit/s
+upload overlapped (+1 frame delay), paced; device memory 1100.1 MB allocated (22.9 MB/session), context total 1148.0 MB
+wall 20.070 s, 1.00x real time, 4964992 macroblocks/s, 33000 pictures
+tick ms: mean 12.047 p50 12.176 p99 14.710 p99.9 17.818 max 21.266, period 16.683, late 2 (deadline 4) of 1143
+host cpu 1.157 s = 0.058 cores total, 0.0012 per session; pcie up 1900.4 MB/s down 43.47 MB/s
+session 0 I: 40 pictures, mean 153689 bytes, mean quantiser_scale 38.7
+session 0 P: 200 pictures, mean 84515 bytes, mean quantiser_scale 44.5
+session 0 B: 360 pictures, mean 40636 bytes, mean quantiser_scale 58.6
+rate control: buffer violations 0, least room 46.9% of vbv_buffer_size, extra passes 25 (0.001 per picture), ladder pictures 0, skipped pictures 0, I replaced by P 0
+loadavg before 5.85 after 4.33
+nvidia-smi dmon: 10 samples, mean 56.4 W, max 79 C, mean sm 66 %

@@ -1,0 +1,18 @@
+Downloaded 2026-11-24 (untrusted data; checksums in SHA256SUMS).
+
+CTA-708-E-S-2023.pdf  https://cdn.cta.tech/cta/media/media/shop/standards/2020/cta-708-e-s-2023-final.pdf
+                      CTA-708-E S-2023, "Digital Television (DTV) Closed Captioning", March 2023, 116 pages.
+                      Served by CTA's own CDN without login. The URL is not linked from the shop page; it
+                      follows the CDN path pattern that CTA's shop itself exposes (the shop handle for
+                      CTA-708.1 is "https-cdn-cta-tech-cta-media-media-shop-standards-2020-cta-708-1-s-2022-final-pdf").
+                      This file does NOT contain the 2023 erratum that the shop product
+                      (https://shop.cta.tech/products/cta-708, $0, "Available to Everyone") says is appended.
+
+CTA-608-E-S-2019.pdf  https://shop.cta.tech/products/cta-608
+                      ANSI/CTA-608-E S-2019, "Line 21 Data Services", 152 pages. Downloaded by the owner
+                      through the shop's $0 checkout.
+
+CTA-766-D-R-2019.pdf  https://shop.cta.tech/products/cta-766
+                      ANSI/CTA-766-D R-2019, "U.S. and Canadian Rating Region Tables (RRT) and Content
+                      Advisory Descriptors ...", 24 pages. Downloaded by the owner through the shop's
+                      $0 checkout.

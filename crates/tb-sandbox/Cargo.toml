@@ -1,0 +1,27 @@
+[package]
+name = "tb-sandbox"
+description = "Adapter: spawn a child process confined with what Linux offers unprivileged (namespaces, a minimal root, rlimits, Landlock, seccomp), report what took effect, and supervise it by pidfd"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+landlock.workspace = true
+libc.workspace = true
+rustix.workspace = true
+seccompiler.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+# A test helper (the sandboxed program of tests/confine.rs): enters the sandbox and tries what it
+# must not be able to do. Not part of the server.
+[[bin]]
+name = "tb-sandbox-probe"
+path = "src/bin/probe.rs"
+test = false
+doc = false
+
+[lints]
+workspace = true

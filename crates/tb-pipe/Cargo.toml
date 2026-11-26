@@ -1,0 +1,25 @@
+[package]
+name = "tb-pipe"
+description = "The pipeline harness: decode, frame selection, conversion on the device, encoder sessions (the counterpart of the C++ spike's m2vpipe)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tb-device.workspace = true
+tb-device-ref.workspace = true
+tb-device-cuda.workspace = true
+tb-m2v-encoder.workspace = true
+tb-convert.workspace = true
+tb-timeline.workspace = true
+tb-decode.workspace = true
+tb-engine.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+anyhow = "1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }
+
+[lints]
+workspace = true

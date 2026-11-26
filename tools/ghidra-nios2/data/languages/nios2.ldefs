@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<language_definitions>
+  <language processor="Nios2"
+            endian="little"
+            size="32"
+            variant="default"
+            version="1.0"
+            slafile="nios2.sla"
+            processorspec="nios2.pspec"
+            id="Nios2:LE:32:default">
+    <description>Altera Nios II R1 (classic), 32-bit little endian</description>
+    <compiler name="default" spec="nios2.cspec" id="default"/>
+    <external_name tool="gnu" name="nios2"/>
+    <external_name tool="gnu" name="nios2:r1"/>
+    <external_name tool="IDA-PRO" name="nios2"/>
+  </language>
+</language_definitions>

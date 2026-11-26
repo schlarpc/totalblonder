@@ -1,0 +1,38 @@
+# 2026-11-25T09:40:26Z load 1.66 1.00 1.10
+== profile 1080i N=28
+wall 8.997 s, 33.35 fps per session, 933.7 session-frames/s (1.11x real time at N=28)
+tick ms: mean 29.790 p50 31.029 p99 32.647 max 43.921, period 33.367, late 3 of 302
+pcie: upload 2904.1 MB/s, download 58.38 MB/s at this pace; per session at real time: up 93.2 MB/s, down 1.87 MB/s
+stage times (profile mode, synchronized after every stage), ms per tick for all 28 sessions:
+  upload+pad      8.537 ms   28.7%   I    0.000  P    0.000  B    0.000
+  pyramid+ME     11.496 ms   38.6%   I    0.932  P    8.321  B   14.561
+  pred+dct+q      5.607 ms   18.8%   I    3.648  P    5.568  B    5.908
+  entropy         2.488 ms    8.4%   I    2.505  P    3.067  B    2.193
+  recon+pyr       1.428 ms    4.8%   I    3.829  P    3.546  B    0.000
+  download        0.232 ms    0.8%   I    0.415  P    0.287  B    0.184
+  host            0.002 ms    0.0%   I    0.005  P    0.002  B    0.002
+== profile 720p N=24
+wall 3.447 s, 87.02 fps per session, 2088.6 session-frames/s (1.45x real time at N=24)
+tick ms: mean 11.415 p50 11.691 p99 15.082 max 17.926, period 16.683, late 1 of 302
+pcie: upload 2887.2 MB/s, download 52.30 MB/s at this pace; per session at real time: up 82.9 MB/s, down 1.50 MB/s
+stage times (profile mode, synchronized after every stage), ms per tick for all 24 sessions:
+  upload+pad      3.295 ms   28.9%   I    0.000  P    0.000  B    0.000
+  pyramid+ME      4.089 ms   35.8%   I    0.054  P    2.769  B    5.040
+  pred+dct+q      2.176 ms   19.1%   I    1.310  P    1.826  B    2.428
+  entropy         1.256 ms   11.0%   I    1.251  P    1.444  B    1.170
+  recon+pyr       0.474 ms    4.2%   I    1.360  P    1.295  B    0.000
+  download        0.124 ms    1.1%   I    0.231  P    0.169  B    0.095
+  host            0.001 ms    0.0%   I    0.004  P    0.001  B    0.001
+== profile 480i N=160
+wall 8.809 s, 34.05 fps per session, 5448.7 session-frames/s (1.14x real time at N=160)
+tick ms: mean 29.170 p50 30.213 p99 33.112 max 40.866, period 33.367, late 2 of 302
+pcie: upload 2824.6 MB/s, download 90.80 MB/s at this pace; per session at real time: up 15.5 MB/s, down 0.50 MB/s
+stage times (profile mode, synchronized after every stage), ms per tick for all 160 sessions:
+  upload+pad      8.349 ms   28.6%   I    0.000  P    0.000  B    0.000
+  pyramid+ME     10.716 ms   36.7%   I    0.796  P    7.743  B   13.589
+  pred+dct+q      5.468 ms   18.7%   I    3.428  P    5.445  B    5.768
+  entropy         2.783 ms    9.5%   I    2.739  P    3.398  B    2.478
+  recon+pyr       1.373 ms    4.7%   I    3.608  P    3.424  B    0.000
+  download        0.473 ms    1.6%   I    0.715  P    0.600  B    0.381
+  host            0.008 ms    0.0%   I    0.020  P    0.007  B    0.007
+# 2026-11-25T09:40:49Z load 1.30 0.96 1.08

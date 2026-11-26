@@ -1,0 +1,77 @@
+#Time         gpu         pid   type     sm    mem    enc    dec    jpg    ofa     fb   ccpm    command 
+#HH:MM:SS     Idx           #    C/G      %      %      %      %      %      %     MB     MB    name 
+ 17:26:18       0    1757505     C     63     51      0      0      -      -    165      0    Plex Transcoder
+ 17:26:18       0    1784038     C      0      0      -      -      -      -     10      0    m2venc-fence   
+ 17:26:19       0    1757505     C      -      -      0      0      -      -    165      0    Plex Transcoder
+ 17:26:19       0    1784038     C     45     34      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:20       0    1757505     C      -      -      1      4      -      -    165      0    Plex Transcoder
+ 17:26:20       0    1784038     C     63     51      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:21       0    1757505     C      -      -      5     20      -      -    165      0    Plex Transcoder
+ 17:26:21       0    1784038     C     66     53      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:22       0    1757505     C      -      -      0      0      -      -    165      0    Plex Transcoder
+ 17:26:22       0    1784038     C     63     51      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:23       0    1757505     C      -      -      0      0      -      -    165      0    Plex Transcoder
+ 17:26:23       0    1784038     C     63     51      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:24       0    1757505     C      -      -      0      0      -      -    165      0    Plex Transcoder
+ 17:26:24       0    1784038     C     63     51      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:24       0    1784093     C      0      -      -      -      -      -     10      0    ffmpeg         
+ 17:26:25       0    1757505     C      -      -      0      0      -      -    165      0    Plex Transcoder
+ 17:26:25       0    1784038     C     64     52      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:25       0    1784093     C      -      -      0      3      -      -    203      0    ffmpeg         
+ 17:26:26       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:26:26       0    1784038     C     64     52      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:26       0    1784093     C      -      -      0      3      -      -    203      0    ffmpeg         
+ 17:26:27       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:26:27       0    1784038     C     64     52      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:27       0    1784093     C      -      -      0      3      -      -    203      0    ffmpeg         
+ 17:26:28       0    1757505     C      -      -      0      -      -      -    165      0    Plex Transcoder
+ 17:26:28       0    1784038     C     64     52      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:28       0    1784093     C      -      -      0      3      -      -    203      0    ffmpeg         
+ 17:26:29       0    1757505     C      -      -      0      -      -      -    165      0    Plex Transcoder
+ 17:26:29       0    1784038     C     57     46      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:29       0    1784093     C      7      5      0      3      -      -    203      0    ffmpeg         
+ 17:26:30       0    1757505     C      -      -      0      -      -      -    165      0    Plex Transcoder
+ 17:26:30       0    1784038     C     50     40      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:30       0    1784093     C     14     11      0      3      -      -    203      0    ffmpeg         
+ 17:26:31       0    1757505     C      -      -      0      0      -      -    165      0    Plex Transcoder
+ 17:26:31       0    1784038     C     51     41      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:31       0    1784093     C     12     10      0      3      -      -    203      0    ffmpeg         
+ 17:26:32       0    1757505     C      -      -      -      0      -      -    165      0    Plex Transcoder
+ 17:26:32       0    1784038     C     64     52      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:33       0    1757505     C      -      -      0      0      -      -    165      0    Plex Transcoder
+ 17:26:33       0    1784038     C     63     52      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:35       0    1757505     C     12     10      0      0      -      -    165      0    Plex Transcoder
+ 17:26:35       0    1784038     C     51     41      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:36       0    1757505     C      -      -      0      0      -      -    165      0    Plex Transcoder
+ 17:26:36       0    1784038     C     63     51      -      -      -      -   3096      0    m2venc-fence   
+#Time         gpu         pid   type     sm    mem    enc    dec    jpg    ofa     fb   ccpm    command 
+#HH:MM:SS     Idx           #    C/G      %      %      %      %      %      %     MB     MB    name 
+ 17:26:36       0    1784146     C      -      -      -      -      -      -     96      0    ffmpeg         
+ 17:26:37       0    1757505     C     16     12     16     48      -      -    165      0    Plex Transcoder
+ 17:26:37       0    1784038     C     65     50      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:37       0    1784146     C      -      -     16      1      -      -   1171      0    ffmpeg         
+ 17:26:38       0    1757505     C      -      -     26     44      -      -    165      0    Plex Transcoder
+ 17:26:38       0    1784038     C     96     73      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:38       0    1784146     C      -      -     51      7      -      -   1171      0    ffmpeg         
+ 17:26:39       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:26:39       0    1784038     C     81     61      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:39       0    1784146     C     16     11     73     23      -      -   1171      0    ffmpeg         
+ 17:26:40       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:26:40       0    1784038     C     26     20      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:40       0    1784146     C     66     50     66     19      -      -   1171      0    ffmpeg         
+ 17:26:41       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:26:41       0    1784038     C     53     40      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:41       0    1784146     C     39     29     65     20      -      -   1171      0    ffmpeg         
+ 17:26:42       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:26:42       0    1784038     C     81     61      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:42       0    1784146     C     13      9     72     21      -      -   1171      0    ffmpeg         
+ 17:26:43       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:26:43       0    1784038     C     92     69      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:43       0    1784146     C      -      -     65     18      -      -   1171      0    ffmpeg         
+ 17:26:44       0    1757505     C      -      -      -      0      -      -    165      0    Plex Transcoder
+ 17:26:44       0    1784038     C     91     68      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:44       0    1784146     C      -      -     60     15      -      -    553      0    ffmpeg         
+ 17:26:45       0    1757505     C      -      -      0      1      -      -    165      0    Plex Transcoder
+ 17:26:45       0    1784038     C     75     58      -      -      -      -   3096      0    m2venc-fence   
+ 17:26:46       0    1757505     C      -      -      -      -      -      -    165      0    Plex Transcoder
+ 17:26:47       0    1757505     C      4      1      0      0      -      -    165      0    Plex Transcoder

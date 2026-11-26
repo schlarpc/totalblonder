@@ -1,0 +1,1 @@
+gpucomp hz 60 iters 2000 blocks 1 copy 0: 421 launches in 7.0 s, round trip ms min 0.031 p10 0.099 p50 0.166 p90 1.378 p99 2.316 max 2.395 mean 0.407, busy 2.4 %

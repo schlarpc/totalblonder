@@ -1,0 +1,16 @@
+work/
+node_modules
+wordlists
+.direnv/
+/target/
+result
+result-*
+/.direnv/
+
+# Third-party documents (vendor firmware, manuals, standards): kept locally, not redistributed.
+# Only the standards' fetch lists and checksums are tracked.
+/docs/external/**
+!/docs/external/**/
+!/docs/external/README.md
+!/docs/external/**/SOURCES.txt
+!/docs/external/**/SHA256SUMS

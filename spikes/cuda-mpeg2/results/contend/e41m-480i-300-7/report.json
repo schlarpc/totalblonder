@@ -1,0 +1,152 @@
+{
+ "dir": "results/contend/e41m-480i-300-7",
+ "hdr": "fmt 480i n 300",
+ "period_ms": 33.36666666666667,
+ "other_active_s": 11,
+ "rows": [
+  {
+   "comp": "(alone)",
+   "ticks": 96,
+   "base_ms": 23.189999999999998,
+   "med_ms": 23.189999999999998,
+   "p95_ms": 23.77,
+   "max_ms": 24.098,
+   "ratio": 1.0,
+   "added_ms": 0.0,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    15.6025,
+    4.3545,
+    2.683
+   ],
+   "base_ph_ms": [
+    15.6025,
+    4.3545,
+    2.683
+   ],
+   "upwait_ms": 0.004,
+   "result": "",
+   "pwr": 62.333333333333336,
+   "gtemp": 89.0,
+   "sm": 64.66666666666667,
+   "mem": 52.0,
+   "enc": 0.0,
+   "dec": 0.0,
+   "pclk": 2115.0,
+   "pviol": 23.0,
+   "tviol": 0.0,
+   "pclk_min": 2085.0
+  },
+  {
+   "comp": "x4k_re",
+   "ticks": 144,
+   "base_ms": 22.5055,
+   "med_ms": 23.5375,
+   "p95_ms": 24.533,
+   "max_ms": 25.114,
+   "ratio": 1.04585545755482,
+   "added_ms": 1.032,
+   "late": 0.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    15.247499999999999,
+    4.346500000000001,
+    2.6485000000000003
+   ],
+   "base_ph_ms": [
+    14.758,
+    4.352,
+    2.6245000000000003
+   ],
+   "upwait_ms": 0.007,
+   "result": "206 frames, 26 fps",
+   "pwr": 62.6,
+   "gtemp": 89.0,
+   "sm": 68.8,
+   "mem": 56.0,
+   "enc": 0.0,
+   "dec": 4.2,
+   "pclk": 2169.0,
+   "pviol": 28.0,
+   "tviol": 0.0,
+   "pclk_min": 2130.0
+  },
+  {
+   "comp": "x4k_max",
+   "ticks": 98,
+   "base_ms": 23.2835,
+   "med_ms": 44.979,
+   "p95_ms": 46.44,
+   "max_ms": 47.356,
+   "ratio": 1.93179719543883,
+   "added_ms": 21.6955,
+   "late": 1.0,
+   "slow": 0,
+   "slow_excess_ms": null,
+   "slow_ph0_excess_ms": null,
+   "ph_ms": [
+    30.424,
+    8.373000000000001,
+    5.2355
+   ],
+   "base_ph_ms": [
+    15.671,
+    4.3555,
+    2.687
+   ],
+   "upwait_ms": 0.006,
+   "result": "2795 frames, 345 fps",
+   "pwr": 67.8,
+   "gtemp": 90.0,
+   "sm": 92.2,
+   "mem": 86.6,
+   "enc": 80.0,
+   "dec": 74.6,
+   "pclk": 2013.0,
+   "pviol": 100.0,
+   "tviol": 0.0,
+   "pclk_min": 1950.0
+  },
+  {
+   "comp": "(plex)",
+   "ticks": 105,
+   "base_ms": 23.189999999999998,
+   "med_ms": 22.915,
+   "p95_ms": 28.984,
+   "max_ms": 30.155,
+   "ratio": 0.988141440275981,
+   "added_ms": -0.2749999999999986,
+   "late": 0.0,
+   "slow": 12,
+   "slow_excess_ms": 6.045000000000002,
+   "slow_ph0_excess_ms": 4.141,
+   "ph_ms": [
+    15.075,
+    4.359,
+    2.652
+   ],
+   "base_ph_ms": [
+    15.6025,
+    4.3545,
+    2.683
+   ],
+   "upwait_ms": 0.008,
+   "result": "",
+   "pwr": null,
+   "gtemp": null,
+   "sm": null,
+   "mem": null,
+   "enc": null,
+   "dec": null,
+   "pclk": null,
+   "pviol": null,
+   "tviol": null,
+   "pclk_min": null
+  }
+ ]
+}

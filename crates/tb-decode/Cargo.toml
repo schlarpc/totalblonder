@@ -1,0 +1,21 @@
+[package]
+name = "tb-decode"
+description = "Decode adapter: inputs demuxed and decoded through libavcodec (NVDEC in an existing CUDA context, or software)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ffmpeg-the-third.workspace = true
+libc.workspace = true
+tb-timeline.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

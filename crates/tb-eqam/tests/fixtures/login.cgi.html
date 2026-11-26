@@ -1,0 +1,102 @@
+<html>
+  <head>
+    <title>Login - Ball Holdings</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+    <link rel="stylesheet" type="text/css" href="../eqam.css">
+    <script language="JavaScript">
+      <!-- Begin
+      function setCookie(expiredays)
+      {
+        var exdate=new Date();
+        exdate.setDate(exdate.getDate() + expiredays);
+        document.cookie = "session_id=" + "123456789" + ((expiredays == null) ? "" : ";expires="+exdate.toGMTString()) + " path=/";
+      }
+      function user_logged_in()
+      {
+        return true;
+      }
+
+    //  End -->
+    </script>
+  </head>
+  <body onload="setCookie(7); document.loginForm.txtUserName.focus();">
+    <form name="loginForm" method="post" onsubmit="return user_logged_in()">
+      <div align="center">
+        <table border="0" cellpadding="0" bgcolor="#FFFFFF" style="border-collapse: collapse" width="1000">
+          <tr>
+            <td>
+            <a href="http://www.blondertongue.com"><img border="0" src="../images/logo.png" alt="Blonder Tongue Laboratories, Inc."></a></td>
+          </tr>
+          <tr>
+            <td bgcolor="#66CEF6" align="center"><font size="6">EQAM-420B-4-64</font></td>
+          </tr>
+          <tr>
+            <td bgcolor="#66CEF6" align="center">
+              <table>
+                <tbody>
+                  <tr>
+                    <td></td>
+                    <td width="25%">ESN: 2013090274</td>
+                    <td></td>
+                    <td width="25%">Temperature: 80.8ºF</td>
+                    <td></td>
+                    <td width="25%">Uptime: 6d 17h 49m 53s</td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td>Headend Name: Ball Holdings</td>
+                    <td></td>
+                    <td>Mode: MPTS</td>
+                    <td></td>
+                    <td>Location: </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td height="520" align="center" valign="top">
+              <br>
+              <table bgcolor="#FFFFFF">
+                <tr>
+                  <td style="text-align: center"><fieldset>
+                    <legend align="left"><b>Login</b></legend>
+                      <table frame="box" border="0">
+                        <tr>
+                          <td>
+                            <table align="left" frame="box" border="0">
+                              <tr>
+                                <td>Username:</td>
+                                <td>
+                                  <input name="txtUserName" type="text" size="26" maxlength="10">
+                                </td>
+                              </tr>
+                              <tr>
+                                <td>Password:</td>
+                                <td>
+                                  <input name="txtPassword" type="password" size="26" maxlength="10">
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td align="center">
+                            <input type="hidden" name="session_id" value="123456789">
+                            <input type="submit" value="Submit" name="btnSubmit">
+                          </td>
+                        </tr>
+                      </table>
+                    </fieldset>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </form>
+  </body>
+</html>

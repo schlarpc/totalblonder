@@ -1,0 +1,52 @@
+
+ ** CUDA GPU Kernel Summary (cuda_gpu_kern_sum):
+
+ Time (%)  Total Time (ns)  Instances   Avg (ns)     Med (ns)    Min (ns)  Max (ns)   StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  -----------  -----------  --------  ---------  -----------  ----------------------------------------------------------------------------------------------------
+     29.2      131,349,091         47  2,794,661.5  2,926,761.0   272,542  3,122,536    571,295.6  k_xf(Geo, const Tables *, Bufs, const SessPar *, const int *, int, const MbInfo *, const unsigned s…
+     20.8       93,484,660         46  2,032,275.2  2,141,248.0    78,496  2,700,043    506,738.9  k_me(Geo, Bufs, const SessPar *, const int *, int, MbInfo *)                                        
+     13.0       58,359,390         50  1,167,187.8  1,257,815.0    38,208  2,330,798    359,845.8  k_quant(Geo, const Tables *, const SessPar *, const int *, int, const unsigned char *, const MbInfo…
+      9.5       42,993,526         50    859,870.5    929,976.5    67,199  1,046,296    236,178.9  k_ent_pack(Geo, const Tables *, const SessPar *, const int *, int, const MbCode *, const MbInfo *, …
+      6.4       28,870,053         47    614,256.4    549,020.0    89,279  1,934,929    335,624.0  k_recon(Geo, const Tables *, const SessPar *, const int *, int, const short *, const unsigned char …
+      5.5       24,690,402         47    525,327.7    542,299.0    72,960    571,291     97,050.7  k_mbstat(Geo, const unsigned char *, unsigned long, const SessPar *, const int *, int, MbInfo *, un…
+      4.7       21,369,114        186    114,887.7     66,831.5     5,248    289,662     95,377.6  k_down2(const unsigned char *, unsigned long, int, int, unsigned char *, unsigned long, int, const …
+      4.6       20,810,715         46    452,406.8    479,404.0    16,832    522,268     99,500.3  k_mvsmooth(Geo, Bufs, const SessPar *, const int *, int, const MbInfo *, MbInfo *)                  
+      1.9        8,346,108         50    166,922.2    179,375.0    13,152    188,414     43,865.3  k_ent_resolve(Geo, const SessPar *, const int *, int, const MbInfo *, const unsigned char *, const …
+      1.7        7,796,255         47    165,877.8    171,902.0    35,136    192,062     30,319.4  k_rowstat_part(Geo, const int *, int, const unsigned long *, unsigned short *)                      
+      1.0        4,602,083        135     34,089.5     24,416.0     3,008     72,768     25,224.8  k_pad_rows(unsigned char *, unsigned long, int, int, int, int, const int *, const unsigned char *, …
+      0.8        3,486,207         47     74,174.6     71,775.0    17,312    242,462     27,738.9  k_ent_scatter(Geo, const int *, int, const MbCode *, const unsigned int *, const unsigned int *, co…
+      0.4        1,968,500         47     41,883.0     42,816.0    16,320     46,016      5,476.7  k_rowstat(Geo, const int *, int, const unsigned short *, const unsigned short *, const MbInfo *, Ro…
+      0.4        1,833,744         50     36,674.9     37,872.0    11,776     40,096      5,706.2  k_ent_rowsum(Geo, const int *, int, const unsigned int *, const unsigned short *, unsigned int *, u…
+      0.1          283,677         50      5,673.5      5,664.0     3,968      6,144        308.0  k_ent_picsum(Geo, const int *, int, const unsigned int *, const unsigned int *, unsigned int *, Pic…
+      0.0          156,544         45      3,478.8      2,912.0     2,784     24,544      3,235.7  k_set_mode(MbInfo *, int, const int *, int, int)                                                    
+      0.0           38,879         48        810.0        768.0       736        992         78.9  k_tick()                                                                                            
+
+
+ ** CUDA API Summary (cuda_api_sum):
+
+ Time (%)  Total Time (ns)  Num Calls    Avg (ns)      Med (ns)    Min (ns)   Max (ns)    StdDev (ns)            Name         
+ --------  ---------------  ---------  ------------  ------------  --------  -----------  ------------  ----------------------
+     72.6      465,155,724        199   2,337,465.9   1,139,193.0       491    7,774,395   2,495,050.8  cudaStreamSynchronize 
+     16.7      106,942,260          2  53,471,130.0  53,471,130.0    29,244  106,913,016  75,578,240.0  cudaMemGetInfo        
+      7.9       50,629,355         14   3,616,382.5       4,672.0     2,163   25,505,247   8,941,270.1  cudaHostAlloc         
+      1.4        8,824,711      2,776       3,178.9       2,624.0     2,474       26,169       1,773.1  cudaMemcpyAsync       
+      0.9        5,774,380      1,038       5,563.0       3,465.0     2,834      831,007      26,166.3  cudaLaunchKernel      
+      0.3        1,756,854         40      43,921.3       7,031.0     1,692      208,615      49,154.1  cudaMalloc            
+      0.1          930,386          1     930,386.0     930,386.0   930,386      930,386           0.0  cuLibraryLoadData     
+      0.1          486,858         47      10,358.7       9,914.0     7,101       19,289       2,377.6  cudaMemsetAsync       
+      0.0          233,182         40       5,829.6       4,862.0     2,043       50,887       7,591.4  cudaMemset            
+      0.0          167,756      1,038         161.6         110.0        70          952         113.9  cuKernelGetName       
+      0.0           38,269          2      19,134.5      19,134.5     2,384       35,885      23,688.8  cudaStreamCreate      
+      0.0           23,485          1      23,485.0      23,485.0    23,485       23,485           0.0  cudaMemcpy            
+      0.0            6,328         17         372.2         350.0       170          621         145.1  cuLibraryGetKernel    
+      0.0            5,798          1       5,798.0       5,798.0     5,798        5,798           0.0  cuModuleGetLoadingMode
+
+
+ ** CUDA GPU MemOps Summary (by Time) (cuda_gpu_mem_time_sum):
+
+ Time (%)  Total Time (ns)  Count  Avg (ns)  Med (ns)  Min (ns)  Max (ns)   StdDev (ns)           Operation          
+ --------  ---------------  -----  --------  --------  --------  ---------  -----------  ----------------------------
+     95.0      171,937,549  2,633  65,301.0  40,192.0       288    181,695     58,570.2  [CUDA memcpy Host-to-Device]
+      2.7        4,868,314     87  55,957.6   2,304.0       352  1,833,714    224,645.1  [CUDA memset]               
+      2.3        4,112,374    144  28,558.2   7,264.0       927    396,732     45,068.6  [CUDA memcpy Device-to-Host]
+

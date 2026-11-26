@@ -1,0 +1,5 @@
+<patternconstraints>
+  <language id="Nios2:LE:32:*">
+    <patternfile>nios2_LE_patterns.xml</patternfile>
+  </language>
+</patternconstraints>

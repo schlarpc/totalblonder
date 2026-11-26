@@ -1,0 +1,4 @@
+rate control: target 6000000 bit/s, vbv 5996544 bits, occupancy min 4028443 max 4909947, underflows 0, stuffing 0 bytes, requant retries 21 (0.06 per picture)
+11.97(q<=10) 12.05(q<=25) 11.93(q<=8) 12.10(q<=31) 12.01(q<=10) 11.92(q<=8) 5.99(q<=16) 6.02(q<=19) 5.99(q<=20) 5.97(q<=20) 6.02(q<=19) 6.03(q<=15) 
+ffmpeg messages at warning level or above (demuxer duration note excluded): 0
+PSNR y:38.190453 u:42.257459 v:42.810846 average:39.216817 min:36.066575 max:43.985117

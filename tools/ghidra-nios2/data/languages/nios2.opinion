@@ -1,0 +1,6 @@
+<opinions>
+    <!-- EM_ALTERA_NIOS2 = 113 -->
+    <constraint loader="Executable and Linking Format (ELF)" compilerSpecID="default">
+        <constraint primary="113" processor="Nios2" endian="little" size="32" variant="default"/>
+    </constraint>
+</opinions>
