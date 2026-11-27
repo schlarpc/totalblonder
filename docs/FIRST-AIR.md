@@ -5,25 +5,28 @@ SPEC M0's ffmpeg-plus-`tsp` spike: the server now produces the stream itself
 (`docs/SERVER.md`). Every step that changes the modulator is marked **(writes)** and needs the
 owner.
 
-## 0. Where things stand (2026-11-26, evening)
+## 0. Where things stand (2026-11-27)
 
-- The control port 10.42.0.184 is on the router's ether7 and answers from bagel and nixark. The
-  supervisor has run against it in report mode (every page parsed, nothing written).
-- GIGE1 is cabled to the rack switch's sfp-sfpplus14 and GIGE2 to sfp-sfpplus8. Both links
-  needed the switch-side speed forced (schlarpc-network-terraform `config/interfaces.nix`).
-  With the speed forced the switch reports link even with no copper link, so use the box's
-  LEDs, or where its MAC is learned, as the test. GIGE1 (10.42.0.183, `00:14:39:00:35:C6`)
-  answers ARP and ping. GIGE2 still has its old address (192.168.253.4, corrupted mask) and
-  does not answer.
-- The box is in MPTS mode, 16 carriers on and locked, no inputs configured, Configuration Mode
-  Automatic (defect B active at the next boot).
+- The control port 10.42.0.184 is on the router's ether7. The supervisor has run against it in
+  report mode (every page parsed, nothing written).
+- The data network is up. GIGE1 is on the rack switch's sfp-sfpplus14, untagged in VLAN 20, and
+  GIGE2 on sfp-sfpplus8 in VLAN 21. Both VLANs go to the Proxmox trunk and nowhere else.
+  `nixark` has a VF in each: `eqam-gige1` 10.42.20.1 and `eqam-gige2` 10.42.21.1. Both switch
+  ports have their speed forced, so the switch reports link even with no copper link; the
+  box's LEDs, or ARP, are the test.
+- The `admin.cgi` save in §1 item 2 was made on 2026-11-27 at 08:38 UTC. The box rebooted into
+  Manual mode, and GIGE1 (10.42.20.2) and GIGE2 (10.42.21.2) answer ARP and ping from nixark. The EEPROM
+  dumps before and after differ only at 0x40, 0x1136, 0x113A, 0x115A–0x115F and
+  0xF30–0xF37, as predicted (firmware §4.1). The boot logged no "Difference detected". (The
+  "Password file not found" line appears at every boot.)
+- The box is in MPTS mode, with 16 carriers on and no inputs configured.
 
 ## 1. Before the first stream
 
 1. **Data VLANs (network repo, Proxmox, flake).** VLAN 20 `10.42.20.0/24` on sfp-sfpplus14 and
    VLAN 21 `10.42.21.0/24` on sfp-sfpplus8, untagged, tagged on the Proxmox trunk, with no
    router interface. Give `nixark` one VF in each at `.1` (SPEC §4.2).
-2. **One `admin.cgi` save (writes; owner present).** Take an EEPROM dump first
+2. **One `admin.cgi` save (writes). Done 2026-11-27 (§0).** Take an EEPROM dump first
    (`tools/eedump`). Then, logged in as Admin, POST exactly these fields and nothing else
    (firmware §4.1):
 

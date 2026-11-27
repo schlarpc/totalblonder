@@ -97,7 +97,7 @@ Measured: `docs/SERVER.md` §7.
 
 | Area | What is needed |
 |---|---|
-| First air | Data VLANs 20/21 and nixark VFs, then the one `admin.cgi` save (`docs/FIRST-AIR.md` §1) |
+| First air | Network, Manual mode and re-addressing done; next the first stream (`docs/FIRST-AIR.md` §2) |
 | The first producer | The live path is proven with ffmpeg standing in for it (H.264 + AAC over RTMP, with the same ffmpeg RTMP client the producer uses); the producer itself has not been run against the server |
 | RF probe adapter | `hdhomerun_config` driver and captures, when the HDHomeRun arrives |
 | Emergency alerts | Not designed beyond the digest |

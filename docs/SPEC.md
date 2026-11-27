@@ -1644,7 +1644,8 @@ For the owner:
    one SR-IOV VF in each, and the owner's VF policy pins each VF's VLAN. Each data VLAN has
    one receiver, so multicast reaches the box even if no switch acts on its IGMP joins. GIGE1
    answers ARP, so unicast is the fallback.
-2. **Manual mode. [analyzed]** What an `admin.cgi` save writes is now known (firmware §4.1).
+2. **Manual mode. [done 2026-11-27: Manual mode set and both GigE ports re-addressed by one
+   save, verified by EEPROM dumps; FIRST-AIR §0]** What an `admin.cgi` save writes is now known (firmware §4.1).
    Only the fields present in the POST are applied, and a changed GigE address reboots the box
    right after the write. The plan is one POST, made by hand with the owner present, carrying
    only `configMode=1` and the six GigE fields. The box then reboots into Manual mode with both
