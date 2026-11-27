@@ -132,7 +132,8 @@ pub enum Alarm {
         /// What the box detects.
         detected: Vec<DetectedProgram>,
     },
-    /// The status page shows no input for a slot the desired state assigns a stream to.
+    /// The status page shows no input for a slot the desired state assigns a stream to, on
+    /// `confirm_polls` polls in a row (the box takes a few seconds to join a new group).
     InputAbsent(Slot),
     /// The Diagnostics page reports an input as oversubscribed (its cell text, verbatim).
     Oversubscribed(Slot, String),
@@ -229,8 +230,9 @@ pub struct DeviceMetrics {
 }
 
 /// Where debug.cgi counts `slot`: FPGA2A serves slots 1–8 as its streams 1–8, FPGA2B slots
-/// 9–16 as its streams 1–8. Checked live for slot 1 only (2026-11-27: FPGA2A IP register 0
-/// and MPTS stream 1 carried slot 1's stream); the FPGA2B half is still an inference.
+/// 9–16 as its streams 1–8. Checked live on 2026-11-27 for slot 1 (FPGA2A IP register 0, MPTS
+/// stream 1) and slot 9 (FPGA2B IP register 0). Which of the 32 error-counter rows belongs to
+/// a slot has not been seen with a nonzero count; row n is assumed.
 pub fn slot_fpga(slot: Slot) -> (InputFpga, u8) {
     if slot.get() <= 8 {
         (InputFpga::A, slot.get())
@@ -349,6 +351,8 @@ pub struct Supervisor {
     seen_log: BTreeSet<EventLine>,
     table_reset_at: Option<Duration>,
     status_failures: u32,
+    /// Consecutive status polls showing each slot's input absent.
+    absent_polls: [u32; 16],
     rate_limited_noted: bool,
     metrics: DeviceMetrics,
 }
@@ -389,6 +393,7 @@ impl Supervisor {
             seen_log: BTreeSet::new(),
             table_reset_at: None,
             status_failures: 0,
+            absent_polls: [0; 16],
             rate_limited_noted: false,
             metrics: DeviceMetrics::default(),
         }
@@ -770,7 +775,13 @@ impl Supervisor {
                 self.desired.streams.get(row.slot),
                 crate::plan::SlotConfig::Assigned { .. }
             );
-            if assigned && row.input == InputState::Absent {
+            let n = &mut self.absent_polls[i];
+            *n = if assigned && row.input == InputState::Absent {
+                n.saturating_add(1)
+            } else {
+                0
+            };
+            if *n >= self.config.confirm_polls.max(1) {
                 out.extend(self.raise(
                     AlarmKey::InputAbsent(row.slot),
                     Alarm::InputAbsent(row.slot),

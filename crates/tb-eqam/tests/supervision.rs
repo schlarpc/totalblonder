@@ -613,6 +613,64 @@ mod live_pages {
     }
 
     #[test]
+    fn one_absent_poll_is_not_an_alarm_two_are() {
+        // Slots 1 and 9 assigned and green (2026-11-27, just after slot 9 was written).
+        const STATUS: &[u8] = include_bytes!("fixtures/status.cgi_slots1_9.html");
+        let s9 = Slot::new(9).unwrap();
+        let streams = one_stream()
+            .with(
+                s9,
+                SlotConfig::Assigned {
+                    url: "UDP://239.10.0.9:5000".parse().unwrap(),
+                    name: "TB9".parse().unwrap(),
+                },
+            )
+            .unwrap();
+        let desired = DesiredState {
+            rf: live_plan(),
+            streams,
+            programs: Default::default(),
+        };
+        let mut s = Supervisor::new(SupervisorConfig::default(), desired, Duration::ZERO);
+        let text = String::from_utf8_lossy(STATUS);
+        let at = text.find("TB9").unwrap();
+        let red = format!(
+            "{}{}",
+            &text[..at],
+            text[at..].replacen("#00FF00", "#FF0000", 1)
+        );
+        let absent = |out: &[Action]| alarms(out).iter().any(|a| **a == Alarm::InputAbsent(s9));
+        assert!(!absent(&feed(&mut s, 1, ReadPage::Status, red.as_bytes())));
+        assert!(absent(&feed(&mut s, 31, ReadPage::Status, red.as_bytes())));
+        assert!(!absent(&feed(&mut s, 61, ReadPage::Status, red.as_bytes())));
+        let out = feed(&mut s, 91, ReadPage::Status, STATUS);
+        assert!(out.contains(&Action::Clear(AlarmKey::InputAbsent(s9))));
+        // Present, absent once, present: nothing.
+        assert!(!absent(&feed(
+            &mut s,
+            121,
+            ReadPage::Status,
+            red.as_bytes()
+        )));
+        assert!(!absent(&feed(&mut s, 151, ReadPage::Status, STATUS)));
+    }
+
+    #[test]
+    fn stream_info_with_two_streams_parses() {
+        let p = tb_eqam::pages::streaminfo::StreamInfoPage::parse(include_bytes!(
+            "fixtures/streaminfo.cgi_slots1_9.html"
+        ))
+        .unwrap();
+        assert_eq!(p.streams.len(), 2);
+        assert_eq!(p.streams[1].index, 9);
+        use tb_eqam::pages::streaminfo::normalized;
+        assert_eq!(
+            normalized(&p.streams[1].programs),
+            normalized(&[program(1, 0x34)])
+        );
+    }
+
+    #[test]
     fn stream_info_matching_the_lineup_raises_nothing() {
         // Listed in the opposite order to the page: the comparison does not care.
         let mut s = sup(vec![program(2, 0x44), program(1, 0x34)]);

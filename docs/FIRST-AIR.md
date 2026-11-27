@@ -33,7 +33,13 @@ owner.
   `logPort=514` and `errors`, `info`, `feedback` = 1. The page read back with exactly those
   changes, uptime unbroken, and no EEPROM error in the event log. These fields do not set either
   reboot flag (firmware §4.1). `/etc/rc` starts `syslogd -R` once from the EEPROM
-  (`start_syslogd`), so the box keeps sending to 10.42.0.53 until its next boot.
+  (`start_syslogd`), so the box keeps sending to 10.42.0.53 until its next boot. Rebooted with
+  the page's Reboot action at 23:42 UTC; the boot's lines arrived at 10.42.0.10:514
+  (`user.info` / `user.error`). The box was back with slot 1 streaming in under 3 minutes.
+- Slot 9, 2026-11-27 23:46 UTC: carrier 9 (one slate, `UDP://239.10.0.9:5000`) out
+  `eqam-gige2`; the supervisor in apply mode wrote the row (`Verified`). The box shows the
+  input present, Stream Info lists the program, and debug.cgi shows the group in FPGA2B's
+  register 0: slots 9–16 are the second input FPGA (device §11.3).
 
 ## 1. Before the first stream
 
