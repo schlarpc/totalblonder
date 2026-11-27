@@ -185,6 +185,9 @@ pub enum Action {
     Clear(AlarmKey),
     /// A write finished (for `device_log` and `device_writes_total`).
     WriteLogged(WriteReport),
+    /// An event-log line not seen before (all of them after a reboot or a restart), for the
+    /// log store: the box's own syslog is not collected.
+    EventLogLine(EventLine),
     /// A write was due but held back by the rate limit.
     RateLimited {
         /// When the next write may start.
@@ -725,12 +728,15 @@ impl Supervisor {
                 self.on_debug(&p);
             }
             Observation::EventLog(p) => {
-                for line in p.lines {
-                    if let Some(kind) = line.alarm()
-                        && !self.seen_log.contains(&line)
-                    {
+                // The page lists the newest line first; pass new lines on oldest first.
+                for line in p.lines.into_iter().rev() {
+                    if self.seen_log.contains(&line) {
+                        continue;
+                    }
+                    if let Some(kind) = line.alarm() {
                         out.push(Action::Alarm(Alarm::EventLog(kind, line.clone())));
                     }
+                    out.push(Action::EventLogLine(line.clone()));
                     self.seen_log.insert(line);
                 }
             }

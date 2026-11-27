@@ -398,6 +398,15 @@ fn reboot_triggers_a_full_comparison_and_event_log_alarms_again() {
         before, 1,
         "the boot line is reported once, not on every poll"
     );
+    let lines = |s: &Sim| {
+        s.actions
+            .iter()
+            .filter(|(_, a)| matches!(a, Action::EventLogLine(_)))
+            .count()
+    };
+    let shown = s.dev.event_lines.len();
+    assert!(shown > 0);
+    assert_eq!(lines(&s), shown, "every line passed on once");
     let n0 = s.dev.log.len();
     // Reboot: uptime restarts, the RAM log is rebuilt with the same lines.
     s.dev.uptime = secs(40);
@@ -428,6 +437,7 @@ fn reboot_triggers_a_full_comparison_and_event_log_alarms_again() {
             .count(),
         2
     );
+    assert_eq!(lines(&s), 2 * shown, "and once more after the reboot");
     let m = s.ctl.supervisor().metrics();
     assert!(m.seconds_since_table_reset.unwrap() < 200);
 }

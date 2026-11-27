@@ -217,6 +217,15 @@ pub fn run(
                     ev.level(tracing::Level::WARN);
                     ev.emit();
                 }
+                Action::EventLogLine(l) => {
+                    tb_telemetry::wide!(
+                        "device.event_log",
+                        time = l.time.clone(),
+                        severity = format!("{:?}", l.severity),
+                        message = l.message.clone(),
+                    )
+                    .emit();
+                }
                 Action::RateLimited { until } => {
                     tracing::info!("device write held back until {until:?}")
                 }
