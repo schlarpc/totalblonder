@@ -354,18 +354,26 @@ impl Streams {
             stream: stream.0,
             pts,
         };
-        let a = self.find(stream, kind).ok_or(Violation::Stream(stream.0))?;
+        self.find(stream, kind).ok_or(Violation::Stream(stream.0))?;
         let Some(t) = pts else { return Ok(()) };
-        let (Some(lo), Some(hi)) = (a.lo, a.hi) else {
-            return Err(bad);
-        };
-        let slack = Rational::new(1, 1)
-            .map(|one| one.rescale(i64::from(slack_secs), a.time_base))
-            .unwrap_or(0);
-        if t < lo.saturating_sub(slack) || t > hi.saturating_add(slack) {
-            return Err(bad);
-        }
-        Ok(())
+        // In the range of the current set or of the previous one: until the worker takes the
+        // new set, a frame may belong to either session, and both may use the same index (an
+        // input that starts over, a looping file, with timestamps from the start again).
+        let fits = self
+            .current
+            .iter()
+            .chain(&self.previous)
+            .filter(|a| a.index == stream && a.kind == kind)
+            .any(|a| {
+                let (Some(lo), Some(hi)) = (a.lo, a.hi) else {
+                    return false;
+                };
+                let slack = Rational::new(1, 1)
+                    .map(|one| one.rescale(i64::from(slack_secs), a.time_base))
+                    .unwrap_or(0);
+                t >= lo.saturating_sub(slack) && t <= hi.saturating_add(slack)
+            });
+        if fits { Ok(()) } else { Err(bad) }
     }
 }
 
@@ -970,6 +978,42 @@ mod tests {
         let _ = t.release(ok);
         s.acknowledged();
         assert!(t.accept_video(&picture(v.pool, 0), &s, &l).is_err());
+    }
+
+    /// An input that starts over with the same stream index and timestamps from the start (a
+    /// looping file): frames of the old session, late in its range, stay valid until the
+    /// worker takes the new set, although the new set's range does not hold them.
+    #[test]
+    fn previous_session_timestamps_with_the_same_index() {
+        let (mut t, mut s, l, v, _) = setup();
+        // the old session reached 60 s; the new one is announced and has no packet yet (what
+        // a looping file does at its end)
+        s.note_packet(StreamIndex(0), Some(5_400_000), None);
+        s.replace(&[open(0, CodecId::H264), open(1, CodecId::Aac)]);
+        let late = |slot| {
+            let mut p = picture(v.pool, slot);
+            p.desc.pts = Some(5_400_000);
+            p
+        };
+        let ok = t.accept_video(&late(0), &s, &l).unwrap();
+        let _ = t.release(ok);
+        // the new session starts again at 1.4 s: the old frame is still valid
+        s.note_packet(StreamIndex(0), Some(126_000), None);
+        let ok = t.accept_video(&late(1), &s, &l).unwrap();
+        let _ = t.release(ok);
+        // a time in neither range (widened by the slack) is still refused
+        let mut wild = picture(v.pool, 2);
+        wild.desc.pts = Some(90_000 * 3600);
+        assert!(matches!(
+            t.accept_video(&wild, &s, &l),
+            Err(Violation::Timestamp { .. })
+        ));
+        // once the worker has the new set, the old range is gone
+        s.acknowledged();
+        assert!(matches!(
+            t.accept_video(&late(3), &s, &l),
+            Err(Violation::Timestamp { .. })
+        ));
     }
 
     #[test]
