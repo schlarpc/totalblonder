@@ -19,7 +19,16 @@ owner.
   dumps before and after differ only at 0x40, 0x1136, 0x113A, 0x115A–0x115F and
   0xF30–0xF37, as predicted (firmware §4.1). The boot logged no "Difference detected". (The
   "Password file not found" line appears at every boot.)
-- The box is in MPTS mode, with 16 carriers on and no inputs configured.
+- First stream, 2026-11-27 08:52 UTC: the §2 configuration ran on nixark as a transient unit
+  (`systemd-run --unit=tb-trial -p DynamicUser=yes -p LoadCredential=eqam:...`; the config
+  sits in `/run`, because `DynamicUser` gives the unit a private `/tmp`). Carrier 1 leaves
+  `eqam-gige1` at 40.1 Mbit/s on the wire, 3,692 datagrams/s, with no nulls missing, send errors or late
+  access units; the worst pacer lateness was 3.6 ms. One run with `reconcile = "apply"` wrote
+  slot 1 (`Verified`, drift 0). The box shows row 1's IP cell green, carrier 2 locked, and
+  Stream Info lists both programs (PMT 48 and 64; MPEG-2 video 49 and 65; AC-3 52 and 68).
+  The Status bitrate (1.5 Mbit/s average, 4.1 max) counts programs without nulls: two slates
+  leave the carrier about 93 % null. Not yet checked: a receiver on cable channel 2.
+- The box is in MPTS mode, with 16 carriers on and slot 1 configured.
 
 ## 1. Before the first stream
 
