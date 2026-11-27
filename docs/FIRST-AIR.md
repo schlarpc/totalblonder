@@ -22,7 +22,7 @@ owner.
 - First stream, 2026-11-27 08:52 UTC: the §2 configuration ran on nixark as a transient unit
   (`systemd-run --unit=tb-trial -p DynamicUser=yes -p LoadCredential=eqam:...`; the config
   sits in `/run`, because `DynamicUser` gives the unit a private `/tmp`). Carrier 1 leaves
-  `eqam-gige1` at 40.1 Mbit/s on the wire, 3,692 datagrams/s, with no nulls missing, send errors or late
+  `eqam-gige1` at 40.1 Mbit/s on the wire, 3,692 datagrams/s, with no null datagrams, send errors or late
   access units; the worst pacer lateness was 3.6 ms. One run with `reconcile = "apply"` wrote
   slot 1 (`Verified`, drift 0). The box shows row 1's IP cell green, carrier 2 locked, and
   Stream Info lists both programs (PMT 48 and 64; MPEG-2 video 49 and 65; AC-3 52 and 68).
