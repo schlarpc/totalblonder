@@ -37,6 +37,110 @@ pub struct InputStats {
     pub bytes: Counter,
 }
 
+/// Wraps an input's sink to report each session (`Streams` … `End`) as one `input.session`
+/// wide event: its streams, what it delivered, how long it lasted and why it ended. Made on the
+/// input's thread, so the event carries that thread's context (the input, the publisher).
+pub struct SessionReporter<S> {
+    inner: S,
+    session: Option<SessionTally>,
+}
+
+struct SessionTally {
+    ev: tb_telemetry::Wide,
+    packets: u64,
+    keyframes: u64,
+    bytes: u64,
+}
+
+impl<S> SessionReporter<S> {
+    /// Reports the sessions passing through to `inner`.
+    pub fn new(inner: S) -> Self {
+        SessionReporter {
+            inner,
+            session: None,
+        }
+    }
+
+    fn end(&mut self, reason: Option<&EndReason>) {
+        let Some(t) = self.session.take() else { return };
+        t.ev.set("packets", t.packets)
+            .set("keyframes", t.keyframes)
+            .set("bytes", t.bytes);
+        match reason {
+            Some(EndReason::Closed) => {
+                t.ev.outcome("closed");
+            }
+            Some(EndReason::Local(why)) => {
+                t.ev.outcome("local").set("reason", why.clone());
+            }
+            Some(EndReason::Transport(why)) => {
+                t.ev.outcome("transport")
+                    .set("reason", why.clone())
+                    .level(tracing::Level::WARN);
+            }
+            Some(EndReason::Protocol(why)) => {
+                t.ev.outcome("protocol")
+                    .set("reason", why.clone())
+                    .level(tracing::Level::WARN);
+            }
+            None => {
+                t.ev.outcome("unfinished");
+            }
+        }
+    }
+}
+
+impl<S> Drop for SessionReporter<S> {
+    fn drop(&mut self) {
+        self.end(None);
+    }
+}
+
+impl<S: EventSink> EventSink for SessionReporter<S> {
+    fn event(&mut self, ev: InputEvent) {
+        match &ev {
+            InputEvent::Streams(list) => {
+                let t = self.session.get_or_insert_with(|| SessionTally {
+                    ev: tb_telemetry::Wide::new("input.session"),
+                    packets: 0,
+                    keyframes: 0,
+                    bytes: 0,
+                });
+                // a second Streams is a reconfiguration within the session
+                t.ev.add("streams_announced", 1u64);
+                for s in list {
+                    let p = |k: &str| format!("stream.{}.{k}", s.index.0);
+                    t.ev.set(p("codec"), format!("{:?}", s.codec));
+                    if let (Some(w), Some(h)) = (s.video.width, s.video.height) {
+                        t.ev.set(p("size"), format!("{w}x{h}"));
+                    }
+                    if let Some(r) = s.video.frame_rate {
+                        t.ev.set(p("fps"), f64::from(r.num()) / f64::from(r.den()));
+                    }
+                    if let Some(r) = s.audio.sample_rate {
+                        t.ev.set(p("sample_rate"), r);
+                    }
+                    if let Some(c) = s.audio.channels {
+                        t.ev.set(p("channels"), c);
+                    }
+                }
+            }
+            InputEvent::Packet(p) => {
+                if let Some(t) = self.session.as_mut() {
+                    t.packets += 1;
+                    t.keyframes += u64::from(p.keyframe);
+                    t.bytes += p.data.len() as u64;
+                }
+            }
+            InputEvent::End(r) => {
+                let r = r.clone();
+                self.end(Some(&r));
+            }
+        }
+        self.inner.event(ev);
+    }
+}
+
 fn serve_rtmp(
     mut s: TcpStream,
     app: &str,
@@ -107,6 +211,7 @@ fn serve_rtmp(
         if sess.wants_close() {
             if let Some(r) = sess.close_reason() {
                 tracing::info!(app, "RTMP session closed: {r:?}");
+                tb_telemetry::annotate(&tracing::Span::current(), "rtmp.close", format!("{r:?}"));
             }
             return;
         }
@@ -138,6 +243,9 @@ pub fn run_rtmp(
                 let _ = s.set_nonblocking(false);
                 st.connections.inc();
                 tracing::info!(%peer, app, "RTMP publisher connected");
+                // The connection's wide event; the session's (input.session) is inside it.
+                let conn = tb_telemetry::wide!("rtmp.connection", peer = peer, "rtmp.app" = &app);
+                let _in = conn.enter();
                 serve_rtmp(s, &app, &key, sink.as_mut(), &st, clock);
             }
             Err(e) if e.kind() == ErrorKind::WouldBlock => {

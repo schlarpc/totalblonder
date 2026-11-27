@@ -21,6 +21,7 @@ tb-ac3.workspace = true
 tb-captions.workspace = true
 tb-statmux.workspace = true
 tb-decoder-client.workspace = true
+tb-telemetry = { workspace = true, features = ["otlp"] }
 tb-ts-verify.workspace = true
 tb-timeline.workspace = true
 serde_json.workspace = true
@@ -36,7 +37,6 @@ serde.workspace = true
 anyhow = "1"
 signal-hook = { version = "0.3", default-features = false }
 toml = { version = "0.9", default-features = false, features = ["parse", "serde", "std"] }
-tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }
 
 [dev-dependencies]
 tempfile.workspace = true

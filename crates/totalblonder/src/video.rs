@@ -115,6 +115,74 @@ pub struct HubSession {
     pub switches: Counter,
     /// Encoder sessions of earlier formats still delivering their last access units.
     pub old_ids: Vec<SessionId>,
+    /// The encoder's counters for this program (metrics).
+    pub encoder: EncoderStats,
+    /// The program's context (service, carrier, program, channel) for its wide events.
+    pub ctx: tracing::Span,
+}
+
+/// A program's encoder counters, over every session it has had (SPEC §11.3 "Program").
+#[derive(Debug, Clone, Default)]
+pub struct EncoderStats {
+    /// Pictures coded on the device.
+    pub pictures: Counter,
+    /// Repeats made on the host.
+    pub repeats: Counter,
+    /// Pictures given up by the deadline policy (the overload signal).
+    pub shed: Counter,
+    /// Pictures whose plan failed.
+    pub failed: Counter,
+    /// Key frame positions that carried a repeat.
+    pub keys_missed: Counter,
+    /// Bits of all access units.
+    pub bits: Counter,
+    /// The delivery rate in force, bit/s.
+    pub rate: Gauge,
+}
+
+impl EncoderStats {
+    /// Registers them under `labels`.
+    pub fn register(&self, reg: &mut crate::control::Registry, labels: &[(&'static str, String)]) {
+        use crate::control::Value::{Counter as C, Gauge as G};
+        let l = || labels.to_vec();
+        reg.add("encoder_pictures_total", l(), C(self.pictures.clone()));
+        reg.add("encoder_repeats_total", l(), C(self.repeats.clone()));
+        reg.add("encoder_shed_total", l(), C(self.shed.clone()));
+        reg.add("encoder_failed_total", l(), C(self.failed.clone()));
+        reg.add(
+            "encoder_keys_missed_total",
+            l(),
+            C(self.keys_missed.clone()),
+        );
+        reg.add("encoder_bits_total", l(), C(self.bits.clone()));
+        reg.add("encoder_rate_bps", l(), G(self.rate.clone()));
+    }
+
+    /// Adds what a session's counters gained since `last` (that session's values when last
+    /// seen; zeros for a new session).
+    fn update(&self, st: &tb_m2v_encoder::SessionStats, rate: u64, last: &mut [u64; 6]) {
+        let now = [
+            st.pictures,
+            st.repeats,
+            st.shed,
+            st.failed,
+            st.keys_missed,
+            st.total_bits as u64,
+        ];
+        let c = [
+            &self.pictures,
+            &self.repeats,
+            &self.shed,
+            &self.failed,
+            &self.keys_missed,
+            &self.bits,
+        ];
+        for ((c, n), l) in c.iter().zip(now).zip(last.iter_mut()) {
+            c.add(n.saturating_sub(*l));
+            *l = n;
+        }
+        self.rate.set(rate);
+    }
 }
 
 /// Step-down settings and what the hub needs to carry a switch out.
@@ -464,6 +532,9 @@ pub fn run<D: TickDevice>(
         .filter(|o| o.plan.enabled && sessions.iter().any(|s| s.ladder.len() > 1))
         .map(|o| Governor::new(o.plan, sessions.len(), timing.p0));
     let mut next_sample = timing.p0 + HZ;
+    // the encoder counters: each session's values when last copied out
+    let mut next_stats = timing.p0 + HZ;
+    let mut enc_last: Vec<[u64; 6]> = vec![[0; 6]; sessions.len()];
     // old sessions still delivering their last access units
     let mut closing: Vec<SessionId> = Vec::new();
     // per program: the tick index at which its new session starts, while switching
@@ -716,6 +787,15 @@ pub fn run<D: TickDevice>(
                 }
             }
         }
+        // The encoder's counters, once a second.
+        if wake >= next_stats {
+            next_stats = wake + HZ;
+            for (i, s) in sessions.iter().enumerate() {
+                if let Ok(sn) = eng.enc().snapshot(ids[i]) {
+                    s.encoder.update(&sn.stats, sn.rate, &mut enc_last[i]);
+                }
+            }
+        }
         // Step-down: once a second, the counters to the governor, and its decision carried out.
         if let (Some(g), Some(setup)) = (gov.as_mut(), overload.as_ref())
             && wake >= next_sample
@@ -752,14 +832,24 @@ pub fn run<D: TickDevice>(
                 // the new session first: if it cannot be opened, nothing changes
                 let new_plan = sessions[i].ladder[to].clone();
                 let cfg = session_config(&new_plan, phases[i], capacity_of(new_plan.format));
+                let down = matches!(step, Step::Down(_));
+                let step_ev = tb_telemetry::Wide::child_of(&sessions[i].ctx, "video.step")
+                    .with("direction", if down { "down" } else { "up" })
+                    .with("from", sessions[i].plan.format.name())
+                    .with("to", new_plan.format.name())
+                    .with("rung", to);
+                step_ev.level(if down {
+                    tracing::Level::WARN
+                } else {
+                    tracing::Level::INFO
+                });
                 match eng.enc_mut().open(&cfg) {
-                    Err(e) => tracing::error!(
-                        program = sessions[i].plan.service,
-                        "step to {:?} refused: {e}",
-                        new_plan.format
-                    ),
+                    Err(e) => {
+                        step_ev.error(format!("the new session was refused: {e}"));
+                    }
                     Ok(new_sid) => {
                         let s = &mut sessions[i];
+                        enc_last[i] = [0; 6];
                         let old = std::mem::replace(&mut ids[i], new_sid);
                         if let Err(e) = eng.enc_mut().close(old) {
                             tracing::warn!("closing the old session: {e}");
@@ -830,13 +920,7 @@ pub fn run<D: TickDevice>(
                                 },
                             },
                         );
-                        tracing::warn!(
-                            program = s.plan.service,
-                            from = ?s.plan.format,
-                            to = ?new_plan.format,
-                            "overload: {} to rung {to}",
-                            if matches!(step, Step::Down(_)) { "stepping down" } else { "stepping back up" }
-                        );
+                        step_ev.set("start_bps", es);
                         s.plan = new_plan;
                         s.plan.rung.set(to);
                         s.rung_gauge.set(to as u64);
@@ -844,6 +928,7 @@ pub fn run<D: TickDevice>(
                         g.reset(i);
                     }
                 }
+                step_ev.emit();
             }
         }
         k += 1;

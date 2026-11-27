@@ -56,6 +56,8 @@ struct File {
     #[serde(default)]
     overload: OverloadFile,
     device: Option<DeviceFile>,
+    #[serde(default)]
+    telemetry: TelemetryFile,
     #[serde(default, rename = "carrier")]
     carriers: Vec<CarrierFile>,
     #[serde(default, rename = "service")]
@@ -197,6 +199,38 @@ impl Default for ControlFile {
     fn default() -> Self {
         ControlFile {
             bind: Some(std::net::SocketAddr::from(([127, 0, 0, 1], 8090))),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+struct TelemetryFile {
+    logs: Option<String>,
+    metrics: Option<String>,
+    log_level: String,
+    metrics_interval_s: u64,
+    summary_interval_s: Option<u64>,
+    timeout_s: u64,
+    service_name: String,
+    instance: Option<String>,
+    resource: std::collections::BTreeMap<String, String>,
+    headers: std::collections::BTreeMap<String, String>,
+}
+
+impl Default for TelemetryFile {
+    fn default() -> Self {
+        TelemetryFile {
+            logs: None,
+            metrics: None,
+            log_level: "info".into(),
+            metrics_interval_s: 10,
+            summary_interval_s: None,
+            timeout_s: 5,
+            service_name: "totalblonder".into(),
+            instance: None,
+            resource: Default::default(),
+            headers: Default::default(),
         }
     }
 }
@@ -401,6 +435,16 @@ pub enum Format {
 }
 
 impl Format {
+    /// `1080i`, `1080p`, `720p` or `480i`, as the file names it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Format::F1080i => "1080i",
+            Format::F1080p => "1080p",
+            Format::F720p => "720p",
+            Format::F480i => "480i",
+        }
+    }
+
     fn parse(s: &str) -> Result<Format, ConfigError> {
         Ok(match s {
             "1080i29.97" | "1080i" => Format::F1080i,
@@ -702,6 +746,15 @@ pub enum InputPlan {
 }
 
 impl InputPlan {
+    /// `rtmp`, `ts_udp` or `file`, as the file names the kinds.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            InputPlan::Rtmp { .. } => "rtmp",
+            InputPlan::TsUdp { .. } => "ts_udp",
+            InputPlan::File { .. } => "file",
+        }
+    }
+
     /// The input's id.
     pub fn id(&self) -> &str {
         match self {
@@ -743,6 +796,65 @@ pub struct Plant {
     pub ratings: Vec<tb_psip::rating::RatingSystem>,
     /// Step-down under sustained overload.
     pub overload: OverloadPlan,
+    /// Telemetry.
+    pub telemetry: TelemetryPlan,
+}
+
+/// Telemetry settings (`[telemetry]`, docs/SERVER.md "Telemetry").
+#[derive(Debug, Clone, PartialEq)]
+pub struct TelemetryPlan {
+    /// The exporters.
+    pub export: tb_telemetry::Config,
+    /// How often the carrier, service, input and process summaries are reported; `None`: never.
+    pub summaries: Option<std::time::Duration>,
+}
+
+fn telemetry_plan(t: &TelemetryFile) -> Result<TelemetryPlan, ConfigError> {
+    let url = |what: &str, u: &Option<String>| -> Result<Option<String>, ConfigError> {
+        match u {
+            Some(u) if !(u.starts_with("http://") || u.starts_with("https://")) => Err(rule(
+                format!("telemetry.{what}: {u:?} is not an http:// or https:// URL"),
+            )),
+            Some(u) => Ok(Some(u.clone())),
+            None => Ok(None),
+        }
+    };
+    let log_level = match t.log_level.as_str() {
+        "trace" => tracing::Level::TRACE,
+        "debug" => tracing::Level::DEBUG,
+        "info" => tracing::Level::INFO,
+        "warn" => tracing::Level::WARN,
+        "error" => tracing::Level::ERROR,
+        x => {
+            return Err(rule(format!(
+                "telemetry.log_level: {x:?} is not trace, debug, info, warn or error"
+            )));
+        }
+    };
+    if t.metrics_interval_s == 0 || t.timeout_s == 0 {
+        return Err(rule(
+            "telemetry: metrics_interval_s and timeout_s must be at least 1",
+        ));
+    }
+    let export = tb_telemetry::Config {
+        logs: url("logs", &t.logs)?,
+        metrics: url("metrics", &t.metrics)?,
+        log_level,
+        metrics_interval: std::time::Duration::from_secs(t.metrics_interval_s),
+        timeout: std::time::Duration::from_secs(t.timeout_s),
+        service_name: t.service_name.clone(),
+        instance: t.instance.clone(),
+        resource: t.resource.clone().into_iter().collect(),
+        headers: t.headers.clone().into_iter().collect(),
+    };
+    // Summaries by default only when there is somewhere for them to go.
+    let every = t
+        .summary_interval_s
+        .unwrap_or(if export.logs.is_some() { 10 } else { 0 });
+    Ok(TelemetryPlan {
+        summaries: (every > 0).then(|| std::time::Duration::from_secs(every)),
+        export,
+    })
 }
 
 /// The modulator's supervisor settings (SPEC §10, §13.2 `[device]`).
@@ -1318,6 +1430,7 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
         inputs,
         ratings,
         overload,
+        telemetry: telemetry_plan(&f.telemetry)?,
     })
 }
 

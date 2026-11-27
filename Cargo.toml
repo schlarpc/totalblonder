@@ -41,6 +41,7 @@ tb-ts-verify = { path = "crates/tb-ts-verify" }
 tb-decoder-proto = { path = "crates/tb-decoder-proto" }
 tb-sandbox = { path = "crates/tb-sandbox" }
 tb-decoder-client = { path = "crates/tb-decoder-client" }
+tb-telemetry = { path = "crates/tb-telemetry" }
 
 bytemuck = { version = "1", features = ["derive", "min_const_generics"] }
 thiserror = "2"

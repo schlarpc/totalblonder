@@ -195,6 +195,9 @@ pub fn run_decoder(
             return;
         }
     };
+    // The worker running now: one `decoder.worker` wide event per worker, from ready to exit,
+    // with what it decoded.
+    let mut worker: Option<(tb_telemetry::Wide, u64, u64)> = None;
     let mut rung = target.rung.get();
     let mut spec = target.specs.get(rung).copied().unwrap_or(target.video_spec);
     dec.set_video_output(Some(spec));
@@ -297,6 +300,9 @@ pub fn run_decoder(
                         .is_ok()
                     {
                         stats.pictures.inc();
+                        if let Some(w) = worker.as_mut() {
+                            w.1 += 1;
+                        }
                     }
                 }
                 Decoded::Audio(a) => {
@@ -343,6 +349,9 @@ pub fn run_decoder(
                         .is_ok()
                     {
                         stats.audio_blocks.inc();
+                        if let Some(w) = worker.as_mut() {
+                            w.2 += 1;
+                        }
                     }
                 }
             }
@@ -350,10 +359,23 @@ pub fn run_decoder(
         let _ = mapper.poll(Ticks27((clock.now() + delay) as i64));
         for e in dec.events() {
             match e {
-                Event::Exited { class, .. } => {
+                Event::Exited { class, generation } => {
                     stats.worker_exits.inc();
                     tracing::warn!(input = name, "decoder worker exited: {class:?}");
                     let _ = target.video.try_send(LiveEvent::Closed);
+                    let (ev, pictures, blocks) = worker.take().unwrap_or_else(|| {
+                        (
+                            tb_telemetry::wide!("decoder.worker", generation = generation),
+                            0,
+                            0,
+                        )
+                    });
+                    ev.set("exit", format!("{class:?}"))
+                        .set("pictures", pictures)
+                        .set("audio_blocks", blocks);
+                    if !matches!(class, tb_decoder_client::proto::supervise::ExitClass::Clean) {
+                        ev.level(tracing::Level::WARN);
+                    }
                 }
                 Event::Started {
                     generation,
@@ -364,15 +386,38 @@ pub fn run_decoder(
                         generation,
                         "decoder worker started: {confinement:?}"
                     );
+                    worker = Some((
+                        tb_telemetry::wide!(
+                            "decoder.worker",
+                            generation = generation,
+                            confinement = format!("{confinement:?}"),
+                        ),
+                        0,
+                        0,
+                    ));
                 }
                 Event::CircuitOpen { for_ } => {
                     tracing::error!(input = name, "decoder failing; paused for {for_:?}");
+                    tb_telemetry::wide!(
+                        "decoder.circuit_open",
+                        paused_ms = tb_telemetry::Val::ms(for_)
+                    )
+                    .emit();
+                }
+                Event::Violation { what } => {
+                    tb_telemetry::wide!("decoder.violation", what = what)
+                        .level(tracing::Level::ERROR);
                 }
                 other => tracing::debug!(input = name, "decoder: {other:?}"),
             }
         }
     }
     dec.shutdown(Duration::from_secs(1));
+    if let Some((ev, pictures, blocks)) = worker.take() {
+        ev.set("exit", "shutdown")
+            .set("pictures", pictures)
+            .set("audio_blocks", blocks);
+    }
 }
 
 /// Counters of an input's socket side, re-exported for registration.

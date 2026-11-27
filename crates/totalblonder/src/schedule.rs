@@ -149,15 +149,27 @@ impl ScheduleFile {
         }
     }
 
-    /// Reads the file again; on any error keeps the previous content and reports why.
-    pub fn reload(&mut self, leap: LeapSeconds) {
+    /// Reads the file again; on any error keeps the previous content, reports why and returns
+    /// false.
+    pub fn reload(&mut self, leap: LeapSeconds) -> bool {
         match std::fs::read_to_string(&self.path)
             .map_err(|e| e.to_string())
             .and_then(|t| parse_with(&t, leap, &self.ratings))
         {
-            Ok(m) => self.last = m,
-            Err(e) => tracing::warn!(path = %self.path.display(), "schedule not reloaded: {e}"),
+            Ok(m) => {
+                self.last = m;
+                true
+            }
+            Err(e) => {
+                tracing::warn!(path = %self.path.display(), "schedule not reloaded: {e}");
+                false
+            }
         }
+    }
+
+    /// How many services the file has events for.
+    pub fn services(&self) -> usize {
+        self.last.len()
     }
 
     /// The schedules of `services` (service id, source id, name).

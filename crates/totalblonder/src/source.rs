@@ -185,6 +185,10 @@ pub struct LiveProvider {
     /// The Active Format Description of what was handed out last.
     afd: tb_m2v_syntax::afd::ActiveFormat,
     stats: SourceStats,
+    /// The program's context, for `source.switch` events.
+    ctx: tracing::Span,
+    /// When the source on air was cut to (process time).
+    since: u64,
 }
 
 /// Frames kept for the frame clock (beyond this the oldest are dropped by the store).
@@ -227,7 +231,15 @@ impl LiveProvider {
             last: None,
             afd: tb_m2v_syntax::afd::ActiveFormat::FULL,
             stats,
+            ctx: tracing::Span::none(),
+            since: 0,
         }
+    }
+
+    /// Reports its switches in `ctx` (the program's span).
+    pub fn with_context(mut self, ctx: tracing::Span) -> Self {
+        self.ctx = ctx;
+        self
     }
 
     /// The source and frame to show at display time `t` (`None` frame: the slate).
@@ -256,10 +268,34 @@ impl LiveProvider {
             Source::Standby => 2,
             Source::Slate => 3,
         };
-        if self.stats.source.get() != code {
-            if self.stats.source.get() != 0 {
+        let was = self.stats.source.get();
+        if was != code {
+            if was != 0 {
                 self.stats.switches.inc();
+                let name = |c: u64| match c {
+                    1 => "live",
+                    2 => "standby",
+                    _ => "slate",
+                };
+                // Down the chain is a fault somewhere upstream; back up is recovery.
+                let level = if code > was {
+                    tracing::Level::WARN
+                } else {
+                    tracing::Level::INFO
+                };
+                let ev = tb_telemetry::Wide::child_of(&self.ctx, "source.switch")
+                    .with("from", name(was))
+                    .with("to", name(code))
+                    .with(
+                        "held_s",
+                        t.saturating_sub(self.since) as f64 / crate::time::HZ as f64,
+                    )
+                    .with("live.ok", ok(sel[0]))
+                    .with("standby.ok", ok(sel[1]));
+                ev.level(level);
+                ev.emit();
             }
+            self.since = t;
             self.stats.source.set(code);
         }
         let frame = feed_index(src).and_then(|i| match sel[i] {

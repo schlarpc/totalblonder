@@ -153,9 +153,26 @@ pub fn run(
                 Action::Alarm(al) => {
                     alarms += 1;
                     tracing::warn!("device alarm: {al:?}");
+                    let detail = format!("{al:?}");
+                    let kind = detail
+                        .split(['(', ' ', '{'])
+                        .next()
+                        .unwrap_or("")
+                        .to_owned();
+                    let ev = tb_telemetry::wide!("device.alarm", alarm = kind, detail = detail);
+                    ev.level(tracing::Level::WARN);
+                    ev.emit();
                 }
-                Action::Clear(k) => tracing::info!("device alarm cleared: {k:?}"),
-                Action::WriteLogged(w) => tracing::warn!("device write: {w:?}"),
+                Action::Clear(k) => {
+                    tracing::info!("device alarm cleared: {k:?}");
+                    tb_telemetry::wide!("device.alarm_cleared", alarm = format!("{k:?}")).emit();
+                }
+                Action::WriteLogged(w) => {
+                    tracing::warn!("device write: {w:?}");
+                    let ev = tb_telemetry::wide!("device.write", detail = format!("{w:?}"));
+                    ev.level(tracing::Level::WARN);
+                    ev.emit();
+                }
                 Action::RateLimited { until } => {
                     tracing::info!("device write held back until {until:?}")
                 }
@@ -172,7 +189,26 @@ pub fn run(
         let wait = match step.next {
             Next::Send(req) => {
                 tracing::debug!(target = %req.target(), "device request");
+                let ev = tb_telemetry::wide!(
+                    "device.request",
+                    method = format!("{:?}", req.method()),
+                    // the kind, not the target: its query carries the session id
+                    kind = format!("{:?}", req.kind()),
+                );
                 let res = http.send(req);
+                match &res {
+                    Ok(r) => {
+                        ev.set("status", r.status).set("bytes", r.body.len());
+                        if r.status >= 400 {
+                            ev.outcome("http_error").level(tracing::Level::WARN);
+                        }
+                    }
+                    Err(e) => {
+                        ev.outcome("transport").set("error", format!("{e:?}"));
+                        ev.level(tracing::Level::WARN);
+                    }
+                }
+                drop(ev);
                 let acts = ctl.on_response(t0.elapsed(), res);
                 gauges.alarms.set(log(acts));
                 None

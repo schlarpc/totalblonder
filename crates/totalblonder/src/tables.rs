@@ -115,8 +115,16 @@ pub fn run(
     let mut t = clock.now();
     loop {
         let unix = clock.unix_nanos_at(t).div_euclid(1_000_000_000) as i64;
+        // One wide event per rebuild: what was read, built and handed over, and how long it took.
+        let cycle = tb_telemetry::wide!("tables.cycle", carriers = targets.len());
         if let Some(s) = schedule.as_mut() {
-            s.reload(leap);
+            let ok = s.reload(leap);
+            cycle
+                .set("schedule.ok", ok)
+                .set("schedule.services", s.services());
+            if !ok {
+                cycle.level(tracing::Level::WARN);
+            }
         }
         if let Some(now) = GpsSeconds::from_unix(unix, leap) {
             for c in &mut targets {
@@ -161,9 +169,15 @@ pub fn run(
                                 tsid = c.lineup.tsid(),
                                 "table set not delivered: queue full"
                             );
+                            cycle.add("queue_full", 1u64).level(tracing::Level::WARN);
+                        } else {
+                            cycle.add("delivered", 1u64);
                         }
                     }
-                    Err(e) => tracing::error!(tsid = c.lineup.tsid(), "tables: {e}"),
+                    Err(e) => {
+                        tracing::error!(tsid = c.lineup.tsid(), "tables: {e}");
+                        cycle.add("failed", 1u64).level(tracing::Level::ERROR);
+                    }
                 }
             }
         }
@@ -174,10 +188,13 @@ pub fn run(
                 .iter_mut()
                 .map(|c| (c.lineup.tsid(), &mut c.versions))
                 .collect();
+            cycle.set("versions_saved", true);
             if let Err(e) = f.save(&mut all) {
                 tracing::warn!("saving table versions: {e}");
+                cycle.error(format!("saving table versions: {e}"));
             }
         }
+        drop(cycle);
         t += period.max(HZ);
         if !clock.sleep_until(t) {
             return;

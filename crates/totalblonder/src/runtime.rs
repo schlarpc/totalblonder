@@ -198,6 +198,7 @@ fn start_live(
             Value::Counter(lstats.sessions.clone()),
         );
         let (sink, rx) = crate::live::input_queue();
+        use crate::ingest::SessionReporter;
         reg.add(
             "input_events_dropped_total",
             l.clone(),
@@ -217,19 +218,46 @@ fn start_live(
         reg.add("input_errors_total", l, Value::Counter(ist.errors.clone()));
         let clock = RealClock::new(epoch, stop.clone());
         let input = input.clone();
-        threads.push(std::thread::Builder::new().name(format!("in-{id}")).spawn(
-            move || match input {
-                crate::config::InputPlan::Rtmp { bind, app, key, .. } => {
-                    crate::ingest::run_rtmp(bind, app, key, Box::new(sink), ist, &clock)
-                }
-                crate::config::InputPlan::TsUdp { bind, .. } => {
-                    crate::ingest::run_ts_udp(bind, Box::new(sink), ist, &clock)
-                }
-                crate::config::InputPlan::File { path, .. } => {
-                    crate::ingest::run_ts_file(path, Box::new(sink), ist, &clock)
-                }
-            },
-        )?);
+        let (service, role_name) = (p.service.clone(), ["live", "standby"][role]);
+        let (service2, input_id) = (service.clone(), id.to_owned());
+        threads.push(
+            std::thread::Builder::new()
+                .name(format!("in-{id}"))
+                .spawn(move || {
+                    let _ctx = tracing::info_span!(
+                        "input",
+                        input = %input_id,
+                        "input.kind" = input.kind(),
+                        service = %service,
+                        role = role_name
+                    )
+                    .entered();
+                    match input {
+                        crate::config::InputPlan::Rtmp { bind, app, key, .. } => {
+                            crate::ingest::run_rtmp(
+                                bind,
+                                app,
+                                key,
+                                Box::new(SessionReporter::new(sink)),
+                                ist,
+                                &clock,
+                            )
+                        }
+                        crate::config::InputPlan::TsUdp { bind, .. } => crate::ingest::run_ts_udp(
+                            bind,
+                            Box::new(SessionReporter::new(sink)),
+                            ist,
+                            &clock,
+                        ),
+                        crate::config::InputPlan::File { path, .. } => crate::ingest::run_ts_file(
+                            path,
+                            Box::new(SessionReporter::new(sink)),
+                            ist,
+                            &clock,
+                        ),
+                    }
+                })?,
+        );
         let clock = RealClock::new(epoch, stop.clone());
         let pool2 = pool.clone();
         let name = id.to_owned();
@@ -237,6 +265,13 @@ fn start_live(
             std::thread::Builder::new()
                 .name(format!("dec-{id}"))
                 .spawn(move || {
+                    let _ctx = tracing::info_span!(
+                        "decoder",
+                        input = %name,
+                        service = %service2,
+                        role = role_name
+                    )
+                    .entered();
                     crate::live::run_decoder(&pool2, &name, rx, target, lstats, &clock)
                 })?,
         );
@@ -306,6 +341,7 @@ fn hub_sessions(
             let slate = Slate::new(w, h, &text);
             let phase = cfgs.get(n).map_or(0, |c| c.gop_phase);
             n += 1;
+            let ctx = program_span(c.id, p);
             let provider: Box<dyn video::FrameProvider> = match live.get_mut(&(ci, p.index)) {
                 Some(l) => match (l.video[0].take(), l.video[1].take()) {
                     (None, None) => Box::new(SlateProvider(slate)),
@@ -323,14 +359,17 @@ fn hub_sessions(
                                 1
                             },
                         };
-                        Box::new(crate::source::LiveProvider::new(
-                            live_rx,
-                            standby_rx,
-                            slate,
-                            cadence,
-                            crate::source::FallbackTimes::default(),
-                            l.stats.clone(),
-                        ))
+                        Box::new(
+                            crate::source::LiveProvider::new(
+                                live_rx,
+                                standby_rx,
+                                slate,
+                                cadence,
+                                crate::source::FallbackTimes::default(),
+                                l.stats.clone(),
+                            )
+                            .with_context(ctx.clone()),
+                        )
                     }
                 },
                 None => Box::new(SlateProvider(slate)),
@@ -348,10 +387,43 @@ fn hub_sessions(
                 rung_gauge: crate::metrics::Gauge::default(),
                 switches: Counter::default(),
                 old_ids: Vec::new(),
+                encoder: video::EncoderStats::default(),
+                ctx,
             });
         }
     }
     v
+}
+
+/// A program's context: its events and wide events carry these fields. Made without a parent,
+/// so it does not keep the span it was made in open.
+fn program_span(carrier: u8, p: &crate::config::ProgramPlan) -> tracing::Span {
+    tracing::info_span!(
+        parent: None,
+        "program",
+        service = %p.service,
+        carrier,
+        program = p.index + 1,
+        channel = %p.psip.channel.number,
+    )
+}
+
+/// What the summaries need to know of each service.
+fn service_infos(plant: &Plant) -> Vec<crate::telemetry::ServiceInfo> {
+    plant
+        .carriers
+        .iter()
+        .flat_map(|c| {
+            c.programs.iter().map(|p| crate::telemetry::ServiceInfo {
+                service: p.service.clone(),
+                carrier: c.id,
+                program: p.index + 1,
+                channel: p.psip.channel.number.to_string(),
+                ladder: p.ladder.iter().map(|f| f.name().to_owned()).collect(),
+                inputs: [p.live.clone(), p.standby.clone()],
+            })
+        })
+        .collect()
 }
 
 #[allow(clippy::too_many_arguments, reason = "the hub thread's whole setup")]
@@ -365,6 +437,7 @@ fn hub<D: TickDevice>(
     ready: std::sync::mpsc::Sender<Result<(), String>>,
 ) {
     let _ = ready.send(Ok(()));
+    let _ctx = tracing::info_span!("video").entered();
     let eng = Engine::new(dev, video::encoder_options(), 5.0);
     if let Err(e) = video::run(eng, sessions, timing, statmux, overload, clock) {
         tracing::error!("video hub stopped: {e}");
@@ -466,7 +539,7 @@ fn start_video(
 }
 
 /// Runs the plant.
-pub fn run(plant: Plant, mode: Mode) -> anyhow::Result<()> {
+pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::Result<()> {
     let delay = plant.output.delay_ms * (HZ / 1000);
     // Frame 0 is presented one Δ after start plus a little, so its submission is at t ≈ 0.
     let p0 = delay + HZ / 10;
@@ -612,6 +685,7 @@ pub fn run(plant: Plant, mode: Mode) -> anyhow::Result<()> {
             let sessions = hub_sessions(&plant, &built, &mut live, p0, delay);
             for s in &sessions {
                 let l = vec![("service", s.plan.service.clone())];
+                s.encoder.register(&mut reg, &l);
                 reg.add(
                     "encoder_access_units_total",
                     l.clone(),
@@ -654,7 +728,10 @@ pub fn run(plant: Plant, mode: Mode) -> anyhow::Result<()> {
             let aclock = RealClock::new(epoch, stop.clone());
             let audio = std::thread::Builder::new()
                 .name("audio".into())
-                .spawn(move || crate::audio::run(tracks, p0, delay, None, &aclock))?;
+                .spawn(move || {
+                    let _ctx = tracing::info_span!("audio").entered();
+                    crate::audio::run(tracks, p0, delay, None, &aclock)
+                })?;
             let gauges: Vec<CarrierGauges> = plant
                 .carriers
                 .iter()
@@ -694,18 +771,21 @@ pub fn run(plant: Plant, mode: Mode) -> anyhow::Result<()> {
                 .clone()
                 .map(|p| crate::schedule::ScheduleFile::with_ratings(p, ratings.clone()));
             let tclock = RealClock::new(epoch, stop.clone());
-            let tables = std::thread::spawn(move || {
-                tables::run(
-                    targets,
-                    guide,
-                    &ratings,
-                    leap,
-                    10 * HZ,
-                    &tclock,
-                    vfile,
-                    sfile,
-                )
-            });
+            let tables = std::thread::Builder::new()
+                .name("tables".into())
+                .spawn(move || {
+                    let _ctx = tracing::info_span!("tables").entered();
+                    tables::run(
+                        targets,
+                        guide,
+                        &ratings,
+                        leap,
+                        10 * HZ,
+                        &tclock,
+                        vfile,
+                        sfile,
+                    )
+                })?;
 
             // Pacers: one per interface, plus one for carriers on none.
             let mut groups: Vec<Vec<pacer::CarrierTx>> = (0..=plant.output.interfaces.len())
@@ -784,6 +864,8 @@ pub fn run(plant: Plant, mode: Mode) -> anyhow::Result<()> {
                     std::thread::Builder::new()
                         .name(format!("mux-{}", c.id))
                         .spawn(move || {
+                            let _ctx =
+                                tracing::info_span!("carrier", carrier = c.id, tsid).entered();
                             carrier::run_realtime(c, feeder, &clock, g, checker, &stop2, &drained2)
                         })?,
                 );
@@ -800,6 +882,7 @@ pub fn run(plant: Plant, mode: Mode) -> anyhow::Result<()> {
                         let clock = RealClock::new(epoch, stop.clone());
                         threads.push(std::thread::Builder::new().name("device".into()).spawn(
                             move || {
+                                let _ctx = tracing::info_span!("device").entered();
                                 crate::device::run(
                                     d.base_url,
                                     creds,
@@ -814,7 +897,25 @@ pub fn run(plant: Plant, mode: Mode) -> anyhow::Result<()> {
                     Err(e) => tracing::error!("device supervisor not started: {e}"),
                 }
             }
+            crate::telemetry::register_process(&mut reg);
             let reg = Arc::new(reg);
+            let _instruments = tel
+                .meter()
+                .map(|m| crate::telemetry::export_metrics(&m, &reg))
+                .unwrap_or_default();
+            if let Some(every) = plant.telemetry.summaries {
+                let s = crate::telemetry::Summaries {
+                    registry: reg.clone(),
+                    every,
+                    services: service_infos(&plant),
+                };
+                let stop = stop_out.clone();
+                threads.push(
+                    std::thread::Builder::new()
+                        .name("summaries".into())
+                        .spawn(move || s.run(&stop))?,
+                );
+            }
             if let Some(addr) = plant.control {
                 match crate::control::serve(addr, reg.clone()) {
                     Ok(_) => {}
@@ -829,7 +930,10 @@ pub fn run(plant: Plant, mode: Mode) -> anyhow::Result<()> {
                 threads.push(
                     std::thread::Builder::new()
                         .name(format!("pacer-{i}"))
-                        .spawn(move || pacer::run(g, epoch, PacerTiming::default(), &s))?,
+                        .spawn(move || {
+                            let _ctx = tracing::info_span!("pacer", pacer = i).entered();
+                            pacer::run(g, epoch, PacerTiming::default(), &s)
+                        })?,
                 );
             }
             tracing::info!(carriers = plant.carriers.len(), "running");
@@ -847,7 +951,13 @@ pub fn run(plant: Plant, mode: Mode) -> anyhow::Result<()> {
             {
                 std::thread::sleep(Duration::from_millis(100));
             }
-            tracing::info!("stopping");
+            let why = if signaled.load(std::sync::atomic::Ordering::Relaxed) {
+                "signal"
+            } else {
+                "duration"
+            };
+            tb_telemetry::annotate(&tracing::Span::current(), "stop", why);
+            tracing::info!(why, "stopping");
             stop.store(true, std::sync::atomic::Ordering::Relaxed);
             // The encoder closes its sessions (the last GOP whole, sequence_end_code); then the
             // queued access units are delivered by their decoding times, at most Δ away.

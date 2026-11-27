@@ -16,26 +16,48 @@ use std::time::Duration;
 use crate::metrics::{Counter, Gauge};
 
 /// A metric's value source.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Value {
     /// A counter.
     Counter(Counter),
     /// A gauge.
     Gauge(Gauge),
+    /// Read when asked (process statistics): a counter when the name ends in `_total`.
+    Probe(Arc<dyn Fn() -> u64 + Send + Sync>),
+}
+
+impl std::fmt::Debug for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Counter(c) => f.debug_tuple("Counter").field(&c.get()).finish(),
+            Value::Gauge(g) => f.debug_tuple("Gauge").field(&g.get()).finish(),
+            Value::Probe(p) => f.debug_tuple("Probe").field(&p()).finish(),
+        }
+    }
 }
 
 impl Value {
-    fn get(&self) -> u64 {
+    /// The value now.
+    pub fn get(&self) -> u64 {
         match self {
             Value::Counter(c) => c.get(),
             Value::Gauge(g) => g.get(),
+            Value::Probe(p) => p(),
         }
     }
     fn kind(&self) -> &'static str {
         match self {
             Value::Counter(_) => "counter",
-            Value::Gauge(_) => "gauge",
+            Value::Gauge(_) | Value::Probe(_) => "gauge",
         }
+    }
+}
+
+impl Series {
+    /// Whether it only ever grows (a counter, or a gauge that copies one): by the Prometheus
+    /// convention, its name ends in `_total`.
+    pub fn cumulative(&self) -> bool {
+        matches!(self.value, Value::Counter(_)) || self.name.ends_with("_total")
     }
 }
 
@@ -86,6 +108,11 @@ impl Registry {
             labels,
             value,
         });
+    }
+
+    /// Every series, in registration order.
+    pub fn series(&self) -> &[Series] {
+        &self.series
     }
 
     /// Prometheus text exposition.

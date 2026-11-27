@@ -1,0 +1,33 @@
+[package]
+name = "tb-telemetry"
+description = "Wide events and OpenTelemetry export: a tracing layer that reports each unit of work once with its context, and ships log lines and metrics over OTLP/HTTP"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# The OTLP/HTTP exporters. Library crates only make wide events and leave this off; the server
+# turns it on.
+otlp = [
+    "dep:opentelemetry",
+    "dep:opentelemetry_sdk",
+    "dep:opentelemetry-otlp",
+    "dep:reqwest",
+    "dep:rustls",
+]
+
+[dependencies]
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "registry", "std"] }
+opentelemetry = { version = "0.33", default-features = false, features = ["logs", "metrics"], optional = true }
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["logs", "metrics", "internal-logs"], optional = true }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = ["http-proto", "logs", "metrics", "reqwest-blocking-client", "internal-logs"], optional = true }
+# TLS for https endpoints: rustls on ring (no C toolchain beyond cc), the system's roots.
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls-no-provider"], optional = true }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"], optional = true }
+
+[lints]
+workspace = true

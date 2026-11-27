@@ -16,9 +16,6 @@ const USAGE: &str =
     "totalblonder --config FILE [--check] [--offline SECONDS --out DIR] [--duration SECONDS]";
 
 fn main() -> ExitCode {
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        .init();
     match real_main() {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
@@ -61,6 +58,29 @@ fn real_main() -> anyhow::Result<()> {
         );
         return Ok(());
     }
+    // Telemetry starts once the configuration says where it goes; nothing logs before.
+    let tel = tb_telemetry::init(&plant.telemetry.export)?;
+    let run = tb_telemetry::wide!(
+        "server.run",
+        config = path.as_path(),
+        mode = if offline.is_some() {
+            "offline"
+        } else {
+            "realtime"
+        },
+        carriers = plant.carriers.len(),
+        programs = plant
+            .carriers
+            .iter()
+            .map(|c| c.programs.len())
+            .sum::<usize>(),
+        inputs = plant.inputs.len(),
+        "video.device" = format!("{:?}", plant.video),
+        statmux = plant.statmux.is_some(),
+        device = plant.device.is_some(),
+    );
+    let _run = run.enter();
+    tb_telemetry::wide!("server.start").emit();
     let mode = match offline {
         Some(s) => runtime::Mode::Offline {
             duration: Duration::from_secs_f64(s),
@@ -70,5 +90,9 @@ fn real_main() -> anyhow::Result<()> {
             duration: duration.map(Duration::from_secs_f64),
         },
     };
-    runtime::run(plant, mode)
+    let r = runtime::run(plant, mode, &tel);
+    if let Err(e) = &r {
+        run.error(format!("{e:#}"));
+    }
+    r
 }

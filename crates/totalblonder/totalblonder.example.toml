@@ -33,6 +33,21 @@ gpu = 0
 [control]
 bind = "127.0.0.1:8090"
 
+[telemetry]                   # OpenTelemetry over OTLP/HTTP (protobuf); docs/SERVER.md "Telemetry"
+# logs = "https://monitoring.example:9428/insert/opentelemetry/v1/logs"   # log lines and wide events
+# metrics = "https://monitoring.example:9428/opentelemetry/v1/metrics"    # every /api/metrics series
+log_level = "info"            # least severe log line exported: trace | debug | info | warn | error
+metrics_interval_s = 10       # how often metrics are pushed
+# summary_interval_s = 10     # a wide event per carrier, service, input and the process; 0: never
+                              # (default: 10 when logs are exported, else never)
+timeout_s = 5                 # per export request
+service_name = "totalblonder" # service.name
+# instance = "nixark"         # service.instance.id and host.name (default: the host's name)
+[telemetry.resource]          # more resource attributes on everything exported
+# "deployment.environment.name" = "production"
+[telemetry.headers]           # more HTTP headers on every export request
+# Authorization = "Basic …"
+
 [overload]                    # step a program down its ladder under sustained overload (SPEC §12.1)
 enabled = true
 window_s = 10                 # pictures given up are counted over this window

@@ -17,6 +17,7 @@
 //! | [`live`] | A live input's decoder thread: sandboxed decoder, mapper, to the program |
 //! | [`control`] | Health, Prometheus metrics and state over HTTP |
 //! | [`runtime`] | Threads, queues and clocks from a plant, real-time or offline |
+//! | [`telemetry`] | Metrics over OpenTelemetry, interval summaries, process statistics |
 #![forbid(unsafe_code)]
 
 pub mod audio;
@@ -33,5 +34,6 @@ pub mod schedule;
 pub mod slate;
 pub mod source;
 pub mod tables;
+pub mod telemetry;
 pub mod time;
 pub mod video;
