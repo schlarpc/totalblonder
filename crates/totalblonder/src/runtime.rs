@@ -871,12 +871,7 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
                 );
             }
             if let Some(d) = plant.device.clone() {
-                let g = crate::device::DeviceGauges {
-                    reachable: reg.gauge("device_reachable", vec![]),
-                    uptime: reg.gauge("device_uptime_seconds", vec![]),
-                    drift: reg.gauge("device_drift_items", vec![]),
-                    alarms: reg.gauge("device_alarms_total", vec![]),
-                };
+                let g = crate::device::DeviceGauges::register(&mut reg, &d.desired);
                 match read_credentials(&d.credentials_file) {
                     Ok(creds) => {
                         let clock = RealClock::new(epoch, stop.clone());

@@ -65,6 +65,7 @@ impl Sim {
             DesiredState {
                 rf: live_plan(),
                 streams,
+                programs: Default::default(),
             },
             Duration::ZERO,
         );
@@ -509,6 +510,7 @@ fn a_stray_statusedit_observation_does_not_start_polling_it() {
     let desired = DesiredState {
         rf: live_plan(),
         streams: StreamTable::empty(),
+        programs: Default::default(),
     };
     let mut sup = Supervisor::new(SupervisorConfig::default(), desired, Duration::ZERO);
     assert_eq!(sup.tick(Duration::ZERO).len(), 9);
@@ -516,4 +518,164 @@ fn a_stray_statusedit_observation_does_not_start_polling_it() {
     sup.on_event(secs(1), ClientEvent::Observed(Box::new(o)));
     let later = sup.tick(secs(10_000));
     assert!(!later.contains(&Action::Job(Job::Read(ReadPage::StatusEdit))));
+}
+
+mod live_pages {
+    //! Pages captured from the live box on 2026-11-27, slot 1 carrying two slates.
+    use super::*;
+    use tb_eqam::ReadPage;
+    use tb_eqam::client::{ClientEvent, Observation};
+    use tb_eqam::pages::streaminfo::{DetectedEs, DetectedProgram};
+    use tb_eqam::supervisor::Supervisor;
+
+    const STREAM_INFO: &[u8] = include_bytes!("fixtures/streaminfo.cgi_stream1.html");
+    const DIAGNOSTIC: &[u8] = include_bytes!("fixtures/diagnostic.cgi_stream1.html");
+    const DEBUG: &[u8] = include_bytes!("fixtures/debug.cgi_stream1.html");
+
+    /// Program `n` as the server lays it out (SPEC §7.1), audio at `audio`.
+    fn program(n: u16, audio: u16) -> DetectedProgram {
+        let base = 0x30 + 0x10 * (n - 1);
+        DetectedProgram {
+            pmt_pid: base,
+            program_number: n,
+            streams: vec![
+                DetectedEs {
+                    pid: audio,
+                    kind: "AC3 Audio".into(),
+                },
+                DetectedEs {
+                    pid: base + 1,
+                    kind: "MPEG-2 Video".into(),
+                },
+            ],
+        }
+    }
+
+    fn sup(programs: Vec<DetectedProgram>) -> Supervisor {
+        let desired = DesiredState {
+            rf: live_plan(),
+            streams: one_stream(),
+            programs: [(Slot::new(1).unwrap(), programs)].into(),
+        };
+        Supervisor::new(SupervisorConfig::default(), desired, Duration::ZERO)
+    }
+
+    fn feed(s: &mut Supervisor, at: u64, page: ReadPage, body: &[u8]) -> Vec<Action> {
+        let o = Observation::parse(page, body).unwrap();
+        s.on_event(secs(at), ClientEvent::Observed(Box::new(o)))
+    }
+
+    fn alarms(actions: &[Action]) -> Vec<&Alarm> {
+        actions
+            .iter()
+            .filter_map(|a| match a {
+                Action::Alarm(al) => Some(al),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn stream_info_matching_the_lineup_raises_nothing() {
+        // Listed in the opposite order to the page: the comparison does not care.
+        let mut s = sup(vec![program(2, 0x44), program(1, 0x34)]);
+        let out = feed(&mut s, 1, ReadPage::StreamInfo, STREAM_INFO);
+        assert!(alarms(&out).is_empty(), "{out:?}");
+    }
+
+    #[test]
+    fn stream_info_mismatch_is_raised_once_and_cleared() {
+        let slot = Slot::new(1).unwrap();
+        // The configuration expects a second audio track the box does not see.
+        let mut extra = program(2, 0x44);
+        extra.streams.push(DetectedEs {
+            pid: 0x45,
+            kind: "AC3 Audio".into(),
+        });
+        let mut s = sup(vec![program(1, 0x34), extra]);
+        let out = feed(&mut s, 1, ReadPage::StreamInfo, STREAM_INFO);
+        match alarms(&out).as_slice() {
+            [
+                Alarm::ProgramsMismatch {
+                    slot: sl,
+                    expected,
+                    detected,
+                },
+            ] => {
+                assert_eq!(*sl, slot);
+                assert_eq!(expected[1].streams.len(), 3);
+                assert_eq!(detected[1].streams.len(), 2);
+            }
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(s.metrics().alarms_active, 1);
+        assert!(alarms(&feed(&mut s, 400, ReadPage::StreamInfo, STREAM_INFO)).is_empty());
+        let fixed = DesiredState {
+            rf: live_plan(),
+            streams: one_stream(),
+            programs: [(slot, vec![program(1, 0x34), program(2, 0x44)])].into(),
+        };
+        s.set_desired(fixed, secs(500));
+        let out = feed(&mut s, 501, ReadPage::StreamInfo, STREAM_INFO);
+        assert!(out.contains(&Action::Clear(AlarmKey::ProgramsMismatch(slot))));
+        assert_eq!(s.metrics().alarms_active, 0);
+    }
+
+    #[test]
+    fn ts_sync_errors_alarm_when_they_rise() {
+        let slot = Slot::new(1).unwrap();
+        let mut s = sup(vec![]);
+        assert!(alarms(&feed(&mut s, 1, ReadPage::Diagnostic, DIAGNOSTIC)).is_empty());
+        assert_eq!(s.metrics().ts_sync_errors[0], Some(0));
+        let worse =
+            String::from_utf8_lossy(DIAGNOSTIC).replace("#C0C0C0\">0</td>", "#C0C0C0\">7</td>");
+        let out = feed(&mut s, 300, ReadPage::Diagnostic, worse.as_bytes());
+        assert_eq!(
+            alarms(&out),
+            [&Alarm::TsSyncErrors {
+                slot,
+                count: 7,
+                previous: 0
+            }]
+        );
+        // Unchanged: nothing more.
+        assert!(alarms(&feed(&mut s, 600, ReadPage::Diagnostic, worse.as_bytes())).is_empty());
+    }
+
+    #[test]
+    fn oversubscription_text_raises_and_clears() {
+        let slot = Slot::new(1).unwrap();
+        let mut s = sup(vec![]);
+        let over = String::from_utf8_lossy(DIAGNOSTIC)
+            .replace("bgcolor=\"#COCOCO\"></td>", "bgcolor=\"#FF0000\">Yes</td>");
+        let out = feed(&mut s, 1, ReadPage::Diagnostic, over.as_bytes());
+        assert_eq!(alarms(&out), [&Alarm::Oversubscribed(slot, "Yes".into())]);
+        let out = feed(&mut s, 300, ReadPage::Diagnostic, DIAGNOSTIC);
+        assert!(out.contains(&Action::Clear(AlarmKey::Oversubscribed(slot))));
+    }
+
+    #[test]
+    fn debug_counters_reach_the_samples() {
+        let mut s = sup(vec![]);
+        feed(&mut s, 1, ReadPage::Debug, DEBUG);
+        let m = s.metrics();
+        assert_eq!(m.timestamp_errors[0], Some(83));
+        assert_eq!(m.overflow_total[0], Some(0));
+        let samples = m.samples(&Default::default());
+        let get = |name: &str, carrier: &str| {
+            samples
+                .iter()
+                .find(|x| x.name == name && x.labels == [("carrier", carrier.to_owned())])
+                .map(|x| x.value)
+        };
+        assert_eq!(get("device_timestamp_errors_total", "1"), Some(83.0));
+        assert_eq!(get("device_timestamp_errors_total", "9"), Some(0.0));
+        assert_eq!(
+            samples
+                .iter()
+                .filter(|x| x.name == "device_refused_total")
+                .count(),
+            9
+        );
+    }
 }

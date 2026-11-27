@@ -92,7 +92,8 @@ Measured: `docs/SERVER.md` §7.
 | Item | State |
 |---|---|
 | `tb-eqam` | Typed client of the web forms: refusal screen enforced by types, parsers for every page, whole-form writes with read-back, four-module RF saves, supervisor with drift, write limits, reboot and defect-D bookkeeping |
-| Live check | Every page of the live box parsed (2026-11-26); the supervisor run in report mode: drift and the boot alarm reported, nothing written |
+| Live check | Every page of the live box parsed (2026-11-26); the supervisor run in report mode: drift and the boot alarm reported, nothing written. With slot 1 in use (2026-11-27), Stream Info, Diagnostics and Debug pages saved as fixtures; slot 1 confirmed as FPGA2A stream 1 |
+| Monitoring | Stream Info compared with each carrier's lineup (alarm per slot); Diagnostics oversubscription and TS sync errors alarmed; every device metric exported, including per-carrier timestamp and TS sync errors and the number of active alarms |
 | RF probe (`tb-probe`) | HDHomeRun replies parsed and judged; the adapter waits for the hardware |
 
 ## 2. Not built

@@ -911,6 +911,7 @@ fn device_plan(d: &DeviceFile, carriers: &[CarrierPlan]) -> Result<DevicePlan, C
     )
     .map_err(|e| bad("rf plan", &e))?;
     let mut streams = StreamTable::empty();
+    let mut programs = std::collections::BTreeMap::new();
     for c in carriers {
         let (proto, a) = match &c.destination {
             Destination::Udp(a) => (Proto::Udp, a),
@@ -925,6 +926,7 @@ fn device_plan(d: &DeviceFile, carriers: &[CarrierPlan]) -> Result<DevicePlan, C
         streams = streams
             .with(slot, SlotConfig::Assigned { url, name })
             .map_err(|e| bad("streams", &e))?;
+        programs.insert(slot, stream_info_programs(&c.lineup));
     }
     Ok(DevicePlan {
         base_url: d.base_url.clone(),
@@ -937,8 +939,40 @@ fn device_plan(d: &DeviceFile, carriers: &[CarrierPlan]) -> Result<DevicePlan, C
                 .map(|h| std::time::Duration::from_secs(h * 3600)),
             ..SupervisorConfig::default()
         },
-        desired: DesiredState { rf, streams },
+        desired: DesiredState {
+            rf,
+            streams,
+            programs,
+        },
     })
+}
+
+/// A carrier's programs as the modulator's Stream Info page should list them.
+fn stream_info_programs(lineup: &Carrier) -> Vec<tb_eqam::pages::streaminfo::DetectedProgram> {
+    use tb_eqam::pages::streaminfo::{DetectedEs, DetectedProgram};
+    lineup
+        .programs()
+        .iter()
+        .map(|p| {
+            let video = match p.video.codec {
+                VideoCodec::Mpeg2 => "MPEG-2 Video",
+                VideoCodec::H264 { .. } => "AVC/H.264 Video",
+            };
+            let mut streams = vec![DetectedEs {
+                pid: p.video.pid.pid().get(),
+                kind: video.into(),
+            }];
+            streams.extend(p.audio.iter().map(|a| DetectedEs {
+                pid: a.pid.pid().get(),
+                kind: "AC3 Audio".into(),
+            }));
+            DetectedProgram {
+                pmt_pid: p.pmt_pid.pid().get(),
+                program_number: p.number.get(),
+                streams,
+            }
+        })
+        .collect()
 }
 
 /// A/52 Table 5.18 rates, kbit/s, by `frmsizecod / 2`.
@@ -1435,7 +1469,7 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     pub(crate) const EXAMPLE: &str = include_str!("../totalblonder.example.toml");

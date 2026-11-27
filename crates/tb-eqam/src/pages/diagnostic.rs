@@ -5,8 +5,11 @@
 //! `diagnostic.cgi` are `%d` (index), `%d.%d.%d.%d` (address), an empty cell colored
 //! `#00FF00` / `#FF0000`, a Ping button cell, a result cell (`Passed`, `Failed`, `-` or
 //! `%d / 4`), and further cells whose order could not be fixed from the strings alone. The
-//! parser therefore keeps every row's cell texts and reads the typed fields by the column
-//! order of the header; this is listed for a live check once an input is configured.
+//! parser keeps every row's cell texts and reads the typed fields by the column order of the
+//! header. A live page with slot 1 in use (2026-11-27,
+//! `tests/fixtures/diagnostic.cgi_stream1.html`) confirmed that order: the Oversubscription
+//! cell is empty (colored `#COCOCO`, the firmware's typo) and TS Sync Errors reads `0`. How
+//! the page shows an oversubscribed input has not been seen.
 
 use crate::html::{Document, row_cells};
 use crate::pages::status::InputState;
@@ -25,6 +28,9 @@ pub struct DiagnosticRow {
     pub ping: String,
     /// The Oversubscription column, verbatim.
     pub oversubscription: String,
+    /// Whether the Oversubscription cell reports a problem: any text other than `-`, or a red
+    /// cell. Inferred; the healthy cell is empty.
+    pub oversubscribed: bool,
     /// The TS Sync Errors column as a number, when it is one.
     pub ts_sync_errors: Option<u64>,
     /// Every cell's text, for anything the typed fields miss.
@@ -72,12 +78,19 @@ impl DiagnosticPage {
                 other => InputState::Unknown(other.unwrap_or_default()),
             };
             let at = |k: usize| texts.get(k).cloned().unwrap_or_default();
+            let oversubscription = at(5);
+            let red = cells
+                .get(5)
+                .and_then(|c| c.attr("bgcolor"))
+                .is_some_and(|c| c.trim_start_matches('#').eq_ignore_ascii_case("FF0000"));
+            let oversubscribed = red || !matches!(oversubscription.as_str(), "" | "-");
             rows.push(DiagnosticRow {
                 index,
                 stream: at(1),
                 input,
                 ping: at(4),
-                oversubscription: at(5),
+                oversubscription,
+                oversubscribed,
                 ts_sync_errors: texts.get(6).and_then(|t| t.parse().ok()),
                 cells: texts,
             });
@@ -97,6 +110,22 @@ mod tests {
             DiagnosticPage::parse(fixtures::DIAGNOSTIC).unwrap().rows,
             vec![]
         );
+    }
+
+    #[test]
+    fn golden_live_page_with_one_stream() {
+        let p = DiagnosticPage::parse(include_bytes!(
+            "../../tests/fixtures/diagnostic.cgi_stream1.html"
+        ))
+        .unwrap();
+        assert_eq!(p.rows.len(), 1);
+        let r = &p.rows[0];
+        assert_eq!((r.index, r.stream.as_str()), (1, "239.10.0.1"));
+        assert_eq!(r.input, InputState::Present);
+        assert_eq!(r.ping, "-");
+        assert_eq!(r.oversubscription, "");
+        assert!(!r.oversubscribed);
+        assert_eq!(r.ts_sync_errors, Some(0));
     }
 
     #[test]

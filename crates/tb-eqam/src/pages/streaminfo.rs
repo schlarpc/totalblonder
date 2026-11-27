@@ -147,6 +147,18 @@ impl StreamInfoPage {
     }
 }
 
+/// `programs` in a fixed order (by program number, streams by PID), so two listings compare
+/// equal whatever order the page or the configuration gives them in.
+pub fn normalized(programs: &[DetectedProgram]) -> Vec<DetectedProgram> {
+    let mut v = programs.to_vec();
+    for p in &mut v {
+        p.streams
+            .sort_by(|a, b| (a.pid, &a.kind).cmp(&(b.pid, &b.kind)));
+    }
+    v.sort_by_key(|p| (p.program_number, p.pmt_pid));
+    v
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,6 +172,42 @@ mod tests {
                 .streams,
             vec![]
         );
+    }
+
+    #[test]
+    fn golden_live_page_with_one_stream() {
+        // Captured 2026-11-27 with carrier 1 (two slates) on slot 1.
+        let p = StreamInfoPage::parse(include_bytes!(
+            "../../tests/fixtures/streaminfo.cgi_stream1.html"
+        ))
+        .unwrap();
+        assert_eq!(p.streams.len(), 1);
+        let s = &p.streams[0];
+        assert_eq!(s.index, 1);
+        assert_eq!(s.url, Some("UDP://239.10.0.1:5000".parse().unwrap()));
+        let es = |pid, kind: &str| DetectedEs {
+            pid,
+            kind: kind.into(),
+        };
+        assert_eq!(
+            s.programs,
+            vec![
+                DetectedProgram {
+                    pmt_pid: 48,
+                    program_number: 1,
+                    streams: vec![es(49, "MPEG-2 Video"), es(52, "AC3 Audio")],
+                },
+                DetectedProgram {
+                    pmt_pid: 64,
+                    program_number: 2,
+                    streams: vec![es(65, "MPEG-2 Video"), es(68, "AC3 Audio")],
+                },
+            ]
+        );
+        let mut reversed = s.programs.clone();
+        reversed.reverse();
+        reversed[0].streams.reverse();
+        assert_eq!(normalized(&reversed), s.programs);
     }
 
     #[test]

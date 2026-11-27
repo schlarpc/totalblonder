@@ -4,6 +4,7 @@
 //!
 //! Mode `report` (the default) never writes; `apply` must be configured explicitly.
 
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::{Duration, Instant};
@@ -11,10 +12,11 @@ use std::time::{Duration, Instant};
 use tb_eqam::client::{ClientConfig, Next};
 use tb_eqam::controller::Controller;
 use tb_eqam::plan::DesiredState;
-use tb_eqam::supervisor::{Action, SupervisorConfig};
+use tb_eqam::supervisor::{Action, DeviceMetrics, Sample, SupervisorConfig};
 use tb_eqam::types::Credentials;
 use tb_eqam::{Method, Request, Response, TransportFailure};
 
+use crate::control::Registry;
 use crate::metrics::Gauge;
 use crate::time::Clock;
 
@@ -109,17 +111,59 @@ impl Http {
     }
 }
 
-/// The device metrics for the control API.
+/// Key of one device series: name and labels.
+type SeriesKey = (&'static str, Vec<(&'static str, String)>);
+
+/// The device metrics for the control API: every series [`tb_eqam::supervisor::DeviceMetrics`]
+/// can report for the configured slots, registered at start, plus the alarm count.
 #[derive(Debug, Clone, Default)]
 pub struct DeviceGauges {
-    /// `device_reachable`.
-    pub reachable: Gauge,
-    /// `device_uptime_seconds`.
-    pub uptime: Gauge,
-    /// `device_drift_items`.
-    pub drift: Gauge,
-    /// Alarms raised since start.
-    pub alarms: Gauge,
+    series: HashMap<SeriesKey, Gauge>,
+    /// `device_alarms_total`: alarms raised since start.
+    alarms: Gauge,
+}
+
+impl DeviceGauges {
+    /// Registers the series. Per-carrier series exist for the slots `desired` assigns.
+    pub fn register(reg: &mut Registry, desired: &DesiredState) -> Self {
+        let mut all = DeviceMetrics {
+            uptime_seconds: Some(0),
+            rf_locked: [Some(false); 4],
+            seconds_since_table_reset: Some(0),
+            temperature_tenths_f: Some(0),
+            ..DeviceMetrics::default()
+        };
+        for s in desired.streams.assigned() {
+            let i = s.index();
+            all.input_present[i] = Some(false);
+            all.bitrate_bps[i] = Some(0);
+            all.overflow_total[i] = Some(0);
+            all.timestamp_errors[i] = Some(0);
+            all.ts_sync_errors[i] = Some(0);
+        }
+        let series = all
+            .samples(&Default::default())
+            .into_iter()
+            .map(|x| {
+                let g = reg.gauge(x.name, x.labels.clone());
+                ((x.name, x.labels), g)
+            })
+            .collect();
+        DeviceGauges {
+            series,
+            alarms: reg.gauge("device_alarms_total", vec![]),
+        }
+    }
+
+    /// Copies the samples into the registered series; others are ignored.
+    fn set(&self, samples: Vec<Sample>) {
+        for x in samples {
+            if let Some(g) = self.series.get(&(x.name, x.labels)) {
+                // Every device value is a count, a flag or a positive reading.
+                g.set(x.value.max(0.0) as u64);
+            }
+        }
+    }
 }
 
 /// Runs the controller until the clock stops.
@@ -216,12 +260,55 @@ pub fn run(
             Next::WaitUntil(t) => Some(t.saturating_sub(now)),
             Next::Idle | Next::AwaitingResponse => Some(Duration::from_secs(1)),
         };
-        let m = ctl.supervisor().metrics();
-        gauges.reachable.set(u64::from(m.reachable));
-        gauges.uptime.set(m.uptime_seconds.unwrap_or(0));
-        gauges.drift.set(m.drift_items as u64);
+        gauges.set(ctl.supervisor().metrics().samples(ctl.client().refused()));
         if let Some(d) = wait {
             std::thread::sleep(d.min(Duration::from_millis(500)));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tb_eqam::types::Slot;
+
+    #[test]
+    fn example_plan_exports_every_device_series() {
+        let plant = crate::config::load(crate::config::tests::EXAMPLE).unwrap();
+        let d = plant.device.unwrap();
+        // The example's carrier 1 carries two programs: MPEG-2 video and one AC-3 track each.
+        let p = &d.desired.programs[&Slot::new(1).unwrap()];
+        assert_eq!(
+            p.iter()
+                .map(|p| (p.program_number, p.pmt_pid))
+                .collect::<Vec<_>>(),
+            [(1, 0x30), (2, 0x40)]
+        );
+        assert_eq!(p[0].streams[0].pid, 0x31);
+        assert_eq!(p[0].streams[0].kind, "MPEG-2 Video");
+        let mut reg = Registry::default();
+        let g = DeviceGauges::register(&mut reg, &d.desired);
+        let mut m = DeviceMetrics {
+            reachable: true,
+            temperature_tenths_f: Some(804),
+            ..DeviceMetrics::default()
+        };
+        m.timestamp_errors[0] = Some(83);
+        m.timestamp_errors[15] = Some(5); // slot 16 is not configured: not exported
+        g.set(m.samples(&Default::default()));
+        let text = reg.prometheus();
+        for line in [
+            "device_reachable 1",
+            "device_timestamp_errors_total{carrier=\"1\"} 83",
+            "device_ts_sync_errors_total{carrier=\"1\"} 0",
+            "device_rf_locked{module=\"4\"} 0",
+            "device_refused_total{rule=\"admin_page\"} 0",
+            "device_temperature_decifahrenheit 804",
+            "device_alarms_active 0",
+            "device_alarms_total 0",
+        ] {
+            assert!(text.lines().any(|l| l == line), "{line} missing:\n{text}");
+        }
+        assert!(!text.contains("carrier=\"16\""));
     }
 }

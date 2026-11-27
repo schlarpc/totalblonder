@@ -1131,7 +1131,7 @@ over OTLP/HTTP **[built]** (SERVER.md §6 "Telemetry").
 | Statmux | `rate_cap_bps{carrier,program}`; `delivery_rate_bps{carrier,program}`; `complexity{carrier,program}`; `avg_qp{carrier,program}`; `rate_changes_total`; `pool_unallocated_bps{carrier}` |
 | Audio | `loudness_lkfs{carrier,program,track}`; `gain_db{…}`; `silence_frames_total{…}` |
 | Clock | `clock_frequency_error_ppm`; `clock_synchronized`; `stt_utc_error_seconds` |
-| Device | `device_reachable`; `device_uptime_seconds`; `device_drift_items`; `device_writes_total{form}`; `device_refused_total{rule}`; `device_input_present{carrier}`; `device_bitrate_bps{carrier}`; `device_overflow_total{carrier}`; `device_rf_locked{module}`; `device_seconds_since_table_reset` |
+| Device | `device_reachable`; `device_uptime_seconds`; `device_drift_items`; `device_writes_total{form}`; `device_refused_total{rule}`; `device_input_present{carrier}`; `device_bitrate_bps{carrier}`; `device_overflow_total{carrier}`; `device_timestamp_errors_total{carrier}`; `device_ts_sync_errors_total{carrier}`; `device_rf_locked{module}`; `device_seconds_since_table_reset`; `device_temperature_decifahrenheit`; `device_alarms_active`; `device_alarms_total` |
 | Probe | `probe_reachable`; `probe_lock{carrier}`; `probe_ss{carrier}`; `probe_snq{carrier}`; `probe_seq{carrier}`; `probe_lineup_match{carrier}`; `probe_cc_errors_total{carrier}`; `probe_last_scan_age_seconds{carrier}` |
 | Process | CPU seconds per thread class; RSS; uptime |
 

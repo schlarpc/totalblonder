@@ -71,6 +71,19 @@ pub enum RefusalRule {
 }
 
 impl RefusalRule {
+    /// Every rule.
+    pub const ALL: [RefusalRule; 9] = [
+        RefusalRule::AdminPage,
+        RefusalRule::ButtonInQuery,
+        RefusalRule::Logout,
+        RefusalRule::ConfigPage,
+        RefusalRule::ModeWrite,
+        RefusalRule::ForbiddenWrite,
+        RefusalRule::WriteOutsideProtocol,
+        RefusalRule::NotAllowListed,
+        RefusalRule::Malformed,
+    ];
+
     /// The label used in `device_refused_total{rule}`.
     pub fn as_str(self) -> &'static str {
         match self {

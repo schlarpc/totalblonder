@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::pages::streaminfo::DetectedProgram;
 use crate::types::{
     Channel, FirstChannel, OutputLevel, QamMap, QamMode, RfModule, Slot, StreamName, StreamUrl,
 };
@@ -198,13 +199,17 @@ impl StreamTable {
 }
 
 /// What the supervisor keeps the device at (SPEC §10.2): MPTS mode (checked, never written),
-/// the RF plan, and one URL and name per slot.
+/// the RF plan, and one URL and name per slot. It also holds what `streaminfo.cgi` should
+/// detect in each stream; that is only compared, never written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DesiredState {
     /// RF plan.
     pub rf: RfPlan,
     /// Stream table.
     pub streams: StreamTable,
+    /// The programs each slot's stream carries, as Stream Info shows them. Slots left out
+    /// are not compared.
+    pub programs: BTreeMap<Slot, Vec<DetectedProgram>>,
 }
 
 #[cfg(test)]

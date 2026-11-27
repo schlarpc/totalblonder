@@ -9,9 +9,11 @@ use std::time::Duration;
 use crate::client::{ClientEvent, Job, Observation, ReadError};
 use crate::pages::ParseError;
 use crate::pages::debug::{DebugPage, InputFpga, StreamCounter};
+use crate::pages::diagnostic::DiagnosticPage;
 use crate::pages::eventlog::{EventAlarm, EventLine};
 use crate::pages::qamconfig::LockState;
 use crate::pages::status::{InputState, ModuleState, StatusPage};
+use crate::pages::streaminfo::{DetectedProgram, StreamInfoPage, normalized};
 use crate::plan::DesiredState;
 use crate::request::ReadPage;
 use crate::session::SessionEvent;
@@ -120,6 +122,27 @@ pub enum Alarm {
         /// Time since the reset.
         since_reset: Duration,
     },
+    /// Stream Info shows programs or elementary streams in a slot's stream that differ from
+    /// what the server sends there.
+    ProgramsMismatch {
+        /// The slot.
+        slot: Slot,
+        /// What the configuration says the stream carries.
+        expected: Vec<DetectedProgram>,
+        /// What the box detects.
+        detected: Vec<DetectedProgram>,
+    },
+    /// The Diagnostics page reports an input as oversubscribed (its cell text, verbatim).
+    Oversubscribed(Slot, String),
+    /// A slot's TS Sync Errors count went up since the last poll.
+    TsSyncErrors {
+        /// The slot.
+        slot: Slot,
+        /// The count read.
+        count: u64,
+        /// The count at the poll before.
+        previous: u64,
+    },
     /// The login was refused (wrong credentials).
     LoginRejected,
     /// Another Administrator holds the session; the supervisor waits.
@@ -141,6 +164,10 @@ pub enum AlarmKey {
     ModuleNotLocked(RfModule),
     /// [`Alarm::DefectDLimit`].
     DefectD,
+    /// [`Alarm::ProgramsMismatch`].
+    ProgramsMismatch(Slot),
+    /// [`Alarm::Oversubscribed`].
+    Oversubscribed(Slot),
 }
 
 /// Something the supervisor wants done or known.
@@ -176,15 +203,33 @@ pub struct DeviceMetrics {
     pub input_present: [Option<bool>; 16],
     /// `device_bitrate_bps{carrier}` (average).
     pub bitrate_bps: [Option<u64>; 16],
-    /// `device_overflow_total{carrier}` from debug.cgi's Buffer Overflow Errors, mapping slot
-    /// n to FPGA2A stream n (1–8) and FPGA2B stream n−8 (9–16) — an inference to check live.
+    /// `device_overflow_total{carrier}` from debug.cgi's Buffer Overflow Errors, by
+    /// [`slot_fpga`].
     pub overflow_total: [Option<u64>; 16],
+    /// `device_timestamp_errors_total{carrier}` from debug.cgi's Timestamp Error Count, by
+    /// [`slot_fpga`].
+    pub timestamp_errors: [Option<u64>; 16],
+    /// `device_ts_sync_errors_total{carrier}` from the Diagnostics page.
+    pub ts_sync_errors: [Option<u64>; 16],
     /// `device_rf_locked{module}`.
     pub rf_locked: [Option<bool>; 4],
     /// `device_seconds_since_table_reset`.
     pub seconds_since_table_reset: Option<u64>,
-    /// Chassis temperature in tenths of °F (not in the SPEC list; free to export).
+    /// `device_temperature_decifahrenheit`: chassis temperature in tenths of °F.
     pub temperature_tenths_f: Option<i32>,
+    /// `device_alarms_active`: persistent alarms raised and not yet cleared.
+    pub alarms_active: usize,
+}
+
+/// Where debug.cgi counts `slot`: FPGA2A serves slots 1–8 as its streams 1–8, FPGA2B slots
+/// 9–16 as its streams 1–8. Checked live for slot 1 only (2026-11-27: FPGA2A IP register 0
+/// and MPTS stream 1 carried slot 1's stream); the FPGA2B half is still an inference.
+pub fn slot_fpga(slot: Slot) -> (InputFpga, u8) {
+    if slot.get() <= 8 {
+        (InputFpga::A, slot.get())
+    } else {
+        (InputFpga::B, slot.get() - 8)
+    }
 }
 
 /// One metric sample: name, labels, value.
@@ -226,11 +271,12 @@ impl DeviceMetrics {
                 v as f64,
             );
         }
-        for (rule, n) in refused {
+        for rule in crate::refusal::RefusalRule::ALL {
+            let n = refused.get(&rule).copied().unwrap_or(0);
             push(
                 "device_refused_total",
                 vec![("rule", rule.as_str().to_owned())],
-                *n as f64,
+                n as f64,
             );
         }
         for s in Slot::all() {
@@ -242,7 +288,13 @@ impl DeviceMetrics {
                 push("device_bitrate_bps", c.clone(), b as f64);
             }
             if let Some(o) = self.overflow_total[s.index()] {
-                push("device_overflow_total", c, o as f64);
+                push("device_overflow_total", c.clone(), o as f64);
+            }
+            if let Some(n) = self.timestamp_errors[s.index()] {
+                push("device_timestamp_errors_total", c.clone(), n as f64);
+            }
+            if let Some(n) = self.ts_sync_errors[s.index()] {
+                push("device_ts_sync_errors_total", c, n as f64);
             }
         }
         for m in RfModule::all() {
@@ -257,6 +309,10 @@ impl DeviceMetrics {
         if let Some(s) = self.seconds_since_table_reset {
             push("device_seconds_since_table_reset", vec![], s as f64);
         }
+        if let Some(t) = self.temperature_tenths_f {
+            push("device_temperature_decifahrenheit", vec![], f64::from(t));
+        }
+        push("device_alarms_active", vec![], self.alarms_active as f64);
         out
     }
 }
@@ -398,6 +454,7 @@ impl Supervisor {
 
     fn raise(&mut self, key: AlarmKey, alarm: Alarm) -> Option<Action> {
         if self.active.insert(key) {
+            self.metrics.alarms_active = self.active.len();
             Some(Action::Alarm(alarm))
         } else {
             None
@@ -406,6 +463,7 @@ impl Supervisor {
 
     fn clear(&mut self, key: AlarmKey) -> Option<Action> {
         if self.active.remove(&key) {
+            self.metrics.alarms_active = self.active.len();
             Some(Action::Clear(key))
         } else {
             None
@@ -672,9 +730,9 @@ impl Supervisor {
                     self.seen_log.insert(line);
                 }
             }
-            Observation::StatusEdit(_)
-            | Observation::StreamInfo(_)
-            | Observation::Diagnostic(_) => {}
+            Observation::StreamInfo(p) => self.on_stream_info(&p, out),
+            Observation::Diagnostic(p) => self.on_diagnostic(&p, out),
+            Observation::StatusEdit(_) => {}
         }
     }
 
@@ -722,13 +780,70 @@ impl Supervisor {
 
     fn on_debug(&mut self, p: &DebugPage) {
         for s in Slot::all() {
-            let (fpga, n) = if s.get() <= 8 {
-                (InputFpga::A, s.get())
-            } else {
-                (InputFpga::B, s.get() - 8)
-            };
+            let (fpga, n) = slot_fpga(s);
             self.metrics.overflow_total[s.index()] =
                 p.stream_counter(StreamCounter::BufferOverflow, fpga, n);
+            self.metrics.timestamp_errors[s.index()] = p.timestamp_errors(fpga, n);
+        }
+    }
+
+    /// Compare what the box detects in each stream with what the server sends. A stream the
+    /// page does not list is not compared: its input is absent, which the status page shows.
+    fn on_stream_info(&mut self, p: &StreamInfoPage, out: &mut Vec<Action>) {
+        let expected: Vec<(Slot, Vec<DetectedProgram>)> = self
+            .desired
+            .programs
+            .iter()
+            .map(|(s, v)| (*s, normalized(v)))
+            .collect();
+        for (slot, want) in expected {
+            let crate::plan::SlotConfig::Assigned { url, .. } = self.desired.streams.get(slot)
+            else {
+                continue;
+            };
+            let Some(seen) = p.streams.iter().find(|d| d.url.as_ref() == Some(url)) else {
+                continue;
+            };
+            let got = normalized(&seen.programs);
+            if got == want {
+                out.extend(self.clear(AlarmKey::ProgramsMismatch(slot)));
+            } else {
+                out.extend(self.raise(
+                    AlarmKey::ProgramsMismatch(slot),
+                    Alarm::ProgramsMismatch {
+                        slot,
+                        expected: want,
+                        detected: got,
+                    },
+                ));
+            }
+        }
+    }
+
+    fn on_diagnostic(&mut self, p: &DiagnosticPage, out: &mut Vec<Action>) {
+        for row in &p.rows {
+            let Ok(slot) = Slot::new(row.index) else {
+                continue;
+            };
+            let i = slot.index();
+            if let (Some(now), Some(before)) = (row.ts_sync_errors, self.metrics.ts_sync_errors[i])
+                && now > before
+            {
+                out.push(Action::Alarm(Alarm::TsSyncErrors {
+                    slot,
+                    count: now,
+                    previous: before,
+                }));
+            }
+            self.metrics.ts_sync_errors[i] = row.ts_sync_errors;
+            if row.oversubscribed {
+                out.extend(self.raise(
+                    AlarmKey::Oversubscribed(slot),
+                    Alarm::Oversubscribed(slot, row.oversubscription.clone()),
+                ));
+            } else {
+                out.extend(self.clear(AlarmKey::Oversubscribed(slot)));
+            }
         }
     }
 

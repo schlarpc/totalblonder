@@ -295,4 +295,42 @@ mod tests {
             Some("00000000")
         );
     }
+
+    #[test]
+    fn golden_live_page_with_slot_1_in_use() {
+        // Captured 2026-11-27 with slot 1 = UDP://239.10.0.1:5000 arriving on GIGE1. Slot 1
+        // shows up as FPGA2A's register 0 and MPTS stream 1 and nowhere else: the evidence for
+        // the slot-to-FPGA mapping in the supervisor.
+        let p = DebugPage::parse(include_bytes!(
+            "../../tests/fixtures/debug.cgi_stream1.html"
+        ))
+        .unwrap();
+        assert_eq!(
+            p.value("Registers", "FPGA2A IP Register 0"),
+            Some("239.10.0.1")
+        );
+        assert_eq!(
+            p.value("Registers", "FPGA2A RTP Flag & Port Register 0"),
+            Some("00001388")
+        );
+        assert_eq!(
+            p.mpts_bitrate(InputFpga::A, 1),
+            Some((Bitrate(2_906_503), Bitrate(4_120_960)))
+        );
+        assert_eq!(p.timestamp_errors(InputFpga::A, 1), Some(83));
+        for n in 2..=9 {
+            assert_eq!(
+                p.mpts_bitrate(InputFpga::A, n),
+                Some((Bitrate(0), Bitrate(0)))
+            );
+            // The timestamp section lists 8 streams per FPGA, the bitrate sections 9.
+            assert_eq!(p.timestamp_errors(InputFpga::A, n), (n <= 8).then_some(0));
+        }
+        for n in 1..=32 {
+            assert_eq!(
+                p.stream_counter(StreamCounter::BufferOverflow, InputFpga::A, n),
+                Some(0)
+            );
+        }
+    }
 }
