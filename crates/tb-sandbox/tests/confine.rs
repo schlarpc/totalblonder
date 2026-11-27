@@ -260,3 +260,18 @@ fn bad_policies_are_refused() {
     let (_, w) = rustix::pipe::pipe_with(rustix::pipe::PipeFlags::CLOEXEC).unwrap();
     assert!(tb_sandbox::spawn(&tb_sandbox::Command::new("relative"), w, &policy()).is_err());
 }
+
+/// A parent with more descriptors open than the child's RLIMIT_NOFILE (a server some time into
+/// its run, with its GPU, sockets and other workers) still starts a child: the limit is set
+/// after the descriptors are moved into place and the rest closed.
+#[test]
+fn a_parent_with_many_descriptors_still_starts_a_child() {
+    let p = policy();
+    let held: Vec<std::fs::File> = (0..2 * p.rlimits.nofile)
+        .map(|_| std::fs::File::open("/dev/null").unwrap())
+        .collect();
+    let r = run(&p, &["exit=7"]);
+    assert_eq!(r.exit.setup_failed, None, "{}", r.child.confinement());
+    assert_eq!(r.exit.status, ExitStatus::Exited(7));
+    drop(held);
+}

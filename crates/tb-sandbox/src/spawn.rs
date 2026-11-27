@@ -798,6 +798,12 @@ fn report(fd: RawFd, r: LayerReport) {
     let _ = rustix::io::write(fd, &r.encode());
 }
 
+/// The errno of the last failed libc call (no allocation: usable in the child).
+fn last_errno() -> Errno {
+    // SAFETY: __errno_location returns this thread's errno slot, always valid to read.
+    Errno::from_raw_os_error(unsafe { *libc::__errno_location() })
+}
+
 fn fail(status: RawFd, stage: Stage, e: Errno) -> ! {
     // SAFETY: as in `report`.
     let fd = unsafe { BorrowedFd::borrow_raw(status) };
@@ -934,16 +940,6 @@ fn child_main(p: &Plan, in_ns: bool) -> ! {
             );
         }
     }
-    for (res, lim) in &p.rlimits {
-        if let Err(e) = rustix::process::setrlimit(*res, *lim) {
-            report(
-                rep,
-                LayerReport::new(Layer::Rlimits, LayerState::Failed, e.raw_os_error(), 0),
-            );
-            fail(st, Stage::Rlimits, e);
-        }
-    }
-    report(rep, LayerReport::applied(Layer::Rlimits, 0));
     if let Err(e) = rustix::thread::set_no_new_privs(true) {
         report(
             rep,
@@ -963,7 +959,7 @@ fn child_main(p: &Plan, in_ns: bool) -> ! {
         // SAFETY: F_DUPFD_CLOEXEC on a descriptor of this process; no memory involved.
         let h = unsafe { libc::fcntl(src, libc::F_DUPFD_CLOEXEC, 10) };
         if h < 0 {
-            fail(st, Stage::Fds, Errno::BADF);
+            fail(st, Stage::Fds, last_errno());
         }
         if let Some(slot) = high.get_mut(i) {
             *slot = h;
@@ -973,7 +969,7 @@ fn child_main(p: &Plan, in_ns: bool) -> ! {
         // SAFETY: dup2 between descriptors of this process; the target is cleared of
         // close-on-exec, as it must survive execve.
         if unsafe { libc::dup2(*h, target as c_int) } < 0 {
-            fail(st, Stage::Fds, Errno::BADF);
+            fail(st, Stage::Fds, last_errno());
         }
     }
     // SAFETY: closes every descriptor above the six the program gets (the copies included).
@@ -985,6 +981,20 @@ fn child_main(p: &Plan, in_ns: bool) -> ! {
         fail(FD_STATUS, Stage::Fds, Errno::INVAL);
     }
     report(FD_REPORT, LayerReport::applied(Layer::CloseFds, 0));
+    // Resource limits after the descriptors: the child starts with every descriptor of the
+    // parent, and F_DUPFD above needs a free number below RLIMIT_NOFILE, which a parent with
+    // more open descriptors than the limit (a server some time into its run) would not have.
+    // A limit below descriptors already open is legal; here only 0..=5 are.
+    for (res, lim) in &p.rlimits {
+        if let Err(e) = rustix::process::setrlimit(*res, *lim) {
+            report(
+                FD_REPORT,
+                LayerReport::new(Layer::Rlimits, LayerState::Failed, e.raw_os_error(), 0),
+            );
+            fail(FD_STATUS, Stage::Rlimits, e);
+        }
+    }
+    report(FD_REPORT, LayerReport::applied(Layer::Rlimits, 0));
     // SAFETY: plain signal-state calls on a valid empty set; no handlers are installed.
     unsafe {
         libc::sigprocmask(
