@@ -1,5 +1,6 @@
-//! NVDEC through the `cuda` hwaccel in the sandboxed worker, on the machine with the card
-//! (nixark). Ignored by default; run with `--ignored`. The clip is made with the `ffmpeg`
+//! Hardware decoding in the sandboxed worker: NVDEC through the `cuda` hwaccel on the machine
+//! with the NVIDIA card (nixark), VA-API through the `vaapi` hwaccel on one with an AMD card
+//! (bagel). Ignored by default; run with `--ignored` and the test of the machine's card. The clip is made with the `ffmpeg`
 //! program when it is on PATH, else taken from `TB_GPU_CLIP` (an Annex B H.264 file with access
 //! unit delimiters, 320x240, made elsewhere with `tests/common` `h264`), with its reference
 //! decode in `TB_GPU_CLIP.yuv` (`ffmpeg -i clip -f rawvideo -pix_fmt yuv420p`).
@@ -21,6 +22,27 @@ fn nvdec_in_the_sandbox_matches_software() {
         std::path::Path::new("/dev/nvidia0").exists(),
         "no /dev/nvidia0 here"
     );
+    gpu_decode_matches_software();
+}
+
+#[test]
+#[ignore = "needs an AMD card, its DRM render node and Mesa's VA driver"]
+fn vaapi_in_the_sandbox_matches_software() {
+    assert!(
+        std::path::Path::new("/dev/dri/renderD128").exists(),
+        "no /dev/dri/renderD128 here"
+    );
+    // the worker prefers CUDA: this test is for a machine without it
+    assert!(
+        !std::path::Path::new("/dev/nvidia0").exists(),
+        "an NVIDIA card is here: the worker would use NVDEC"
+    );
+    gpu_decode_matches_software();
+}
+
+/// A clip decoded in the sandboxed worker on the machine's hardware decoder equals the
+/// software decode, picture for picture.
+fn gpu_decode_matches_software() {
     let (clip, want) = match std::env::var_os("TB_GPU_CLIP") {
         Some(p) => {
             let p = PathBuf::from(p);

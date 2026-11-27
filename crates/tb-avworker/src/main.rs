@@ -6,8 +6,8 @@
 //! 1. [`tb_sandbox::child::enter`]: the namespace's init splits off; death signal, not
 //!    dumpable, Landlock.
 //! 2. `Hello` on the control channel (fd 3); `Configure` comes back with the input ring's memfd.
-//! 3. libav is initialized: log level; with GPU decode, the CUDA device is opened (the driver's
-//!    libraries are loaded now, while files can still be opened).
+//! 3. libav is initialized: log level; with GPU decode, the hardware device is opened (CUDA,
+//!    else VA-API: the driver's libraries are loaded now, while files can still be opened).
 //! 4. The seccomp filter goes on ([`tb_sandbox::child::Entered::lock_down`]); the confinement
 //!    report is complete; `Ready`.
 //! 5. The loop: `Streams` opens a libavcodec decoder per stream (allow-listed codecs only);
@@ -18,9 +18,10 @@
 //!
 //! Linked: libavcodec, libavutil, libswscale, libswresample. No demuxers, no protocols, no
 //! device or filter libraries; the worker gets packets, nothing else. Software decode is the
-//! default; NVDEC through the `cuda` hwaccel when `Configure::gpu` says so and the device
-//! opened, with `av_hwframe_transfer_data` to host memory (NV12 or P010) before the copy into
-//! the slot.
+//! default; with `Configure::gpu`, NVDEC through the `cuda` hwaccel where an NVIDIA card is,
+//! else VA-API through the `vaapi` hwaccel (AMD: Mesa's radeonsi VA driver on the card's DRM
+//! render node), with `av_hwframe_transfer_data` to host memory (NV12 or P010) before the copy
+//! into the slot.
 //!
 //! # Output per stream (`StreamOpen::output`)
 //!
@@ -742,7 +743,7 @@ impl Worker {
             self.emit_converted(i, spec);
             return;
         }
-        let on_device = self.frame.pix() == av::Pix::Cuda;
+        let on_device = self.frame.pix() == av::Pix::Device;
         if on_device && self.frame.transfer_to(&mut self.sw).is_err() {
             self.stats.decode_errors += 1;
             return;
@@ -754,7 +755,7 @@ impl Worker {
             av::Pix::Yuv420p | av::Pix::Yuv422p => PixelFormat::Yuv420p,
             av::Pix::Nv12 => PixelFormat::Nv12,
             av::Pix::Yuv420p10 | av::Pix::P010 => PixelFormat::P010,
-            av::Pix::Cuda | av::Pix::Other(_) => {
+            av::Pix::Device | av::Pix::Other(_) => {
                 self.stats.unsupported_frames += 1;
                 let t = format!("unsupported pixel format {pix:?}");
                 self.error(1, &t);
@@ -965,7 +966,7 @@ impl Worker {
     /// pillarboxed with black, or stretched; bob deinterlacing (each field to the full height,
     /// two pictures) of pictures flagged interlaced when asked.
     fn emit_converted(&mut self, i: usize, spec: VideoSpec) {
-        let on_device = self.frame.pix() == av::Pix::Cuda;
+        let on_device = self.frame.pix() == av::Pix::Device;
         if on_device && self.frame.transfer_to(&mut self.sw).is_err() {
             self.stats.decode_errors += 1;
             return;
@@ -1347,7 +1348,7 @@ fn write_picture(
                 |r| f.row(2, r, 2 * n),
             );
         }
-        av::Pix::Cuda | av::Pix::Other(_) => return false,
+        av::Pix::Device | av::Pix::Other(_) => return false,
     }
     ok
 }
@@ -1434,15 +1435,25 @@ fn main() -> ExitCode {
     av::quiet();
     let hw = if cfg.gpu {
         // NVDEC's library is loaded by libavcodec when a decoder opens, which is after the
-        // system-call filter (no more opening of files): load it now
+        // system-call filter (no more opening of files): load it now (where there is none,
+        // nothing is loaded; VA-API's driver is loaded when its device opens, below)
         av::preload(&[
             c"/run/opengl-driver/lib/libnvcuvid.so.1",
             c"libnvcuvid.so.1",
         ]);
-        match av::HwDevice::cuda() {
-            Ok(d) => Some(d),
+        // CUDA first (an NVIDIA machine may have a VA-API driver too), then VA-API
+        match av::HwDevice::open(av::HwKind::Cuda)
+            .or_else(|_| av::HwDevice::open(av::HwKind::Vaapi))
+        {
+            Ok(d) => {
+                eprintln!("tb-avworker: hardware decoder {:?}", d.kind());
+                Some(d)
+            }
             Err(e) => {
-                eprintln!("tb-avworker: no CUDA device ({}): software decode", e.0);
+                eprintln!(
+                    "tb-avworker: no hardware decoder (CUDA nor VA-API; {}): software decode",
+                    e.0
+                );
                 None
             }
         }

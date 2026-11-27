@@ -1,5 +1,6 @@
 //! Thin owners of the libav objects the worker uses: decoder contexts, frames, packets,
-//! parsers, a CUDA device. Every `unsafe` block of the worker that touches libav is here.
+//! parsers, a hardware decoding device (CUDA or VAAPI). Every `unsafe` block of the worker that
+//! touches libav is here.
 
 use std::ffi::{CStr, c_int};
 use std::ptr;
@@ -58,19 +59,42 @@ impl Codec {
     }
 }
 
-/// A CUDA device context for the `cuda` hwaccel.
-pub struct HwDevice(*mut ffi::AVBufferRef);
+/// The hardware decoders the worker can use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HwKind {
+    /// NVDEC through the `cuda` hwaccel (NVIDIA).
+    Cuda,
+    /// VA-API through the `vaapi` hwaccel (AMD and Intel: Mesa's or Intel's VA driver on a DRM
+    /// render node).
+    Vaapi,
+}
+
+impl HwKind {
+    fn device_type(self) -> ffi::AVHWDeviceType {
+        match self {
+            Self::Cuda => ffi::AVHWDeviceType::CUDA,
+            Self::Vaapi => ffi::AVHWDeviceType::VAAPI,
+        }
+    }
+}
+
+/// A hardware device context for decoding.
+pub struct HwDevice {
+    buf: *mut ffi::AVBufferRef,
+    kind: HwKind,
+}
 
 impl HwDevice {
-    /// Opens the default CUDA device (loads the driver's libraries). Done before the
-    /// system-call filter is in place.
-    pub fn cuda() -> Result<Self, AvErr> {
+    /// Opens the default device of `kind`: loads the driver's libraries and, for VA-API, opens
+    /// the first DRM render node and initializes its VA driver. Done before the system-call
+    /// filter is in place.
+    pub fn open(kind: HwKind) -> Result<Self, AvErr> {
         let mut p: *mut ffi::AVBufferRef = ptr::null_mut();
         // SAFETY: `p` receives a new reference on success; no device name, no options.
         let r = unsafe {
             ffi::av_hwdevice_ctx_create(
                 &raw mut p,
-                ffi::AVHWDeviceType::CUDA,
+                kind.device_type(),
                 ptr::null(),
                 ptr::null_mut(),
                 0,
@@ -79,20 +103,25 @@ impl HwDevice {
         if r < 0 || p.is_null() {
             return Err(AvErr(r));
         }
-        Ok(Self(p))
+        Ok(Self { buf: p, kind })
+    }
+
+    /// Which decoder this is.
+    pub fn kind(&self) -> HwKind {
+        self.kind
     }
 }
 
 impl Drop for HwDevice {
     fn drop(&mut self) {
         // SAFETY: a reference this object owns; unref sets the pointer to null.
-        unsafe { ffi::av_buffer_unref(&raw mut self.0) };
+        unsafe { ffi::av_buffer_unref(&raw mut self.buf) };
     }
 }
 
-/// `get_format` with a device: the CUDA format if offered, else the first software format
-/// (libav then decodes in software).
-unsafe extern "C" fn pick_cuda(
+/// `get_format` with a device: the device's format (`HW`: CUDA or VAAPI) if offered, else the
+/// first software format (libav then decodes in software).
+unsafe extern "C" fn pick_hw<const HW: i32>(
     _: *mut ffi::AVCodecContext,
     list: *const ffi::AVPixelFormat,
 ) -> ffi::AVPixelFormat {
@@ -101,7 +130,7 @@ unsafe extern "C" fn pick_cuda(
     // SAFETY: libavcodec passes a list terminated by AV_PIX_FMT_NONE.
     unsafe {
         while *f != ffi::AVPixelFormat::NONE {
-            if *f == ffi::AVPixelFormat::CUDA {
+            if *f == ffi::AVPixelFormat(HW) {
                 return *f;
             }
             if first_sw == ffi::AVPixelFormat::NONE {
@@ -172,11 +201,14 @@ impl Decoder {
                 c.height = h;
             }
             if let Some(hw) = p.hw {
-                c.hw_device_ctx = ffi::av_buffer_ref(hw.0);
+                c.hw_device_ctx = ffi::av_buffer_ref(hw.buf);
                 if c.hw_device_ctx.is_null() {
                     return Err(AvErr(ENOMEM));
                 }
-                c.get_format = Some(pick_cuda);
+                c.get_format = Some(match hw.kind {
+                    HwKind::Cuda => pick_hw::<{ ffi::AVPixelFormat::CUDA.0 }>,
+                    HwKind::Vaapi => pick_hw::<{ ffi::AVPixelFormat::VAAPI.0 }>,
+                });
             }
         }
         // SAFETY: the context was allocated for `codec`; no options dictionary.
@@ -373,8 +405,8 @@ pub enum Pix {
     Nv12,
     /// 10-bit 4:2:0, interleaved chroma, value in the high bits.
     P010,
-    /// A device frame (CUDA).
-    Cuda,
+    /// A device frame (CUDA or VAAPI): transferred to host memory before use.
+    Device,
     /// Anything else.
     Other(i32),
 }
@@ -434,7 +466,7 @@ impl Frame {
             ffi::AVPixelFormat::YUV420P10LE => Pix::Yuv420p10,
             ffi::AVPixelFormat::NV12 => Pix::Nv12,
             ffi::AVPixelFormat::P010LE => Pix::P010,
-            ffi::AVPixelFormat::CUDA => Pix::Cuda,
+            ffi::AVPixelFormat::CUDA | ffi::AVPixelFormat::VAAPI => Pix::Device,
             _ => Pix::Other(v),
         }
     }

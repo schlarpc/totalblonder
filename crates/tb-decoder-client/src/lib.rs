@@ -792,19 +792,27 @@ impl Decoder {
         tb_sandbox::shm::seal(ring_fd.as_fd(), true).map_err(StartError::Sys)?;
         let mut policy = cfg.policy.clone();
         if cfg.gpu {
+            // NVIDIA's device nodes (NVDEC), and the DRM render nodes (VA-API: AMD, Intel); the
+            // worker uses CUDA where it opens, else VA-API
+            let render = (128..136).map(|n| format!("/dev/dri/renderD{n}"));
             for d in [
                 "/dev/nvidiactl",
                 "/dev/nvidia0",
                 "/dev/nvidia-uvm",
                 "/dev/nvidia-uvm-tools",
-            ] {
+            ]
+            .map(String::from)
+            .into_iter()
+            .chain(render)
+            {
                 let p = PathBuf::from(d);
                 if p.exists() && !policy.devices.contains(&p) {
                     policy.devices.push(p);
                 }
             }
-            // the driver's libraries; CUDA's initialization also reads /sys (CPU and NUMA
-            // topology) and /proc: GPU mode is wider by necessity
+            // the drivers' libraries (CUDA's, Mesa's VA driver); CUDA's initialization also reads
+            // /sys (CPU and NUMA topology) and /proc, Mesa /sys (the device's PCI identity):
+            // GPU mode is wider by necessity
             for p in ["/run/opengl-driver", "/sys"] {
                 let p = PathBuf::from(p);
                 if p.exists() && !policy.ro_paths.contains(&p) {
