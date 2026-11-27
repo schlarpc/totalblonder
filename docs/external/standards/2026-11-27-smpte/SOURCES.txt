@@ -1,0 +1,7 @@
+Downloaded 2026-11-27 (untrusted data; checksums in SHA256SUMS).
+
+SMPTE_ST_2016-1_2009.pdf  Sci-Hub, looked up by DOI (10.5594/SMPTE.ST2016-1.2009 by SMPTE's
+                          scheme; the file does not print it)
+                          SMPTE ST 2016-1:2009, "Format for Active Format Description and Bar
+                          Data" (revision of SMPTE 2016-1-2007), 21 pages. Downloaded by the owner;
+                          saved as format-for-active-format-description-and-bar-data.pdf.
