@@ -19,7 +19,7 @@ tb-m2venc [group options] [--group [group options]]... [global options]
          [--rate-walk lo:hi:seed] [--force-key D,D...] [--cc | --cc-text f.srt|f.vtt]
          [--pool] [--priority P]
          [--aspect 1|2|3] [--film 3,2,...]
- global: [--device cuda|ref] [--gpu ORDINAL] [--check-arena] [--device-timeout S]
+ global: [--device cuda|hip|ref] [--gpu ORDINAL] [--check-arena] [--device-timeout S]
          [--conformance h262|a53|scte43-64qam|scte43-256qam]  (every session; default
          scte43-256qam: a configuration outside the profile is refused)
          [--input-mode host|dev] [--deadline] [--force-shed P:SEED] [--hold G:S:FROM:TO]
@@ -54,8 +54,10 @@ pub enum OptError {
 /// Which adapter executes the plans.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeviceKind {
-    /// The card (`tb-device-cuda`).
+    /// An NVIDIA card (`tb-device-gpu`, CUDA).
     Cuda,
+    /// An AMD card (`tb-device-gpu`, HIP).
+    Hip,
     /// The kernels compiled for the host (`tb-device-ref`): slow, for small pictures.
     Ref,
 }
@@ -498,6 +500,7 @@ pub fn parse(args: &[String]) -> Result<Opts, OptError> {
             "--device" => {
                 o.device = match val()? {
                     "cuda" => DeviceKind::Cuda,
+                    "hip" => DeviceKind::Hip,
                     "ref" => DeviceKind::Ref,
                     v => return Err(OptError::Value(a.to_owned(), v.to_owned())),
                 }

@@ -22,7 +22,7 @@ struct AvCudaDeviceContext {
 
 /// Loads the driver's libraries that libav opens by name (`libcuda.so.1` for the device context,
 /// `libnvcuvid.so.1` for NVDEC), so that libav finds them: by the loader's search path first,
-/// else from where NixOS puts them (as `tb-device-cuda` does for `libcuda.so.1`). A library
+/// else from where NixOS puts them (as `tb-device-gpu` does for `libcuda.so.1`). A library
 /// loaded here answers libav's later `dlopen` of the same soname. Missing libraries are left
 /// for libav to report.
 fn preload_driver() {

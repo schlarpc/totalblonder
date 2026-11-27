@@ -1,6 +1,6 @@
 [package]
-name = "tb-device-cuda"
-description = "CUDA adapter: executes device plans through the CUDA driver API with the kernel image built by Nix"
+name = "tb-device-gpu"
+description = "GPU adapter: executes device plans through the CUDA driver API or HIP with the kernel images built by Nix"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -12,7 +12,7 @@ checked on their own merits with the gate's machinery (check.py):
            no broadcast format; S1/S2 fail, S3 fails unless gate-allow.txt allows it)
   golden   with --golden: SHA-256 of every stream equals crates/tb-golden/vectors/<case>.sha256
 
-Usage: gate_small.py --enc tb-m2venc [--device ref|cuda] [--golden] [--work DIR]
+Usage: gate_small.py --enc tb-m2venc [--device ref|cuda|hip] [--golden] [--work DIR]
 Needs ffmpeg, ffprobe, mpeg2dec on PATH and the verifier (M2V_VERIFY). No GPU is needed with
 --device ref: this is the gate that runs in `nix flake check` (check gate/ref-small).
 Exit status 0 only if every case passes.
@@ -276,7 +276,7 @@ def golden_digests(c, names, device="ref"):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--enc", required=True, help="the encoder binary (tb-m2venc)")
-    ap.add_argument("--device", default="ref", choices=["ref", "cuda"])
+    ap.add_argument("--device", default="ref", choices=["ref", "cuda", "hip"])
     ap.add_argument("--golden", action="store_true", help="also require the streams of crates/tb-golden/vectors/*.sha256")
     ap.add_argument("--work", help="directory for clips and outputs (default: a temporary one)")
     a = ap.parse_args()

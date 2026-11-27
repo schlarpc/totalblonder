@@ -4,7 +4,7 @@
 
 use tb_device::sim::HostGuard;
 use tb_device::{ArenaSizes, Completion, Device, DeviceError, Nanos, Plan, Ticket};
-use tb_device_cuda::{CudaDevice, WaitMode};
+use tb_device_gpu::{GpuDevice, Runtime, WaitMode};
 use tb_device_ref::RefDevice;
 
 /// A device the tick loop can drive.
@@ -28,9 +28,9 @@ pub trait TickDevice: Device {
     fn describe(&self) -> String;
 }
 
-impl TickDevice for CudaDevice {
+impl<R: Runtime> TickDevice for GpuDevice<R> {
     fn submit_class(&mut self, plan: &Plan, class: u8) -> Result<Ticket, DeviceError> {
-        CudaDevice::submit_class(self, plan, class)
+        GpuDevice::submit_class(self, plan, class)
     }
     fn set_blocking(&mut self, blocking: bool) {
         self.set_wait_mode(if blocking {
@@ -40,7 +40,7 @@ impl TickDevice for CudaDevice {
         });
     }
     fn set_timing(&mut self, on: bool) {
-        CudaDevice::set_timing(self, on);
+        GpuDevice::set_timing(self, on);
     }
     fn device_time(&self, ticket: Ticket) -> Option<Nanos> {
         self.last_device_time()
@@ -53,7 +53,11 @@ impl TickDevice for CudaDevice {
         false
     }
     fn describe(&self) -> String {
-        format!("CUDA device {}, pinned host arena", self.name())
+        format!(
+            "{} device {}, pinned host arena",
+            self.runtime(),
+            self.name()
+        )
     }
 }
 

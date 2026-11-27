@@ -7,7 +7,7 @@
 //! captions through drops and repeats (`tb_timeline::captions`), whether an input may use the
 //! hardware decoder (`tb_timeline::admission`), which conversions a tick needs and their
 //! plan steps (`tb_convert`), and the encoder (`tb_m2v_encoder`). The adapters are
-//! `tb_decode` (libav), `tb_device_cuda` and `tb_device_ref`. This crate is the edge that
+//! `tb_decode` (libav), `tb_device_gpu` and `tb_device_ref`. This crate is the edge that
 //! joins them: the command line ([`opts`]), the run loop ([`run`]), the report ([`report`]),
 //! the pictures the harness makes itself ([`pattern`]) and the hand-over of decoder surfaces
 //! to the device adapter ([`dev`]).

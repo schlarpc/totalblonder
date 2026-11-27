@@ -1,9 +1,13 @@
-//! The CUDA adapter on a real card. Needs a GPU and its driver, so `nix flake check` does not
-//! run these tests; run them where the card is:
+//! The GPU adapter on a real card. Needs a GPU and its driver, so `nix flake check` does not
+//! run these tests; run them where the card is, with the runtime's tests selected by a filter:
 //!
 //! ```sh
-//! nix run .#gpu-plumbing
+//! nix run .#gpu-plumbing -- cuda::    # an NVIDIA card
+//! nix run .#gpu-plumbing -- hip::     # an AMD card
 //! ```
+//!
+//! Every test is written once over the runtime and instantiated in the modules `cuda` and `hip`
+//! (bottom of the file); what differs between the vendors' cards is in [`Card`].
 //!
 //! The tests share the device's primary context (one process, and the test harness runs tests
 //! on several threads), and some reset it, so each takes `CARD` first. The test that faults on
@@ -22,10 +26,7 @@ use tb_device::sim::{Recorder, Replay};
 use tb_device::{
     ArenaSizes, DevBuf, Device, DeviceError, HostBuf, Kernel, Launch, Nanos, selftest,
 };
-use tb_device_cuda::{
-    CUDA_ERROR_ILLEGAL_ADDRESS, CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES, CudaDevice, CudaError, IMAGE,
-    WaitMode,
-};
+use tb_device_gpu::{Cuda, GpuDevice, GpuError, Hip, Runtime, WaitMode};
 use tb_kernel_abi::{Geo, SL_CUR, SL_ZERO};
 
 mod float_parity;
@@ -35,6 +36,54 @@ static CARD: Mutex<()> = Mutex::new(());
 fn card() -> MutexGuard<'static, ()> {
     CARD.lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// SIGABRT (6 on Linux).
+const fn libc_sigabrt() -> i32 {
+    6
+}
+
+/// What differs between the vendors' cards, as measured.
+trait Card: Runtime {
+    /// The test module of this runtime (for running one test in a child process).
+    const MODULE: &'static str;
+    /// A launch of `k_me` (blocks, threads per block) that the launch call refuses, and its
+    /// status.
+    const TOO_BIG: (u32, u32);
+    const TOO_BIG_STATUS: i32;
+    /// The session index that makes `k_pyr` read far outside the arena ([`faulting_plan`]),
+    /// and the status that read surfaces with.
+    const FAULT_SESSION: i32;
+    const FAULT_STATUS: i32;
+    /// Whether the runtime aborts the process on that fault instead of returning a status.
+    const FAULT_ABORTS: bool;
+}
+
+impl Card for Cuda {
+    const MODULE: &'static str = "cuda";
+    // k_me uses about 168 registers per thread: 1024 threads need more than a multiprocessor
+    // has.
+    const TOO_BIG: (u32, u32) = (1, 1024);
+    const TOO_BIG_STATUS: i32 = tb_device_gpu::cuda::CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES;
+    const FAULT_SESSION: i32 = 1 << 30;
+    const FAULT_STATUS: i32 = tb_device_gpu::cuda::CUDA_ERROR_ILLEGAL_ADDRESS;
+    const FAULT_ABORTS: bool = false;
+}
+
+impl Card for Hip {
+    const MODULE: &'static str = "hip";
+    // The RX 7900 runs k_me with 1024 threads per block (its 192 registers per lane fit a
+    // workgroup processor's register file); a grid of 2^31 such blocks is more work-items than
+    // a dispatch can name.
+    const TOO_BIG: (u32, u32) = (1 << 31, 1024);
+    const TOO_BIG_STATUS: i32 = tb_device_gpu::hip::hipErrorInvalidValue;
+    // 2^36 bytes past the arena is still mapped in the GPU's view of the process on ROCm (the
+    // read returns whatever is there); 2^37 bytes below it is not.
+    const FAULT_SESSION: i32 = i32::MIN;
+    const FAULT_STATUS: i32 = tb_device_gpu::hip::hipErrorIllegalAddress;
+    // ROCm's runtime prints "Memory access fault by GPU node-N ... Page not present" and calls
+    // abort(): no status reaches the adapter (ROCm 7.2, RX 7900 XTX).
+    const FAULT_ABORTS: bool = true;
 }
 
 /// Large enough for the self-test's layout and a slow upload beside it.
@@ -55,7 +104,7 @@ fn rss_kib() -> u64 {
         .unwrap()
 }
 
-fn digest_of(dev: &CudaDevice, d1: HostBuf, d2: HostBuf) -> u64 {
+fn digest_of<R: Runtime>(dev: &GpuDevice<R>, d1: HostBuf, d2: HostBuf) -> u64 {
     let out = selftest::PyrOutput {
         d1: d1.of(dev.host()).unwrap().to_vec(),
         d2: d2.of(dev.host()).unwrap().to_vec(),
@@ -82,11 +131,9 @@ fn outputs(plan: &Plan) -> (HostBuf, HostBuf) {
     (d[0], d[1])
 }
 
-#[test]
-#[ignore = "needs a CUDA device and its driver"]
-fn pyramid_matches_the_definition_on_the_card() {
+fn pyramid_matches_the_definition_on_the_card<R: Card>() {
     let _card = card();
-    let mut dev = CudaDevice::new(0, selftest::ARENAS, &IMAGE).unwrap();
+    let mut dev = GpuDevice::<R>::new(0, selftest::ARENAS, &R::IMAGE).unwrap();
     let out = selftest::run(&mut dev).unwrap();
     let (d1, d2) = selftest::expected(&selftest::source());
     assert_eq!(out.d1, d1);
@@ -100,22 +147,18 @@ fn pyramid_matches_the_definition_on_the_card() {
     );
 }
 
-#[test]
-#[ignore = "needs a CUDA device and its driver"]
-fn recorded_run_on_the_card_replays() {
+fn recorded_run_on_the_card_replays<R: Card>() {
     let _card = card();
-    let mut rec = Recorder::new(CudaDevice::new(0, selftest::ARENAS, &IMAGE).unwrap());
+    let mut rec = Recorder::new(GpuDevice::<R>::new(0, selftest::ARENAS, &R::IMAGE).unwrap());
     let live = selftest::run(&mut rec).unwrap();
     let (trace, _) = rec.finish();
     let again = selftest::run(&mut Replay::new(trace)).unwrap();
     assert_eq!((again.d1, again.d2), (live.d1, live.d2));
 }
 
-#[test]
-#[ignore = "needs a CUDA device and its driver"]
-fn repeated_plans_and_a_timed_wait() {
+fn repeated_plans_and_a_timed_wait<R: Card>() {
     let _card = card();
-    let mut dev = CudaDevice::new(0, selftest::ARENAS, &IMAGE).unwrap();
+    let mut dev = GpuDevice::<R>::new(0, selftest::ARENAS, &R::IMAGE).unwrap();
     selftest::fill_host(dev.host_mut()).unwrap();
     for mode in [WaitMode::Blocking, WaitMode::Hybrid] {
         dev.set_wait_mode(mode);
@@ -128,11 +171,9 @@ fn repeated_plans_and_a_timed_wait() {
     }
 }
 
-#[test]
-#[ignore = "needs a CUDA device and its driver"]
-fn upload2d_lands_at_its_pitch() {
+fn upload2d_lands_at_its_pitch<R: Card>() {
     let _card = card();
-    let mut dev = CudaDevice::new(0, selftest::ARENAS, &IMAGE).unwrap();
+    let mut dev = GpuDevice::<R>::new(0, selftest::ARENAS, &R::IMAGE).unwrap();
     let (width, rows, src_pitch, dst_pitch) = (90u32, 7u32, 100u32, 128u32);
     let src = HostBuf::new(0, u64::from((rows - 1) * src_pitch + width));
     let dst = DevBuf::new(1024, u64::from((rows - 1) * dst_pitch + width));
@@ -191,11 +232,9 @@ fn fenced_plan(with_wait: bool) -> Plan {
     p
 }
 
-#[test]
-#[ignore = "needs a CUDA device and its driver"]
-fn events_order_streams_in_one_plan_and_across_plans() {
+fn events_order_streams_in_one_plan_and_across_plans<R: Card>() {
     let _card = card();
-    let mut dev = CudaDevice::new(0, BIG, &IMAGE).unwrap();
+    let mut dev = GpuDevice::<R>::new(0, BIG, &R::IMAGE).unwrap();
     selftest::fill_host(dev.host_mut()).unwrap();
     let (h1, h2) = outputs(&selftest::plan());
 
@@ -245,11 +284,9 @@ fn events_order_streams_in_one_plan_and_across_plans() {
     );
 }
 
-#[test]
-#[ignore = "needs a CUDA device and its driver"]
-fn plans_in_flight_complete_in_any_order() {
+fn plans_in_flight_complete_in_any_order<R: Card>() {
     let _card = card();
-    let mut dev = CudaDevice::new(0, BIG, &IMAGE).unwrap();
+    let mut dev = GpuDevice::<R>::new(0, BIG, &R::IMAGE).unwrap();
     let mut slow = Plan::new();
     slow.push(
         StreamId::UPLOAD,
@@ -285,11 +322,9 @@ fn plans_in_flight_complete_in_any_order() {
     }
 }
 
-#[test]
-#[ignore = "needs a CUDA device and its driver"]
-fn timing_events_report_device_time() {
+fn timing_events_report_device_time<R: Card>() {
     let _card = card();
-    let mut dev = CudaDevice::new(0, BIG, &IMAGE).unwrap();
+    let mut dev = GpuDevice::<R>::new(0, BIG, &R::IMAGE).unwrap();
     dev.set_timing(true);
     let p = fenced_plan(true);
     let t = dev.submit(&p).unwrap();
@@ -310,7 +345,7 @@ fn timing_events_report_device_time() {
     );
 }
 
-fn me_launch(block: u32) -> Op {
+fn me_launch(grid: u32, block: u32) -> Op {
     let d = DevBuf::new(0, 0);
     Op::Launch(Launch {
         kernel: Kernel::Me(Me {
@@ -322,42 +357,40 @@ fn me_launch(block: u32) -> Op {
             prev: d,
             out: d,
         }),
-        grid: 1,
+        grid,
         block,
     })
 }
 
-#[test]
-#[ignore = "needs a CUDA device and its driver"]
-fn launch_out_of_resources_fails_the_plan_only() {
+fn launch_out_of_resources_fails_the_plan_only<R: Card>() {
     let _card = card();
-    let mut dev = CudaDevice::new(0, selftest::ARENAS, &IMAGE).unwrap();
+    let mut dev = GpuDevice::<R>::new(0, selftest::ARENAS, &R::IMAGE).unwrap();
     let mut p = Plan::new();
     p.main(Op::Fill {
         dst: DevBuf::new(0, 4096),
         byte: 1,
     });
-    // k_me uses about 168 registers per thread: 1024 threads need more than a multiprocessor
-    // has. cuLaunchKernel refuses it.
-    p.main(me_launch(1024));
+    // A launch the card cannot run ([`Card::TOO_BIG`]). The launch call refuses it.
+    let (grid, block) = R::TOO_BIG;
+    p.main(me_launch(grid, block));
     p.main(Op::Download {
         dst: HostBuf::new(0, 4096),
         src: DevBuf::new(0, 4096),
     });
     let t = dev.submit(&p).unwrap();
     let c = dev.wait(t, None);
-    println!("k_me with 1024 threads per block: {:?}", c.status);
+    println!("k_me with {grid} blocks of {block} threads: {:?}", c.status);
     assert_eq!(
         c.status,
         Err(DeviceError::Failed {
             step: 1,
-            code: CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES
+            code: R::TOO_BIG_STATUS
         })
     );
     assert!(!dev.is_lost());
     // The same kernel at a size it can run, and the self-test, work on the same context.
     let mut ok = Plan::new();
-    ok.main(me_launch(64));
+    ok.main(me_launch(1, 64));
     let t = dev.submit(&ok).unwrap();
     assert_eq!(dev.wait(t, None).status, Ok(()));
     let out = selftest::run(&mut dev).unwrap();
@@ -366,11 +399,11 @@ fn launch_out_of_resources_fails_the_plan_only() {
 
 /// A plan whose kernel reads far outside the device arena: `k_pyr` with a session list naming
 /// session 2^30, so that it reads its parameters about 2^36 bytes past the arena.
-fn faulting_plan(dev: &mut CudaDevice) -> Plan {
+fn faulting_plan<R: Card>(dev: &mut GpuDevice<R>) -> Plan {
     let list = HostBuf::new(0, 4);
     list.of_mut(dev.host_mut())
         .unwrap()
-        .copy_from_slice(&(1i32 << 30).to_ne_bytes());
+        .copy_from_slice(&R::FAULT_SESSION.to_ne_bytes());
     let dlist = DevBuf::new(0, 4);
     let mut p = Plan::new();
     p.main(Op::Upload {
@@ -401,10 +434,11 @@ fn faulting_plan(dev: &mut CudaDevice) -> Plan {
 }
 
 /// Run test `name` of this binary in a child process: for a test that poisons the process.
-/// The child sees `TB_IN_CHILD` and runs the body; the parent checks that it passed.
-fn in_child(name: &str) -> bool {
+/// In the child (it sees `TB_IN_CHILD`) returns `None`: run the body. In the parent returns the
+/// child's output, its stdout and stderr printed.
+fn child(name: &str) -> Option<std::process::Output> {
     if std::env::var_os("TB_IN_CHILD").is_some() {
-        return true;
+        return None;
     }
     let out = std::process::Command::new(std::env::current_exe().unwrap())
         .args([
@@ -420,22 +454,45 @@ fn in_child(name: &str) -> bool {
         .unwrap();
     print!("{}", String::from_utf8_lossy(&out.stdout));
     print!("{}", String::from_utf8_lossy(&out.stderr));
-    assert!(
-        out.status.success(),
-        "child process failed: {:?}",
-        out.status
-    );
-    false
+    Some(out)
 }
 
-#[test]
-#[ignore = "needs a CUDA device and its driver"]
-fn device_fault_is_lost_and_poisons_the_process() {
+fn device_fault_is_lost_and_poisons_the_process<R: Card>() {
     let _card = card();
-    if !in_child("device_fault_is_lost_and_poisons_the_process") {
+    let name = format!(
+        "{}::device_fault_is_lost_and_poisons_the_process",
+        R::MODULE
+    );
+    if let Some(out) = child(&name) {
+        if R::FAULT_ABORTS {
+            use std::os::unix::process::ExitStatusExt;
+            assert_eq!(
+                out.status.signal(),
+                Some(libc_sigabrt()),
+                "{:?}",
+                out.status
+            );
+            assert!(
+                String::from_utf8_lossy(&out.stderr).contains("Memory access fault"),
+                "the runtime's message"
+            );
+        } else {
+            assert!(
+                out.status.success(),
+                "child process failed: {:?}",
+                out.status
+            );
+        }
         return;
     }
-    let mut dev = CudaDevice::new(0, selftest::ARENAS, &IMAGE).unwrap();
+    let mut dev = GpuDevice::<R>::new(0, selftest::ARENAS, &R::IMAGE).unwrap();
+    if R::FAULT_ABORTS {
+        let p = faulting_plan(&mut dev);
+        let t = dev.submit(&p).unwrap();
+        // The runtime aborts the process inside the wait.
+        let c = dev.wait(t, None);
+        panic!("the runtime did not abort the process: {:?}", c.status);
+    }
     selftest::fill_host(dev.host_mut()).unwrap();
     // A plan in flight beside the faulting one also ends lost.
     let other = dev.submit(&selftest::plan()).unwrap();
@@ -449,7 +506,7 @@ fn device_fault_is_lost_and_poisons_the_process() {
     let Err(DeviceError::Lost { code }) = c.status else {
         panic!("expected Lost, got {:?}", c.status);
     };
-    assert_eq!(code, CUDA_ERROR_ILLEGAL_ADDRESS);
+    assert_eq!(code, R::FAULT_STATUS);
     assert!(dev.is_lost());
     let o = dev.wait(other, None).status;
     assert!(matches!(o, Ok(()) | Err(DeviceError::Lost { .. })), "{o:?}");
@@ -462,34 +519,32 @@ fn device_fault_is_lost_and_poisons_the_process() {
     for _ in 0..2 {
         let r = dev.restore();
         println!("restore: {r:?}");
-        assert_eq!(r, Err(CudaError::ProcessPoisoned { status: code }));
+        assert_eq!(r, Err(GpuError::ProcessPoisoned { status: code }));
         assert!(dev.is_lost());
         assert!(dev.host().is_empty());
         assert_eq!(
             dev.submit(&selftest::plan()),
             Err(DeviceError::Lost {
-                code: tb_device_cuda::CUDA_ERROR_CONTEXT_IS_DESTROYED
+                code: R::CONTEXT_IS_DESTROYED
             })
         );
     }
     drop(dev);
-    let again = CudaDevice::new(0, selftest::ARENAS, &IMAGE);
+    let again = GpuDevice::<R>::new(0, selftest::ARENAS, &R::IMAGE);
     println!(
         "a new adapter in the same process: {:?}",
         again.as_ref().err()
     );
-    assert!(matches!(again, Err(CudaError::ProcessPoisoned { .. })));
+    assert!(matches!(again, Err(GpuError::ProcessPoisoned { .. })));
 }
 
-#[test]
-#[ignore = "needs a CUDA device and its driver"]
-fn restore_does_not_leak_the_pinned_arena() {
+fn restore_does_not_leak_the_pinned_arena<R: Card>() {
     let _card = card();
     let arenas = ArenaSizes {
         device: 64 << 20,
         host: 128 << 20,
     };
-    let mut dev = CudaDevice::new(0, arenas, &IMAGE).unwrap();
+    let mut dev = GpuDevice::<R>::new(0, arenas, &R::IMAGE).unwrap();
     dev.restore().unwrap();
     let before = rss_kib();
     for _ in 0..20 {
@@ -507,15 +562,13 @@ fn restore_does_not_leak_the_pinned_arena() {
     assert!(after < before + 32 * 1024, "{before} -> {after} KiB");
 }
 
-#[test]
-#[ignore = "needs a CUDA device and its driver"]
-fn ten_thousand_plans_without_growth() {
+fn ten_thousand_plans_without_growth<R: Card>() {
     let _card = card();
-    let mut dev = CudaDevice::new(0, selftest::ARENAS, &IMAGE).unwrap();
+    let mut dev = GpuDevice::<R>::new(0, selftest::ARENAS, &R::IMAGE).unwrap();
     selftest::fill_host(dev.host_mut()).unwrap();
     let plan = selftest::plan();
     let (h1, h2) = outputs(&plan);
-    let run = |dev: &mut CudaDevice, n: usize, class: Option<u8>| {
+    let run = |dev: &mut GpuDevice<R>, n: usize, class: Option<u8>| {
         for _ in 0..n {
             let t = match class {
                 Some(c) => dev.submit_class(&plan, c),
@@ -541,3 +594,88 @@ fn ten_thousand_plans_without_growth() {
     );
     assert!(after <= before + 256, "{before} -> {after} KiB");
 }
+
+/// Every test above, on one runtime.
+macro_rules! tests_on {
+    ($m:ident, $rt:ty, $why:literal) => {
+        mod $m {
+            #![allow(clippy::wildcard_imports, reason = "the tests of the parent module")]
+            use super::*;
+
+            #[test]
+            #[ignore = $why]
+            fn pyramid_matches_the_definition_on_the_card() {
+                super::pyramid_matches_the_definition_on_the_card::<$rt>();
+            }
+
+            #[test]
+            #[ignore = $why]
+            fn recorded_run_on_the_card_replays() {
+                super::recorded_run_on_the_card_replays::<$rt>();
+            }
+
+            #[test]
+            #[ignore = $why]
+            fn repeated_plans_and_a_timed_wait() {
+                super::repeated_plans_and_a_timed_wait::<$rt>();
+            }
+
+            #[test]
+            #[ignore = $why]
+            fn upload2d_lands_at_its_pitch() {
+                super::upload2d_lands_at_its_pitch::<$rt>();
+            }
+
+            #[test]
+            #[ignore = $why]
+            fn events_order_streams_in_one_plan_and_across_plans() {
+                super::events_order_streams_in_one_plan_and_across_plans::<$rt>();
+            }
+
+            #[test]
+            #[ignore = $why]
+            fn plans_in_flight_complete_in_any_order() {
+                super::plans_in_flight_complete_in_any_order::<$rt>();
+            }
+
+            #[test]
+            #[ignore = $why]
+            fn timing_events_report_device_time() {
+                super::timing_events_report_device_time::<$rt>();
+            }
+
+            #[test]
+            #[ignore = $why]
+            fn launch_out_of_resources_fails_the_plan_only() {
+                super::launch_out_of_resources_fails_the_plan_only::<$rt>();
+            }
+
+            #[test]
+            #[ignore = $why]
+            fn device_fault_is_lost_and_poisons_the_process() {
+                super::device_fault_is_lost_and_poisons_the_process::<$rt>();
+            }
+
+            #[test]
+            #[ignore = $why]
+            fn restore_does_not_leak_the_pinned_arena() {
+                super::restore_does_not_leak_the_pinned_arena::<$rt>();
+            }
+
+            #[test]
+            #[ignore = $why]
+            fn ten_thousand_plans_without_growth() {
+                super::ten_thousand_plans_without_growth::<$rt>();
+            }
+
+            #[test]
+            #[ignore = $why]
+            fn float_kernels_on_the_card_equal_the_reference_adapter() {
+                super::float_parity::float_kernels_on_the_card_equal_the_reference_adapter::<$rt>();
+            }
+        }
+    };
+}
+
+tests_on!(cuda, Cuda, "needs an NVIDIA card and its driver");
+tests_on!(hip, Hip, "needs an AMD card and ROCm");

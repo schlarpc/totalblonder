@@ -26,6 +26,7 @@ use std::process::ExitCode;
 
 use anyhow::{Context, bail};
 use tb_device::{Device, selftest};
+use tb_device_gpu::{Cuda, CudaDevice, Hip, HipDevice, Runtime};
 use tb_engine::device::Guarded;
 use tb_m2venc::clip::{ClipKind, make_clip};
 use tb_m2venc::opts::{self, DeviceKind, Opts};
@@ -119,8 +120,15 @@ fn encode(o: &Opts) -> anyhow::Result<Result<Outcome, RunError>> {
             }
         }
         (DeviceKind::Cuda, check) => {
-            let d = tb_device_cuda::CudaDevice::new(o.gpu, arenas, &tb_device_cuda::IMAGE)
-                .context("CUDA device")?;
+            let d = CudaDevice::new(o.gpu, arenas, &Cuda::IMAGE).context("CUDA device")?;
+            if check {
+                run(o, Guarded::new(d), &mut console)
+            } else {
+                run(o, d, &mut console)
+            }
+        }
+        (DeviceKind::Hip, check) => {
+            let d = HipDevice::new(o.gpu, arenas, &Hip::IMAGE).context("HIP device")?;
             if check {
                 run(o, Guarded::new(d), &mut console)
             } else {
@@ -141,9 +149,12 @@ fn real_main() -> anyhow::Result<ExitCode> {
         }
         ["plumb", "cuda"] => {
             let mut d =
-                tb_device_cuda::CudaDevice::new(0, selftest::ARENAS, &tb_device_cuda::IMAGE)
-                    .context("CUDA device")?;
+                CudaDevice::new(0, selftest::ARENAS, &Cuda::IMAGE).context("CUDA device")?;
             return Ok(plumb(&mut d, "cuda"));
+        }
+        ["plumb", "hip"] => {
+            let mut d = HipDevice::new(0, selftest::ARENAS, &Hip::IMAGE).context("HIP device")?;
+            return Ok(plumb(&mut d, "hip"));
         }
         ["--golden-tables", path] => {
             golden_tables(path)?;

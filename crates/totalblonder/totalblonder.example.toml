@@ -27,7 +27,7 @@ placeholders = true           # windows without events get one titled with the c
 # schedule = "/var/lib/totalblonder/schedule.json"   # guide events per service, re-read every 10 s
 
 [video]
-device = "cuda"               # cuda | ref (the reference kernels on the CPU: tests only)
+device = "cuda"               # cuda (NVIDIA) | hip (AMD) | ref (the reference kernels on the CPU: tests only)
 gpu = 0
 
 [control]

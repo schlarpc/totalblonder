@@ -108,6 +108,7 @@
       packages.${system} = repo.flake.packages // {
         default = ws.packages.tb-m2venc;
         kernels-device = kernels.deviceImage;
+        kernels-device-hip = kernels.deviceImageHip;
         kernels-ref = kernels.refLib;
         abi-header = kernels.abiHeader;
         gate-tools = gate.tools;
@@ -121,12 +122,12 @@
         # GPU tests: run on the machine with the card (nixark). They are test apps of
         # breakbulk under their long names; these are the short ones.
         gpu-plumbing = script "gpu-plumbing" ''
-          exec ${repo.apps."default/${triple}/tb-device-cuda/test/plumbing".program} --include-ignored --nocapture "$@"
+          exec ${repo.apps."default/${triple}/tb-device-gpu/test/plumbing".program} --include-ignored --nocapture "$@"
         '';
         # The protocol-cost bench of the CUDA adapter (release build), on the card.
         gpu-bench = script "gpu-bench" ''
           exec ${
-            ws.target.${triple}.variants.default.benches.tb-device-cuda."bench/protocol"
+            ws.target.${triple}.variants.default.benches.tb-device-gpu."bench/protocol"
           }/bin/protocol "$@"
         '';
         # Regenerate the committed copy of the kernel ABI header.

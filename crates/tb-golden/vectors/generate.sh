@@ -20,11 +20,11 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 out=$here check= device=ref
 if [ "${1:-}" = "--device" ]; then
-  device=${2:?usage: generate.sh [--device ref|cuda] [--check DIR]}
+  device=${2:?usage: generate.sh [--device ref|cuda|hip] [--check DIR]}
   shift 2
 fi
 if [ "${1:-}" = "--check" ]; then
-  out=${2:?usage: generate.sh [--device ref|cuda] [--check DIR]}
+  out=${2:?usage: generate.sh [--device ref|cuda|hip] [--check DIR]}
   check=1
   mkdir -p "$out"
 fi

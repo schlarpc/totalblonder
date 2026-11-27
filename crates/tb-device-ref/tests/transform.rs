@@ -11,7 +11,7 @@
 //!   with a fused multiply-add (`mul_add`) exactly where the kernels write `fmaf` / `fmaf_nc`
 //!   and nowhere else. Both builds of the kernels compile without implicit contraction, and
 //!   those fused operations are where nvcc's default contraction put them (K3), so this pins
-//!   the host build and, through the GPU tests of `tb-device-cuda` (`float_parity`), the card.
+//!   the host build and, through the GPU tests of `tb-device-gpu` (`float_parity`), the cards.
 #![allow(
     clippy::excessive_precision,
     reason = "the DCT constants are the literals of kernels.h, rounded to f32 as C++ rounds them"

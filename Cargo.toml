@@ -18,7 +18,7 @@ tb-m2v-encoder = { path = "crates/tb-m2v-encoder" }
 tb-timeline = { path = "crates/tb-timeline" }
 tb-convert = { path = "crates/tb-convert" }
 tb-device-ref = { path = "crates/tb-device-ref" }
-tb-device-cuda = { path = "crates/tb-device-cuda" }
+tb-device-gpu = { path = "crates/tb-device-gpu" }
 tb-golden = { path = "crates/tb-golden" }
 tb-decode = { path = "crates/tb-decode" }
 tb-engine = { path = "crates/tb-engine" }

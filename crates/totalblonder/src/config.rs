@@ -411,8 +411,10 @@ impl Format {
 /// How the video encoder runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VideoDevice {
-    /// The card, by ordinal.
+    /// An NVIDIA card (CUDA), by ordinal.
     Cuda(u32),
+    /// An AMD card (HIP), by ordinal.
+    Hip(u32),
     /// The kernels compiled for the host: slow, for tests and offline runs.
     Ref,
 }
@@ -779,8 +781,9 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
     }
     let video = match f.video.device.as_str() {
         "cuda" => VideoDevice::Cuda(f.video.gpu),
+        "hip" => VideoDevice::Hip(f.video.gpu),
         "ref" => VideoDevice::Ref,
-        x => return Err(rule(format!("video device {x:?}: cuda or ref"))),
+        x => return Err(rule(format!("video device {x:?}: cuda, hip or ref"))),
     };
 
     let mut services = HashMap::new();

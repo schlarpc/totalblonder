@@ -1,10 +1,11 @@
 //! Host cost of executing plans through the protocol against the same driver calls made
-//! directly (docs/ARCHITECTURE.md §8.1), and the hybrid wait against the blocking one. Needs the
-//! card; prints a note and exits 0 where there is none. Run it on nixark with the card idle
-//! (look at `nvidia-smi pmon` first):
+//! directly (docs/ARCHITECTURE.md §8.1), and the hybrid wait against the blocking one, on every
+//! runtime whose card is present (`--runtime cuda|hip` picks one); prints a note for a runtime
+//! without a card and exits 0. Run it with the card idle (look at `nvidia-smi pmon` or
+//! `amd-smi monitor` first):
 //!
 //! ```sh
-//! nix run .#gpu-bench            # or: cargo bench -p tb-device-cuda --bench protocol
+//! nix run .#gpu-bench            # or: cargo bench -p tb-device-gpu --bench protocol
 //! ```
 #![allow(
     clippy::print_stdout,
@@ -12,7 +13,7 @@
     reason = "a benchmark program: the table is its output"
 )]
 
-use tb_device_cuda::{CudaDevice, IMAGE, cost};
+use tb_device_gpu::{Cuda, GpuDevice, Hip, Runtime, cost};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args().any(|a| a == "--test") {
@@ -24,16 +25,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(2000);
-    let mut dev = match CudaDevice::new(0, cost::ARENAS, &IMAGE) {
+    let only = std::env::args().skip_while(|a| a != "--runtime").nth(1);
+    let wants = |name: &str| only.as_deref().is_none_or(|o| o.eq_ignore_ascii_case(name));
+    if wants("cuda") {
+        bench::<Cuda>(reps)?;
+    }
+    if wants("hip") {
+        bench::<Hip>(reps)?;
+    }
+    Ok(())
+}
+
+fn bench<R: Runtime>(reps: usize) -> Result<(), Box<dyn std::error::Error>> {
+    let mut dev = match GpuDevice::<R>::new(0, cost::ARENAS, &R::IMAGE) {
         Ok(d) => d,
         Err(e) => {
-            println!("no CUDA device ({e}); nothing measured");
+            println!("no {} device ({e}); nothing measured", R::NAME);
             return Ok(());
         }
     };
     println!(
-        "device: {}; {reps} repetitions per shape, medians",
-        dev.name()
+        "device: {} ({}); {reps} repetitions per shape, medians",
+        dev.name(),
+        R::NAME
     );
     println!();
     println!(
@@ -62,5 +76,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             w.mode, w.loop_us, w.device_us, w.cpu_us
         );
     }
+    println!();
     Ok(())
 }

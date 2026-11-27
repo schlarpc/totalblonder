@@ -623,7 +623,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tb-device-cuda"
+name = "tb-device-gpu"
 version = "0.0.0"
 dependencies = [
  "bytemuck",
@@ -654,7 +654,7 @@ name = "tb-engine"
 version = "0.0.0"
 dependencies = [
  "tb-device",
- "tb-device-cuda",
+ "tb-device-gpu",
  "tb-device-ref",
  "tb-m2v-encoder",
  "thiserror",
@@ -736,7 +736,7 @@ dependencies = [
  "bytemuck",
  "tb-captions",
  "tb-device",
- "tb-device-cuda",
+ "tb-device-gpu",
  "tb-device-ref",
  "tb-engine",
  "tb-golden",
@@ -785,7 +785,7 @@ dependencies = [
  "tb-convert",
  "tb-decode",
  "tb-device",
- "tb-device-cuda",
+ "tb-device-gpu",
  "tb-device-ref",
  "tb-engine",
  "tb-m2v-encoder",
@@ -962,7 +962,7 @@ dependencies = [
  "tb-captions",
  "tb-decoder-client",
  "tb-device",
- "tb-device-cuda",
+ "tb-device-gpu",
  "tb-device-ref",
  "tb-engine",
  "tb-eqam",

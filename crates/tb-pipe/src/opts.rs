@@ -91,8 +91,10 @@ pub const FMTS: [Fmt; 4] = [
 /// Which device executes the plans.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeviceKind {
-    /// The card.
+    /// An NVIDIA card (CUDA; NVDEC decoding into the adapter's context).
     Cuda,
+    /// An AMD card (HIP; decoding in software for now).
+    Hip,
     /// The reference adapter (software inputs only: there is no decoder on it).
     Ref,
 }
@@ -144,7 +146,7 @@ pub struct Opts {
     pub stall: Option<(usize, f64, f64)>,
     /// `--mem-limit-mb`: device memory in use at which opening inputs stops.
     pub mem_limit_mb: u64,
-    /// `--device cuda|ref`.
+    /// `--device cuda|hip|ref`.
     pub device: DeviceKind,
     /// `--gpu N`.
     pub gpu: i32,
@@ -209,7 +211,7 @@ pub const USAGE: &str = "usage: tb-pipe --in FILE[*N][@sw[,threads=N]|@at=S|@uns
   [--secs S] [--paced | --offline] [--deadline] [--lead ms] [--hold ms] [--degrade ms] [--resync ms]
   [--dec-ctx shared|own] [--no-overlap] [--exact-down] [--stall IN:FROM:TO] [--warmup TICKS]
   [--output PREFIX] [--write K] [--dump-conv F.yuv] [--ptslog F] [--ticklog F] [--json F]
-  [--device cuda|ref] [--gpu N] [--conv-mb MB] [--mem-limit-mb MB] [--nvdec-share F] [--sw-cores C]
+  [--device cuda|hip|ref] [--gpu N] [--conv-mb MB] [--mem-limit-mb MB] [--nvdec-share F] [--sw-cores C]
   [--no-cc] [--device-timeout S]
        tb-pipe --golden-taps FILE   the conversion path's golden records (crates/tb-golden/vectors/taps.jsonl)";
 
@@ -303,6 +305,7 @@ impl Opts {
                     let v = val()?;
                     o.device = match v.as_str() {
                         "cuda" => DeviceKind::Cuda,
+                        "hip" => DeviceKind::Hip,
                         "ref" => DeviceKind::Ref,
                         _ => return Err(OptError::Bad(a.clone(), v)),
                     };

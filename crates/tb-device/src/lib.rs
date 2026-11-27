@@ -9,7 +9,7 @@
 //! back as bytes in the host arena at the places the plan's downloads named.
 //!
 //! Three adapters execute plans:
-//! - `tb-device-cuda`: the CUDA driver API on a real card;
+//! - `tb-device-gpu`: a real card, through the CUDA driver API (NVIDIA) or HIP (AMD);
 //! - `tb-device-ref`: the same kernel source compiled for the host, synchronous, bit-exact
 //!   integer arithmetic, runs in the Nix sandbox;
 //! - [`sim::Replay`] in this crate: replays a recorded trace and injects faults (late

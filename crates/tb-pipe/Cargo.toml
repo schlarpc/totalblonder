@@ -10,7 +10,7 @@ publish.workspace = true
 [dependencies]
 tb-device.workspace = true
 tb-device-ref.workspace = true
-tb-device-cuda.workspace = true
+tb-device-gpu.workspace = true
 tb-m2v-encoder.workspace = true
 tb-convert.workspace = true
 tb-timeline.workspace = true

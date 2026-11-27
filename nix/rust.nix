@@ -29,10 +29,10 @@ in
       })
     ];
     memberDefaults.test.runner = breakbulk.testRunners.nextest { };
-    # The bench plan (release profile, so its units are the products'): the CUDA adapter's
+    # The bench plan (release profile, so its units are the products'): the GPU adapter's
     # protocol-cost bench, run on the card by `nix run .#gpu-bench`. In `nix flake check` it
     # runs once with --test, which measures nothing.
-    variants.default.benches = [ "tb-device-cuda" ];
+    variants.default.benches = [ "tb-device-gpu" ];
     # The tests of the reference adapter once more, with the kernels built with
     # AddressSanitizer (kernels.refLibAsan, linked by the crate's feature `asan`).
     variants.asan = {
@@ -56,16 +56,19 @@ in
     # launcher live until the process ends, by design.
     test.env.ASAN_OPTIONS = "verify_asan_link_order=0:detect_leaks=0:abort_on_error=1";
   };
-  packages.tb-device-cuda = {
+  packages.tb-device-gpu = {
     env = {
-      TB_KERNEL_IMAGE = "${kernels.deviceImage}/tb_kernels.cubin";
-      TB_KERNEL_SYMBOLS = "${kernels.deviceImage}/tb_kernels.sym";
+      TB_KERNEL_IMAGE_CUDA = "${kernels.deviceImage}/tb_kernels.cubin";
+      TB_KERNEL_SYMBOLS_CUDA = "${kernels.deviceImage}/tb_kernels.sym";
+      TB_KERNEL_IMAGE_HIP = "${kernels.deviceImageHip}/tb_kernels.hsaco";
+      TB_KERNEL_SYMBOLS_HIP = "${kernels.deviceImageHip}/tb_kernels.sym";
     };
-    # tests/plumbing.rs needs the card and its driver. Its tests are `#[ignore]`d, so the run
+    # tests/plumbing.rs needs a card and its driver. Its tests are `#[ignore]`d, so the run
     # in `nix flake check` (and a bare `cargo test`) builds the binary and runs nothing; on the
     # machine with the card it runs outside the sandbox as the test app
-    # default/x86_64-unknown-linux-gnu/tb-device-cuda/test/plumbing with --include-ignored
-    # (alias: nix run .#gpu-plumbing).
+    # default/x86_64-unknown-linux-gnu/tb-device-gpu/test/plumbing with --include-ignored
+    # (alias: nix run .#gpu-plumbing; its tests are `cuda::...` and `hip::...`, one set per
+    # runtime, so a filter picks the vendor of the machine).
     # benches/protocol.rs has no libtest harness, which nextest cannot list.
     bench.runner = breakbulk.testRunners.direct;
   };

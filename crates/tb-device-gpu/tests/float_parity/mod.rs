@@ -1,6 +1,6 @@
 //! The card and the reference adapter compute the same bytes (work package K3).
 //!
-//! The same plan runs on the CUDA adapter and on the reference adapter (the kernels compiled
+//! The same plan runs on the GPU adapter (CUDA or HIP) and on the reference adapter (the kernels compiled
 //! for the host) and every buffer it writes is compared byte for byte. The plan is the first
 //! phase of the encoder and the quantization and reconstruction after it, for one batch of
 //! three sessions coding an I, a P and a B picture of real content, twice: the second tick
@@ -22,7 +22,7 @@ use tb_device::kernel::{
     BufsRef, Kernel, MbStat, Me, MvSmooth, Pyr, Quant, Recon, RowStat, SetMode, Xf,
 };
 use tb_device::{ArenaSizes, DevBuf, Device, HostBuf, Launch, Op, Plan};
-use tb_device_cuda::{CudaDevice, IMAGE};
+use tb_device_gpu::{GpuDevice, Runtime};
 use tb_device_ref::RefDevice;
 use tb_kernel_abi::{
     Geo, MODE_BI, MODE_INTRA, MbInfo, PIC_B, PIC_I, PIC_P, RowStat as RowStatRec, SL_CUR, SL_REC,
@@ -596,9 +596,7 @@ fn coverage(info: &[MbInfo], nmb: usize) -> Coverage {
     c
 }
 
-#[test]
-#[ignore = "needs a CUDA device and its driver"]
-fn float_kernels_on_the_card_equal_the_reference_adapter() {
+pub fn float_kernels_on_the_card_equal_the_reference_adapter<R: Runtime>() {
     let _card = card();
     let (mut failures, mut field_dct) = (Vec::new(), 0);
     for clip in clips() {
@@ -608,7 +606,7 @@ fn float_kernels_on_the_card_equal_the_reference_adapter() {
             device: size,
             host: size,
         };
-        let card_out = run(&mut CudaDevice::new(0, arenas, &IMAGE).unwrap(), &l);
+        let card_out = run(&mut GpuDevice::<R>::new(0, arenas, &R::IMAGE).unwrap(), &l);
         let ref_out = run(&mut RefDevice::new(arenas).unwrap(), &l);
         let mut differing = Vec::new();
         for (name, kernel, b) in &l.bufs {

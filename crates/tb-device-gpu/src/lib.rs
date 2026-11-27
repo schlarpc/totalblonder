@@ -1,10 +1,16 @@
-//! The CUDA adapter.
+//! The GPU adapter: executes device plans on an NVIDIA card through the CUDA driver API or on an
+//! AMD card through HIP, with one implementation of the protocol over both.
 //!
-//! Executes device plans through the CUDA driver API: the device's primary context with
-//! blocking-sync scheduling, the kernel image that Nix builds from the kernel sources
-//! (`nvcc -cubin`, sm_89; embedded in this crate at compile time), three streams, two events,
-//! one block of device memory and one block of pinned host memory taken when the adapter is
-//! made (the C++ `Encoder::Encoder` with `--overlap` and `--arena`).
+//! [`GpuDevice<R>`] is written once against the operations of a [`Runtime`] ([`Cuda`]:
+//! `libcuda.so.1`; [`Hip`]: `libamdhip64.so`), which HIP mirrors nearly name for name. Both
+//! runtimes are bound by hand and loaded at run time, so one binary runs on either vendor and
+//! builds and starts without either. Each embeds its device image, built by Nix from the same
+//! kernel sources (`nix/kernels.nix`: `nvcc -cubin` for sm_89; `hipcc` for the AMD targets of
+//! `deviceImageHip`).
+//!
+//! The device: its primary context with blocking-sync scheduling, the kernel image, three
+//! streams, two events, one block of device memory and one block of pinned host memory taken
+//! when the adapter is made (the C++ `Encoder::Encoder` with `--overlap` and `--arena`).
 //!
 //! - `submit` validates the plan, queues every step in order and records a completion event of
 //!   its own at the end of the plan's wait stream; it does not wait.
@@ -12,79 +18,71 @@
 //!   so they complete in any order, and a later plan on the same stream does not delay the
 //!   wait of an earlier one.
 //! - `wait` is the hybrid wait of the C++ ([`WaitMode`], module `wait`).
-//! - [`CudaDevice::set_timing`] brackets each plan with a pair of timing events on its wait
-//!   stream; [`CudaDevice::last_device_time`] reports the device-side duration of the last plan
+//! - [`GpuDevice::set_timing`] brackets each plan with a pair of timing events on its wait
+//!   stream; [`GpuDevice::last_device_time`] reports the device-side duration of the last plan
 //!   waited for (the stage profile of the benchmarks).
-//! - [`CudaDevice::restore`] makes the context's objects again after `DeviceError::Lost`,
-//!   where the driver allows it (not after a fault on the device: see below).
+//! - [`GpuDevice::restore`] makes the context's objects again after `DeviceError::Lost`,
+//!   where the runtime allows it (not after a fault on the device: see below).
 //!
 //! # Errors
 //!
-//! Every driver status is a value; none aborts. `CUDA_SUCCESS` is success; the statuses of
-//! [`api::context_lost`] are `DeviceError::Lost` (the context is unusable: every later submit
-//! returns `Lost` until [`CudaDevice::restore`]); every other status, including statuses this
-//! crate has no name for, is `DeviceError::Failed` with the code as the driver gave it.
+//! Every runtime status is a value; none aborts. 0 is success; the statuses of the runtime's
+//! `context_lost` ([`cuda::context_lost`], [`hip::context_lost`]) are `DeviceError::Lost` (the
+//! context is unusable: every later submit returns `Lost` until [`GpuDevice::restore`]); every
+//! other status, including statuses this crate has no name for, is `DeviceError::Failed` with
+//! the code as the runtime gave it.
 //!
-//! Where a status arrives (measured on the RTX 2000 Ada, driver 595.71.05, by the tests in
-//! `tests/plumbing.rs`):
-//! - A launch the card cannot run (`k_me` with 1024 threads per block: more registers than a
-//!   multiprocessor has) is refused by `cuLaunchKernel` itself with
-//!   `CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES` (701). The adapter stops queueing that plan there,
-//!   still records its completion event, and reports `Failed { step, code: 701 }` at the wait,
-//!   after the stream has drained. The context stays usable: the next plan runs normally.
-//! - A kernel that faults on the device (a read far outside the arena) is not seen by any
-//!   queueing call; it surfaces at the wait as `CUDA_ERROR_ILLEGAL_ADDRESS` (700), reported as
-//!   `Lost { code: 700 }`, and every later submit returns `Lost`. Such a fault poisons the
-//!   process, as `cuda.h` says: after `cuDevicePrimaryCtxReset` the driver still refuses to
-//!   retain the primary context or to create any other with status 700, so
-//!   [`CudaDevice::restore`] returns [`CudaError::ProcessPoisoned`] and only a new process can
-//!   use the card (test `device_fault_is_lost_and_poisons_the_process`). The kernel log gets
-//!   an `Xid 31` (MMU fault) line for the faulting context; other processes on the card are
-//!   not affected.
-//! - Nothing in the tests produced a status that is neither of these; any other status is
-//!   `Failed` at its step, or at the end of the plan if it surfaces at the wait.
+//! A launch the card refuses is `Failed` at its step, reported at the wait after the stream has
+//! drained; the context stays usable. A kernel that faults on the device surfaces at the wait as
+//! `Lost`, and where the runtime keeps the fault for the process, [`GpuDevice::restore`]
+//! returns [`GpuError::ProcessPoisoned`]. Where each status arrives on each vendor's card is
+//! documented in the runtime's module and tested in `tests/plumbing.rs`.
 //!
 //! The adapter belongs to the thread that made it (the context is current there); it is not
 //! `Send`.
 //!
-//! `unsafe` in this crate: the driver calls. Each call site states why the handles and
+//! `unsafe` in this crate: the runtime calls. Each call site states why the handles and
 //! addresses it passes are valid.
-#![allow(unsafe_code, reason = "FFI adapter: the CUDA driver API")]
+#![allow(unsafe_code, reason = "FFI adapter: the CUDA driver API and HIP")]
 
-mod api;
 #[doc(hidden)]
 pub mod cost;
+pub mod cuda;
+pub mod hip;
+mod runtime;
 mod wait;
 
-use std::ffi::{CString, c_char, c_int, c_void};
+use std::ffi::{CString, c_void};
 use std::time::{Duration, Instant};
 
-use api::{Api, CUcontext, CUdevice, CUdeviceptr, CUevent, CUfunction, CUmodule, CUstream};
-pub use api::{
-    CUDA_ERROR_CONTEXT_IS_DESTROYED, CUDA_ERROR_ILLEGAL_ADDRESS,
-    CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES, CUresult, context_lost,
-};
+pub use cuda::Cuda;
+pub use hip::Hip;
+pub use runtime::Runtime;
+use runtime::{Handle, Status};
 use tb_device::plan::{EventId, Op, Plan, StreamId};
 use tb_device::{ArenaSizes, Completion, Device, DeviceError, Kernel, Nanos, Ticket};
 pub use wait::WaitMode;
 use wait::{Schedule, WaitStats};
 
-/// The device image and the names of its kernels, as built by `nix/kernels.nix`
-/// (`deviceImage`). The flake names the two files in `TB_KERNEL_IMAGE` and `TB_KERNEL_SYMBOLS`
-/// for this package's build and in the dev shell.
+/// The adapter on an NVIDIA card.
+pub type CudaDevice = GpuDevice<Cuda>;
+/// The adapter on an AMD card.
+pub type HipDevice = GpuDevice<Hip>;
+
+/// Success, in both runtimes.
+const SUCCESS: Status = 0;
+
+/// A device image and the names of its kernels, as built by `nix/kernels.nix` (`deviceImage`,
+/// `deviceImageHip`). The flake names the files in `TB_KERNEL_IMAGE_CUDA` /
+/// `TB_KERNEL_SYMBOLS_CUDA` and `TB_KERNEL_IMAGE_HIP` / `TB_KERNEL_SYMBOLS_HIP` for this
+/// package's build and in the dev shell; each runtime embeds its own ([`Runtime::IMAGE`]).
 #[derive(Clone, Copy, Debug)]
 pub struct KernelImage {
-    /// The cubin.
+    /// The cubin (CUDA) or the code object or offload bundle (HIP).
     pub image: &'static [u8],
     /// One line per kernel: its name, a space, its (mangled) symbol in the image.
     pub symbols: &'static str,
 }
-
-/// The image this crate was built with.
-pub const IMAGE: KernelImage = KernelImage {
-    image: include_bytes!(env!("TB_KERNEL_IMAGE")),
-    symbols: include_str!(env!("TB_KERNEL_SYMBOLS")),
-};
 
 /// Plans that may be in flight at once. More is a bug of the caller (a ticket never waited
 /// for), reported as `DeviceError::BadPlan` by `submit`.
@@ -92,30 +90,35 @@ pub const MAX_IN_FLIGHT: usize = 64;
 
 /// Why the adapter could not be made or made again.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum CudaError {
-    /// The driver library could not be loaded, or lacks a function.
-    #[error("CUDA driver library: {0}")]
-    Driver(String),
-    /// A driver call failed while the adapter was being made.
-    #[error("{call} failed with CUDA status {status} ({name})")]
+pub enum GpuError {
+    /// The runtime's library could not be loaded, or lacks a function.
+    #[error("{runtime} runtime library: {detail}")]
+    Driver {
+        /// "CUDA" or "HIP".
+        runtime: &'static str,
+        /// What the loader said.
+        detail: String,
+    },
+    /// A runtime call failed while the adapter was being made.
+    #[error("{call} failed with status {status} ({name})")]
     Call {
-        /// The driver function.
+        /// The runtime function.
         call: &'static str,
         /// Its status.
         status: i32,
-        /// The status's name as the driver gives it (`cuGetErrorName`), or "unknown".
+        /// The status's name as the runtime gives it, or "unknown".
         name: String,
     },
     /// The image has no symbol for a kernel the protocol names.
     #[error("the kernel image has no kernel named {0}")]
     MissingKernel(&'static str),
-    /// The driver refuses to make any context in this process again: after a fault on the
+    /// The runtime refuses to make any context in this process again: after a fault on the
     /// device (an illegal address, a trap, a launch failure) the driver keeps the status for
-    /// the whole process, as `cuda.h` says ("the process must be terminated and relaunched").
+    /// the whole process ("the process must be terminated and relaunched", as `cuda.h` says).
     /// Only a new process can use the card.
-    #[error("CUDA status {status} poisons this process: it must be restarted to use the card")]
+    #[error("status {status} poisons this process: it must be restarted to use the card")]
     ProcessPoisoned {
-        /// The status the driver keeps returning.
+        /// The status the runtime keeps returning.
         status: i32,
     },
 }
@@ -124,9 +127,9 @@ pub enum CudaError {
 /// adapter's life, so that the steady state makes no driver objects.
 #[derive(Clone, Copy)]
 struct Slot {
-    done: CUevent,
-    start: CUevent,
-    end: CUevent,
+    done: Handle,
+    start: Handle,
+    end: Handle,
     busy: bool,
 }
 
@@ -135,7 +138,7 @@ struct InFlight {
     /// The slot whose completion event follows the plan; `NO_SLOT` for a plan without steps,
     /// which is a wait for `stream` itself.
     slot: usize,
-    stream: CUstream,
+    stream: Handle,
     class: u64,
     steps: usize,
     timed: bool,
@@ -151,30 +154,30 @@ const NO_SLOT: usize = usize::MAX;
 #[derive(Clone, Copy)]
 enum Target {
     /// A plan's completion event.
-    Event(CUevent),
+    Event(Handle),
     /// A stream: everything queued on it (a plan without steps).
-    Stream(CUstream),
+    Stream(Handle),
 }
 
-/// A CUDA device executing plans.
-pub struct CudaDevice {
-    api: Api,
-    device: CUdevice,
+/// A GPU executing plans through runtime `R` ([`Cuda`] or [`Hip`]).
+pub struct GpuDevice<R: Runtime> {
+    api: R,
+    device: i32,
     image: KernelImage,
     /// Whether the primary context is retained (released on teardown).
     retained: bool,
-    /// The primary context while retained.
-    ctx: CUcontext,
-    module: CUmodule,
-    /// `CUfunction` of each kernel of `Kernel::NAMES`.
-    functions: Vec<CUfunction>,
-    streams: [CUstream; StreamId::COUNT],
+    /// The primary context while retained (null where the runtime hands none out).
+    ctx: Handle,
+    module: Handle,
+    /// The function of each kernel of `Kernel::NAMES`.
+    functions: Vec<Handle>,
+    streams: [Handle; StreamId::COUNT],
     /// A stream outside the protocol, made on request for another user of the context.
-    aux_stream: CUstream,
-    events: [CUevent; EventId::COUNT],
+    aux_stream: Handle,
+    events: [Handle; EventId::COUNT],
     slots: Vec<Slot>,
     arenas: ArenaSizes,
-    dev_base: CUdeviceptr,
+    dev_base: u64,
     host_base: *mut u8,
     in_flight: Vec<InFlight>,
     /// Foreign device regions by slot: base address and length (length 0: not bound).
@@ -190,9 +193,10 @@ pub struct CudaDevice {
     name: String,
 }
 
-impl std::fmt::Debug for CudaDevice {
+impl<R: Runtime> std::fmt::Debug for GpuDevice<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CudaDevice")
+        f.debug_struct("GpuDevice")
+            .field("runtime", &R::NAME)
             .field("name", &self.name)
             .field("arenas", &self.arenas)
             .field("lost", &self.lost)
@@ -200,29 +204,28 @@ impl std::fmt::Debug for CudaDevice {
     }
 }
 
-/// Status from the driver: success, or the status as an error to report.
-fn ok(s: CUresult) -> Result<(), CUresult> {
-    if s == api::CUDA_SUCCESS {
-        Ok(())
-    } else {
-        Err(s)
-    }
+/// Status from the runtime: success, or the status as an error to report.
+fn ok(s: Status) -> Result<(), Status> {
+    if s == SUCCESS { Ok(()) } else { Err(s) }
 }
 
 /// A status as a protocol error at `step`.
-fn device_error(step: usize, status: CUresult) -> DeviceError {
-    if context_lost(status) {
+fn device_error<R: Runtime>(step: usize, status: Status) -> DeviceError {
+    if R::context_lost(status) {
         DeviceError::Lost { code: status }
     } else {
         DeviceError::Failed { step, code: status }
     }
 }
 
-impl CudaDevice {
-    /// Make an adapter on CUDA device `ordinal` with arenas of these sizes and the kernels of
-    /// `image`. The device arena is cleared.
-    pub fn new(ordinal: i32, arenas: ArenaSizes, image: &KernelImage) -> Result<Self, CudaError> {
-        let api = Api::load().map_err(CudaError::Driver)?;
+impl<R: Runtime> GpuDevice<R> {
+    /// Make an adapter on device `ordinal` of runtime `R` with arenas of these sizes and the
+    /// kernels of `image` (normally `&R::IMAGE`). The device arena is cleared.
+    pub fn new(ordinal: i32, arenas: ArenaSizes, image: &KernelImage) -> Result<Self, GpuError> {
+        let api = R::load().map_err(|detail| GpuError::Driver {
+            runtime: R::NAME,
+            detail,
+        })?;
         let null = std::ptr::null_mut();
         let mut this = Self {
             api,
@@ -250,37 +253,28 @@ impl CudaDevice {
             epoch: Instant::now(),
             name: String::new(),
         };
-        let mut device: CUdevice = 0;
-        // SAFETY: cuInit is the first call; the out-pointer is to a local.
-        unsafe {
-            this.ck("cuInit", (this.api.cuInit)(0))?;
-            this.ck("cuDeviceGet", (this.api.cuDeviceGet)(&mut device, ordinal))?;
-        }
+        // SAFETY: the runtime's first calls; out-pointers are to locals inside `init`.
+        let device = unsafe { this.api.init(ordinal) }.map_err(|c| this.call_error(c))?;
         this.device = device;
-        let mut name = [0 as c_char; 128];
-        // SAFETY: `name` has the length passed (less one, so that it stays NUL-terminated);
-        // CStr reads up to the NUL inside it.
-        unsafe {
-            if (this.api.cuDeviceGetName)(name.as_mut_ptr(), name.len() as c_int - 1, device)
-                == api::CUDA_SUCCESS
-            {
-                this.name = std::ffi::CStr::from_ptr(name.as_ptr())
-                    .to_string_lossy()
-                    .into_owned();
-            }
-        }
+        // SAFETY: `device` is the handle `init` returned.
+        this.name = unsafe { this.api.device_name(device) }.unwrap_or_default();
         // On an error `this` is dropped, which frees what `setup` made so far.
         this.setup()?;
         tracing::info!(
-            device = %this.name, device_bytes = arenas.device, host_bytes = arenas.host,
-            kernels = this.functions.len(), "CUDA device ready"
+            runtime = R::NAME, device = %this.name, device_bytes = arenas.device,
+            host_bytes = arenas.host, kernels = this.functions.len(), "GPU device ready"
         );
         Ok(this)
     }
 
-    /// The device's name as the driver reports it.
+    /// The device's name as the runtime reports it.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// The runtime's name ("CUDA", "HIP").
+    pub fn runtime(&self) -> &'static str {
+        R::NAME
     }
 
     /// How `wait` waits (default [`WaitMode::Hybrid`]).
@@ -289,7 +283,7 @@ impl CudaDevice {
     }
 
     /// Bracket every plan submitted from now on with timing events, for
-    /// [`CudaDevice::last_device_time`]. Off by default (the events cost a little).
+    /// [`GpuDevice::last_device_time`]. Off by default (the events cost a little).
     pub fn set_timing(&mut self, on: bool) {
         self.timing = on;
     }
@@ -300,37 +294,30 @@ impl CudaDevice {
         self.last_time
     }
 
-    /// The CUDA context the adapter works in (the device's primary context), as the driver's
-    /// `CUcontext` handle, for code that must put its own work into the same context (the
-    /// decoders: two contexts time-slice even inside one process). Null after a failed restore.
-    pub fn context(&self) -> *mut c_void {
-        self.ctx.cast()
-    }
-
-    /// Free and total memory of the card in bytes, as the driver reports them for this
-    /// context (`cuMemGetInfo`): everything every process holds counts as used.
+    /// Free and total memory of the card in bytes, as the runtime reports them for this
+    /// context: everything every process holds counts as used.
     pub fn mem_info(&self) -> Option<(u64, u64)> {
         let (mut free, mut total) = (0usize, 0usize);
         // SAFETY: out-pointers to locals; the context is current on this thread.
-        let s = unsafe { (self.api.cuMemGetInfo_v2)(&mut free, &mut total) };
-        (s == api::CUDA_SUCCESS).then_some((free as u64, total as u64))
+        let s = unsafe { self.api.mem_info(&mut free, &mut total) };
+        (s == SUCCESS).then_some((free as u64, total as u64))
     }
 
     /// A stream of the adapter's context that no plan uses, for another user of the context
     /// (libavcodec's copies of decoder surfaces): created on the first call with the
     /// non-blocking flag, so that work on it neither waits for nor holds up the default stream,
-    /// and destroyed with the adapter. The handle is the driver's `CUstream`; it is invalid
-    /// after [`CudaDevice::restore`] (ask again).
-    pub fn aux_stream(&mut self) -> Result<*mut c_void, CudaError> {
+    /// and destroyed with the adapter. The handle is the runtime's stream; it is invalid after
+    /// [`GpuDevice::restore`] (ask again).
+    pub fn aux_stream(&mut self) -> Result<*mut c_void, GpuError> {
         if self.aux_stream.is_null() {
             let mut s = std::ptr::null_mut();
             // SAFETY: the out-pointer is to a local; the context made in `setup` is current on
             // this thread (the type is not `Send`).
-            let status = unsafe { (self.api.cuStreamCreate)(&mut s, api::CU_STREAM_NON_BLOCKING) };
-            self.ck("cuStreamCreate", status)?;
+            let status = unsafe { self.api.stream_create(&mut s, true) };
+            self.ck("stream create", status)?;
             self.aux_stream = s;
         }
-        Ok(self.aux_stream.cast())
+        Ok(self.aux_stream)
     }
 
     /// Bind device memory the adapter does not own (a decoder surface) to foreign slot `slot`,
@@ -354,90 +341,74 @@ impl CudaDevice {
         self.foreign.clear();
     }
 
-    /// Whether the context was lost and [`CudaDevice::restore`] is needed.
+    /// Whether the context was lost and [`GpuDevice::restore`] is needed.
     pub fn is_lost(&self) -> bool {
         self.lost.is_some()
     }
 
     /// Destroy the context's objects and make them again: after `DeviceError::Lost`, or at any
-    /// time. The primary context is reset (every allocation of it is freed by the driver, the
+    /// time. The primary context is reset (every allocation of it is freed by the runtime, the
     /// pinned arena included), then made again with the same arena sizes and image. Plans in
     /// flight are forgotten (their tickets become unknown), the host arena is zeroed and may
     /// move, the device arena is cleared. If it fails, the adapter stays lost (no host arena,
     /// every submit `Lost`) and `restore` may be tried again.
     ///
-    /// After a fault on the device this cannot succeed: driver 595 keeps the fault's status for
-    /// the process (measured: `cuDevicePrimaryCtxRetain` and `cuCtxCreate` return 700 after
-    /// `cuDevicePrimaryCtxReset`), and `restore` returns [`CudaError::ProcessPoisoned`]. The
-    /// process must then be restarted; a restore succeeds after losses that do not poison the
-    /// process (a context destroyed or reset by another part of the process) and on a healthy
-    /// context.
-    pub fn restore(&mut self) -> Result<(), CudaError> {
-        tracing::warn!(lost = ?self.lost, "making the CUDA context again");
+    /// After a fault on the device this cannot succeed where the runtime keeps the fault for
+    /// the process (CUDA: driver 595 returns 700 from `cuDevicePrimaryCtxRetain` and
+    /// `cuCtxCreate` after `cuDevicePrimaryCtxReset`), and `restore` returns
+    /// [`GpuError::ProcessPoisoned`]. The process must then be restarted; a restore succeeds
+    /// after losses that do not poison the process (a context destroyed or reset by another
+    /// part of the process) and on a healthy context.
+    pub fn restore(&mut self) -> Result<(), GpuError> {
+        tracing::warn!(runtime = R::NAME, lost = ?self.lost, "making the GPU context again");
         self.teardown(true);
-        self.lost = Some(api::CUDA_ERROR_CONTEXT_IS_DESTROYED);
+        self.lost = Some(R::CONTEXT_IS_DESTROYED);
         self.setup()?;
         self.lost = None;
         Ok(())
     }
 
-    fn status_name(&self, s: CUresult) -> String {
-        let mut p: *const c_char = std::ptr::null();
-        // SAFETY: the out-pointer is to a local; on success the driver points it at a static
-        // NUL-terminated string. Any status may be passed: an unknown one is refused with
-        // CUDA_ERROR_INVALID_VALUE and `p` stays null.
-        unsafe {
-            if (self.api.cuGetErrorName)(s, &mut p) == api::CUDA_SUCCESS && !p.is_null() {
-                return std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned();
+    fn status_name(&self, s: Status) -> String {
+        self.api
+            .status_name(s)
+            .unwrap_or_else(|| "unknown".to_owned())
+    }
+
+    fn call_error(&self, c: runtime::Call) -> GpuError {
+        if R::poisons_process(c.status) {
+            GpuError::ProcessPoisoned { status: c.status }
+        } else {
+            GpuError::Call {
+                call: c.call,
+                status: c.status,
+                name: self.status_name(c.status),
             }
         }
-        "unknown".to_owned()
     }
 
-    fn ck(&self, call: &'static str, status: CUresult) -> Result<(), CudaError> {
-        ok(status).map_err(|status| {
-            if api::poisons_process(status) {
-                CudaError::ProcessPoisoned { status }
-            } else {
-                CudaError::Call {
-                    call,
-                    status,
-                    name: self.status_name(status),
-                }
-            }
-        })
+    fn ck(&self, call: &'static str, status: Status) -> Result<(), GpuError> {
+        runtime::call(call, status).map_err(|c| self.call_error(c))
     }
 
-    /// Retain and enter the primary context, load the image, make streams, events and arenas.
-    /// Every object made is recorded in `self` as soon as it exists, so that `teardown` frees
+    /// Enter the primary context, load the image, make streams, events and arenas. Every
+    /// object made is recorded in `self` as soon as it exists, so that `teardown` frees
     /// exactly what was made, also after a failure half-way.
-    fn setup(&mut self) -> Result<(), CudaError> {
+    fn setup(&mut self) -> Result<(), GpuError> {
         let null = std::ptr::null_mut();
-        let mut ctx: CUcontext = null;
-        // SAFETY: plain driver calls with out-pointers to locals and fields. The primary
-        // context's flags are set before it is retained (they apply when the context is made;
-        // if another part of the process already holds it, the call fails with
-        // PRIMARY_CONTEXT_ACTIVE and the existing flags stay, which is accepted).
-        unsafe {
-            let _ = (self.api.cuDevicePrimaryCtxSetFlags_v2)(
-                self.device,
-                api::CU_CTX_SCHED_BLOCKING_SYNC,
-            );
-            self.ck(
-                "cuDevicePrimaryCtxRetain",
-                (self.api.cuDevicePrimaryCtxRetain)(&mut ctx, self.device),
-            )?;
-            self.retained = true;
-            self.ctx = ctx;
-            self.ck("cuCtxSetCurrent", (self.api.cuCtxSetCurrent)(ctx))?;
-            let mut module = null;
-            self.ck(
-                "cuModuleLoadData",
-                // The image is an ELF cubin whose length the driver reads from its headers.
-                (self.api.cuModuleLoadData)(&mut module, self.image.image.as_ptr().cast()),
-            )?;
-            self.module = module;
-        }
+        // SAFETY: `device` is the handle `init` returned; on success the context stays
+        // entered until `teardown`.
+        let ctx = unsafe { self.api.enter(self.device) }.map_err(|c| self.call_error(c))?;
+        self.retained = true;
+        self.ctx = ctx;
+        let mut module = null;
+        // SAFETY: the image is the runtime's own format (a cubin, a code object), which the
+        // runtime reads up to the length its headers give; the out-pointer is to a local.
+        let s = unsafe {
+            self.api
+                .module_load(&mut module, self.image.image.as_ptr().cast())
+        };
+        self.ck("module load", s)?;
+        self.module = module;
         self.functions.clear();
         for kernel in Kernel::NAMES {
             let symbol = self
@@ -446,14 +417,14 @@ impl CudaDevice {
                 .lines()
                 .filter_map(|l| l.split_once(' '))
                 .find_map(|(n, s)| (n == *kernel).then_some(s.trim()))
-                .ok_or(CudaError::MissingKernel(kernel))?;
-            let c = CString::new(symbol).map_err(|_| CudaError::MissingKernel(kernel))?;
+                .ok_or(GpuError::MissingKernel(kernel))?;
+            let c = CString::new(symbol).map_err(|_| GpuError::MissingKernel(kernel))?;
             let mut f = null;
             // SAFETY: `module` is the module loaded above; `c` is NUL-terminated and lives
             // across the call.
-            let s = unsafe { (self.api.cuModuleGetFunction)(&mut f, self.module, c.as_ptr()) };
-            if s != api::CUDA_SUCCESS {
-                return Err(CudaError::MissingKernel(kernel));
+            let s = unsafe { self.api.module_function(&mut f, self.module, c.as_ptr()) };
+            if s != SUCCESS {
+                return Err(GpuError::MissingKernel(kernel));
             }
             self.functions.push(f);
         }
@@ -464,35 +435,31 @@ impl CudaDevice {
         unsafe {
             for i in 0..StreamId::COUNT {
                 let mut s = null;
-                self.ck("cuStreamCreate", (self.api.cuStreamCreate)(&mut s, 0))?;
+                self.ck("stream create", self.api.stream_create(&mut s, false))?;
                 self.streams[i] = s;
             }
             for i in 0..EventId::COUNT {
                 let mut e = null;
-                self.ck(
-                    "cuEventCreate",
-                    (self.api.cuEventCreate)(&mut e, api::CU_EVENT_DISABLE_TIMING),
-                )?;
+                self.ck("event create", self.api.event_create(&mut e, false, false))?;
                 self.events[i] = e;
             }
             let dev_len = self.arenas.device.max(1) as usize;
             let mut base = 0;
-            self.ck("cuMemAlloc", (self.api.cuMemAlloc_v2)(&mut base, dev_len))?;
+            self.ck("device alloc", self.api.mem_alloc(&mut base, dev_len))?;
             self.dev_base = base;
             self.ck(
-                "cuMemHostAlloc",
-                (self.api.cuMemHostAlloc)(&mut host, self.arenas.host.max(1) as usize, 0),
+                "pinned host alloc",
+                self.api
+                    .host_alloc(&mut host, self.arenas.host.max(1) as usize),
             )?;
             self.host_base = host.cast();
             std::ptr::write_bytes(self.host_base, 0, self.arenas.host as usize);
             self.ck(
-                "cuMemsetD8Async",
-                (self.api.cuMemsetD8Async)(self.dev_base, 0, dev_len, self.streams[0]),
+                "memset",
+                self.api
+                    .memset_d8(self.dev_base, 0, dev_len, self.streams[0]),
             )?;
-            self.ck(
-                "cuStreamSynchronize",
-                (self.api.cuStreamSynchronize)(self.streams[0]),
-            )?;
+            self.ck("stream synchronize", self.api.stream_sync(self.streams[0]))?;
         }
         Ok(())
     }
@@ -510,48 +477,48 @@ impl CudaDevice {
             if self.lost.is_none() {
                 for s in self.streams {
                     if !s.is_null() {
-                        let _ = (api.cuStreamSynchronize)(s);
+                        let _ = api.stream_sync(s);
                     }
                 }
             }
             if !self.host_base.is_null() {
-                let _ = (api.cuMemFreeHost)(self.host_base.cast());
+                let _ = api.host_free(self.host_base.cast());
                 self.host_base = std::ptr::null_mut();
             }
             if self.dev_base != 0 {
-                let _ = (api.cuMemFree_v2)(self.dev_base);
+                let _ = api.mem_free(self.dev_base);
                 self.dev_base = 0;
             }
             for slot in &self.slots {
                 for e in [slot.done, slot.start, slot.end] {
                     if !e.is_null() {
-                        let _ = (api.cuEventDestroy_v2)(e);
+                        let _ = api.event_destroy(e);
                     }
                 }
             }
             for e in &mut self.events {
                 if !e.is_null() {
-                    let _ = (api.cuEventDestroy_v2)(*e);
+                    let _ = api.event_destroy(*e);
                     *e = null;
                 }
             }
             for s in self.streams.iter_mut().chain([&mut self.aux_stream]) {
                 if !s.is_null() {
-                    let _ = (api.cuStreamDestroy_v2)(*s);
+                    let _ = api.stream_destroy(*s);
                     *s = null;
                 }
             }
             if !self.module.is_null() {
-                let _ = (api.cuModuleUnload)(self.module);
+                let _ = api.module_unload(self.module);
                 self.module = null;
             }
             if self.retained {
-                let _ = (api.cuDevicePrimaryCtxRelease_v2)(self.device);
+                api.leave(self.device);
                 self.retained = false;
                 self.ctx = null;
             }
             if reset {
-                let _ = (api.cuDevicePrimaryCtxReset_v2)(self.device);
+                api.reset(self.device);
             }
         }
         self.slots.clear();
@@ -561,21 +528,16 @@ impl CudaDevice {
     }
 
     /// A free slot with the events a plan needs, made if there is none yet.
-    fn slot_for(&mut self, timed: bool) -> Result<usize, CUresult> {
+    fn slot_for(&mut self, timed: bool) -> Result<usize, Status> {
         let i = match self.slots.iter().position(|s| !s.busy) {
             Some(i) => i,
             None => {
                 let null = std::ptr::null_mut();
                 let mut done = null;
-                // SAFETY: out-pointer to a local. The completion event sleeps in
-                // cuEventSynchronize (the context's blocking-sync flag covers stream waits,
-                // this flag the event's) and keeps no time stamp.
-                ok(unsafe {
-                    (self.api.cuEventCreate)(
-                        &mut done,
-                        api::CU_EVENT_BLOCKING_SYNC | api::CU_EVENT_DISABLE_TIMING,
-                    )
-                })?;
+                // SAFETY: out-pointer to a local. The completion event sleeps in a synchronize
+                // (the context's blocking-sync flag covers stream waits, this flag the event's)
+                // and keeps no time stamp.
+                ok(unsafe { self.api.event_create(&mut done, true, false) })?;
                 self.slots.push(Slot {
                     done,
                     start: null,
@@ -587,12 +549,12 @@ impl CudaDevice {
         };
         if timed && self.slots[i].start.is_null() {
             let (mut start, mut end) = (std::ptr::null_mut(), std::ptr::null_mut());
-            // SAFETY: out-pointers to locals; flags 0: timing events. Each is stored as soon
-            // as it exists, so that teardown destroys it.
+            // SAFETY: out-pointers to locals; timing events. Each is stored as soon as it
+            // exists, so that teardown destroys it.
             unsafe {
-                ok((self.api.cuEventCreate)(&mut start, 0))?;
+                ok(self.api.event_create(&mut start, false, true))?;
                 self.slots[i].start = start;
-                ok((self.api.cuEventCreate)(&mut end, 0))?;
+                ok(self.api.event_create(&mut end, false, true))?;
                 self.slots[i].end = end;
             }
         }
@@ -609,33 +571,28 @@ impl CudaDevice {
             // device address `dev_base + off .. + len` lies in the device allocation and every
             // host address in the pinned allocation, both owned by `self` and alive until
             // teardown (after all streams are synchronized). Streams, events and functions are
-            // the handles made in `setup`. The driver copies kernel arguments and the 2-D copy
-            // descriptor during the call, so pointers into `args` and `c` need to live only
-            // across it.
+            // the handles made in `setup`. The runtime copies kernel arguments and the 2-D copy
+            // descriptor during the call, so pointers into `args` need to live only across it.
             let status = unsafe {
                 match step.op {
-                    Op::Fill { dst, byte } => (api.cuMemsetD8Async)(
-                        self.dev_base + dst.off,
-                        byte,
-                        dst.len as usize,
-                        stream,
-                    ),
+                    Op::Fill { dst, byte } => {
+                        api.memset_d8(self.dev_base + dst.off, byte, dst.len as usize, stream)
+                    }
                     // The handles were resolved in place by `submit_keyed` before anything was
                     // queued: from here it is a copy like any other.
-                    Op::Upload { dst, src } | Op::UploadRefs { dst, src, .. } => (api
-                        .cuMemcpyHtoDAsync_v2)(
+                    Op::Upload { dst, src } | Op::UploadRefs { dst, src, .. } => api.htod(
                         self.dev_base + dst.off,
                         self.host_base.add(src.off as usize).cast(),
                         src.len as usize,
                         stream,
                     ),
-                    Op::Copy { dst, src } => (api.cuMemcpyDtoDAsync_v2)(
+                    Op::Copy { dst, src } => api.dtod(
                         self.dev_base + dst.off,
                         self.dev_base + src.off,
                         src.len as usize,
                         stream,
                     ),
-                    Op::Download { dst, src } => (api.cuMemcpyDtoHAsync_v2)(
+                    Op::Download { dst, src } => api.dtoh(
                         self.host_base.add(dst.off as usize).cast(),
                         self.dev_base + src.off,
                         src.len as usize,
@@ -648,52 +605,32 @@ impl CudaDevice {
                         src_pitch,
                         width,
                         rows,
-                    } => {
-                        let c = api::Memcpy2d {
-                            srcXInBytes: 0,
-                            srcY: 0,
-                            srcMemoryType: api::CU_MEMORYTYPE_HOST,
-                            srcHost: self.host_base.add(src.off as usize).cast(),
-                            srcDevice: 0,
-                            srcArray: std::ptr::null_mut(),
-                            srcPitch: src_pitch as usize,
-                            dstXInBytes: 0,
-                            dstY: 0,
-                            dstMemoryType: api::CU_MEMORYTYPE_DEVICE,
-                            dstHost: std::ptr::null_mut(),
-                            dstDevice: self.dev_base + dst.off,
-                            dstArray: std::ptr::null_mut(),
-                            dstPitch: dst_pitch as usize,
-                            WidthInBytes: width as usize,
-                            Height: rows as usize,
-                        };
-                        (api.cuMemcpy2DAsync_v2)(&c, stream)
-                    }
+                    } => api.htod_2d(
+                        self.dev_base + dst.off,
+                        dst_pitch as usize,
+                        self.host_base.add(src.off as usize).cast(),
+                        src_pitch as usize,
+                        width as usize,
+                        rows as usize,
+                        stream,
+                    ),
                     Op::Launch(l) => {
                         let mut args = l.kernel.resolve(self.dev_base);
                         let mut ptrs = args.pointers();
-                        (api.cuLaunchKernel)(
+                        api.launch(
                             self.functions[l.kernel.index()],
                             l.grid,
-                            1,
-                            1,
                             l.block,
-                            1,
-                            1,
-                            0,
                             stream,
                             ptrs.as_mut_ptr(),
-                            std::ptr::null_mut(),
                         )
                     }
-                    Op::Record(e) => (api.cuEventRecord)(self.events[usize::from(e.0)], stream),
-                    Op::WaitFor(e) => {
-                        (api.cuStreamWaitEvent)(stream, self.events[usize::from(e.0)], 0)
-                    }
+                    Op::Record(e) => api.event_record(self.events[usize::from(e.0)], stream),
+                    Op::WaitFor(e) => api.stream_wait_event(stream, self.events[usize::from(e.0)]),
                 }
             };
-            if status != api::CUDA_SUCCESS {
-                return Err(device_error(i, status));
+            if status != SUCCESS {
+                return Err(device_error::<R>(i, status));
             }
         }
         Ok(())
@@ -746,9 +683,9 @@ impl CudaDevice {
         if plan.steps.is_empty() && !timed {
             // A plan without steps is a wait for its stream (the host's wait for the upload
             // stream at the start of a tick, a settle). An event recorded on an idle stream
-            // costs a round trip to the device before it reads as complete (measured: about
-            // 30 us per tick, 0.5 to 1 % of a free-running tick); asking the stream itself
-            // returns at once when it is idle, as the C++ `cudaStreamSynchronize` does.
+            // costs a round trip to the device before it reads as complete (measured on CUDA:
+            // about 30 us per tick, 0.5 to 1 % of a free-running tick); asking the stream
+            // itself returns at once when it is idle, as the C++ `cudaStreamSynchronize` does.
             let ticket = Ticket(self.next_ticket);
             self.next_ticket += 1;
             self.in_flight.push(InFlight {
@@ -763,7 +700,7 @@ impl CudaDevice {
             });
             return Ok(ticket);
         }
-        let slot = self.slot_for(timed).map_err(|s| device_error(0, s))?;
+        let slot = self.slot_for(timed).map_err(|s| device_error::<R>(0, s))?;
         let Slot {
             done, start, end, ..
         } = self.slots[slot];
@@ -772,8 +709,8 @@ impl CudaDevice {
         let mut failed = if timed {
             // SAFETY: the events are the slot's, made by `slot_for` (start and end when
             // `timed`); the stream is one of `setup`'s.
-            let s = unsafe { (self.api.cuEventRecord)(start, wait_stream) };
-            ok(s).err().map(|s| device_error(0, s))
+            let s = unsafe { self.api.event_record(start, wait_stream) };
+            ok(s).err().map(|s| device_error::<R>(0, s))
         } else {
             None
         };
@@ -786,18 +723,18 @@ impl CudaDevice {
             // SAFETY: as above.
             let s = unsafe {
                 if timed {
-                    let s = (self.api.cuEventRecord)(end, wait_stream);
-                    if s != api::CUDA_SUCCESS {
+                    let s = self.api.event_record(end, wait_stream);
+                    if s != SUCCESS {
                         s
                     } else {
-                        (self.api.cuEventRecord)(done, wait_stream)
+                        self.api.event_record(done, wait_stream)
                     }
                 } else {
-                    (self.api.cuEventRecord)(done, wait_stream)
+                    self.api.event_record(done, wait_stream)
                 }
             };
             if let Err(s) = ok(s) {
-                failed = failed.or(Some(device_error(n, s)));
+                failed = failed.or(Some(device_error::<R>(n, s)));
             }
         }
         if let Some(e) = &failed {
@@ -830,24 +767,24 @@ impl CudaDevice {
         target: Target,
         class: u64,
         timeout: Option<Nanos>,
-    ) -> Result<CUresult, ()> {
-        let query = |api: &Api| {
+    ) -> Result<Status, ()> {
+        let query = |api: &R| {
             // SAFETY: an event is a slot's completion event, made in `slot_for` and recorded
             // by `submit_keyed`; a stream is one of `setup`'s. Both live until teardown, which
             // takes `&mut self`.
             unsafe {
                 match target {
-                    Target::Event(done) => (api.cuEventQuery)(done),
-                    Target::Stream(s) => (api.cuStreamQuery)(s),
+                    Target::Event(done) => api.event_query(done),
+                    Target::Stream(s) => api.stream_query(s),
                 }
             }
         };
-        let block = |api: &Api| {
+        let block = |api: &R| {
             // SAFETY: as for `query`.
             unsafe {
                 match target {
-                    Target::Event(done) => (api.cuEventSynchronize)(done),
-                    Target::Stream(s) => (api.cuStreamSynchronize)(s),
+                    Target::Event(done) => api.event_sync(done),
+                    Target::Stream(s) => api.stream_sync(s),
                 }
             }
         };
@@ -862,7 +799,7 @@ impl CudaDevice {
                 None => block(&self.api),
                 Some(l) => loop {
                     let s = query(&self.api);
-                    if s != api::CUDA_ERROR_NOT_READY {
+                    if s != R::NOT_READY {
                         break s;
                     }
                     if secs(t0) >= l {
@@ -884,7 +821,7 @@ impl CudaDevice {
                 }
                 loop {
                     let s = query(&self.api);
-                    if s != api::CUDA_ERROR_NOT_READY {
+                    if s != R::NOT_READY {
                         break s;
                     }
                     let el = secs(t0);
@@ -901,14 +838,23 @@ impl CudaDevice {
                 }
             }
         };
-        if status == api::CUDA_SUCCESS {
+        if status == SUCCESS {
             self.stats.update(class, secs(t0));
         }
         Ok(status)
     }
 }
 
-impl Device for CudaDevice {
+impl CudaDevice {
+    /// The CUDA context the adapter works in (the device's primary context), as the driver's
+    /// `CUcontext` handle, for code that must put its own work into the same context (the
+    /// decoders: two contexts time-slice even inside one process). Null after a failed restore.
+    pub fn context(&self) -> *mut c_void {
+        self.ctx
+    }
+}
+
+impl<R: Runtime> Device for GpuDevice<R> {
     fn arenas(&self) -> ArenaSizes {
         self.arenas
     }
@@ -919,7 +865,7 @@ impl Device for CudaDevice {
         }
         // SAFETY: `host_base` is the pinned allocation of `arenas.host` bytes (at least one
         // byte was allocated), initialized in `setup`, alive until teardown, which takes
-        // `&mut self`. The driver writes to it only for downloads of plans in flight; the
+        // `&mut self`. The runtime writes to it only for downloads of plans in flight; the
         // protocol forbids reading those regions before the completion (tb_device::Device).
         unsafe { std::slice::from_raw_parts(self.host_base, self.arenas.host as usize) }
     }
@@ -951,7 +897,7 @@ impl Device for CudaDevice {
             (f.slot, f.class, f.submitted, f.steps, f.timed);
         let lost_at_queue = matches!(f.failed, Some(DeviceError::Lost { .. }));
         let status = if lost_at_queue {
-            api::CUDA_SUCCESS
+            SUCCESS
         } else {
             let target = if slot == NO_SLOT {
                 Target::Stream(f.stream)
@@ -976,10 +922,10 @@ impl Device for CudaDevice {
         }
         let status = match (f.failed, status) {
             (Some(e), _) => Err(e),
-            (None, api::CUDA_SUCCESS) => Ok(()),
+            (None, SUCCESS) => Ok(()),
             // An asynchronous error surfaces at the wait; which step caused it is not known,
             // so it is reported at the end of the plan.
-            (None, s) => Err(device_error(steps, s)),
+            (None, s) => Err(device_error::<R>(steps, s)),
         };
         if let Err(DeviceError::Lost { code }) = status {
             self.lost = Some(code);
@@ -989,8 +935,7 @@ impl Device for CudaDevice {
             let Slot { start, end, .. } = self.slots[slot];
             // SAFETY: both are timing events of this slot, recorded around the plan, which has
             // completed (its completion event follows `end` on the same stream).
-            if unsafe { (self.api.cuEventElapsedTime_v2)(&mut ms, start, end) } == api::CUDA_SUCCESS
-            {
+            if unsafe { self.api.event_elapsed(&mut ms, start, end) } == SUCCESS {
                 self.last_time = Some((ticket, Nanos((f64::from(ms) * 1e6).round() as u64)));
             }
         }
@@ -1003,7 +948,7 @@ impl Device for CudaDevice {
     }
 }
 
-impl Drop for CudaDevice {
+impl<R: Runtime> Drop for GpuDevice<R> {
     fn drop(&mut self) {
         self.teardown(false);
     }
@@ -1015,32 +960,53 @@ mod tests {
 
     #[test]
     fn statuses_map_to_errors() {
+        for lost in [700, 709] {
+            assert_eq!(
+                device_error::<Cuda>(3, lost),
+                DeviceError::Lost { code: lost }
+            );
+            assert_eq!(
+                device_error::<Hip>(3, lost),
+                DeviceError::Lost { code: lost }
+            );
+        }
         assert_eq!(
-            device_error(3, 701),
+            device_error::<Cuda>(3, 701),
             DeviceError::Failed { step: 3, code: 701 }
         );
-        assert_eq!(device_error(3, 700), DeviceError::Lost { code: 700 });
+        assert_eq!(
+            device_error::<Hip>(3, 701),
+            DeviceError::Failed { step: 3, code: 701 }
+        );
         // Codes the adapter has no name for stay values.
-        assert_eq!(
-            device_error(0, -7),
-            DeviceError::Failed { step: 0, code: -7 }
-        );
-        assert_eq!(
-            device_error(0, 123_456),
-            DeviceError::Failed {
-                step: 0,
-                code: 123_456
-            }
-        );
+        for code in [-7, 123_456] {
+            assert_eq!(
+                device_error::<Cuda>(0, code),
+                DeviceError::Failed { step: 0, code }
+            );
+            assert_eq!(
+                device_error::<Hip>(0, code),
+                DeviceError::Failed { step: 0, code }
+            );
+        }
+    }
+
+    fn no_driver_is_an_error_value<R: Runtime>() {
+        // Where the runtime's library is missing (the sandbox), making the adapter fails
+        // without a panic; where it is present, it may succeed or fail for want of a device.
+        match GpuDevice::<R>::new(0, tb_device::selftest::ARENAS, &R::IMAGE) {
+            Ok(_) | Err(GpuError::Driver { .. } | GpuError::Call { .. }) => {}
+            Err(e) => panic!("{e}"),
+        }
     }
 
     #[test]
-    fn no_driver_is_an_error_value() {
-        // Where libcuda is missing (the sandbox), making the adapter fails without a panic;
-        // where it is present, it may succeed or fail for want of a device.
-        match CudaDevice::new(0, tb_device::selftest::ARENAS, &IMAGE) {
-            Ok(_) | Err(CudaError::Driver(_) | CudaError::Call { .. }) => {}
-            Err(e) => panic!("{e}"),
-        }
+    fn no_cuda_driver_is_an_error_value() {
+        no_driver_is_an_error_value::<Cuda>();
+    }
+
+    #[test]
+    fn no_hip_runtime_is_an_error_value() {
+        no_driver_is_an_error_value::<Hip>();
     }
 }

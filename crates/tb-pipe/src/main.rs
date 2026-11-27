@@ -4,7 +4,7 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use anyhow::Context;
-use tb_device_cuda::{CudaDevice, IMAGE};
+use tb_device_gpu::{Cuda, CudaDevice, Hip, HipDevice, Runtime};
 use tb_device_ref::RefDevice;
 use tb_pipe::opts::{DeviceKind, OptError, Opts, USAGE};
 
@@ -33,7 +33,13 @@ fn real_main() -> anyhow::Result<ExitCode> {
     let mut out = std::io::stdout().lock();
     let r = match o.device {
         DeviceKind::Cuda => {
-            let dev = CudaDevice::new(o.gpu, arenas, &IMAGE).context("making the CUDA device")?;
+            let dev =
+                CudaDevice::new(o.gpu, arenas, &Cuda::IMAGE).context("making the CUDA device")?;
+            tb_pipe::run(&o, dev, &mut out)
+        }
+        DeviceKind::Hip => {
+            let dev =
+                HipDevice::new(o.gpu, arenas, &Hip::IMAGE).context("making the HIP device")?;
             tb_pipe::run(&o, dev, &mut out)
         }
         DeviceKind::Ref => {

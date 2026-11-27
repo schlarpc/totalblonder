@@ -2,7 +2,7 @@
 //! surfaces, a decoder device in the adapter's context, the card's memory in use.
 //!
 //! The one place of this crate with `unsafe`: it hands raw device addresses of decoder
-//! surfaces to the CUDA adapter and the adapter's context to libav.
+//! surfaces to the GPU adapter on CUDA and the adapter's context to libav.
 #![allow(
     unsafe_code,
     reason = "the edge between the decoder's surfaces and the CUDA adapter"
@@ -11,7 +11,7 @@
 use std::sync::Arc;
 
 use tb_decode::{DecDevice, DecodeError, Frame};
-use tb_device_cuda::CudaDevice;
+use tb_device_gpu::{CudaDevice, HipDevice};
 use tb_device_ref::RefDevice;
 use tb_engine::device::TickDevice;
 
@@ -57,6 +57,21 @@ impl PipeDevice for CudaDevice {
         // live as long as the adapter. The pipeline drops every input and frame before the
         // adapter (`run` owns them in that order).
         unsafe { DecDevice::wrap(ctx, stream) }.map(Some)
+    }
+
+    fn mem_used_mb(&self) -> Option<f64> {
+        self.mem_info()
+            .map(|(free, total)| (total - free) as f64 / 1_048_576.0)
+    }
+}
+
+/// On an AMD card the pipeline decodes in software: NVDEC's surfaces in the adapter's context
+/// have no counterpart yet (VAAPI surfaces would have to be imported into HIP).
+impl PipeDevice for HipDevice {
+    fn bind_surfaces(&mut self, _planes: &[(u64, u64)], _frames: &[Arc<Frame>]) {}
+
+    fn decoder(&mut self, _shared: bool, _ordinal: u32) -> Result<Option<DecDevice>, DecodeError> {
+        Ok(None)
     }
 
     fn mem_used_mb(&self) -> Option<f64> {

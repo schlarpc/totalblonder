@@ -16,6 +16,7 @@ use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, bail};
+use tb_device_gpu::{Cuda, CudaDevice, Hip, HipDevice, Runtime};
 use tb_engine::{Engine, Guarded, TickDevice};
 use tb_mux::Mux;
 use tb_output::frame::Framing;
@@ -398,21 +399,32 @@ fn start_video(
                     let _ = tx.send(Err(format!("reference device: {e}")));
                 }
             },
-            VideoDevice::Cuda(gpu) => {
-                match tb_device_cuda::CudaDevice::new(gpu as i32, arenas, &tb_device_cuda::IMAGE) {
-                    Ok(d) => hub(
-                        Guarded::new(d),
-                        sessions,
-                        timing,
-                        statmux,
-                        clock.as_ref(),
-                        tx,
-                    ),
-                    Err(e) => {
-                        let _ = tx.send(Err(format!("CUDA device {gpu}: {e}")));
-                    }
+            VideoDevice::Cuda(gpu) => match CudaDevice::new(gpu as i32, arenas, &Cuda::IMAGE) {
+                Ok(d) => hub(
+                    Guarded::new(d),
+                    sessions,
+                    timing,
+                    statmux,
+                    clock.as_ref(),
+                    tx,
+                ),
+                Err(e) => {
+                    let _ = tx.send(Err(format!("CUDA device {gpu}: {e}")));
                 }
-            }
+            },
+            VideoDevice::Hip(gpu) => match HipDevice::new(gpu as i32, arenas, &Hip::IMAGE) {
+                Ok(d) => hub(
+                    Guarded::new(d),
+                    sessions,
+                    timing,
+                    statmux,
+                    clock.as_ref(),
+                    tx,
+                ),
+                Err(e) => {
+                    let _ = tx.send(Err(format!("HIP device {gpu}: {e}")));
+                }
+            },
         })?;
     match rx.recv() {
         Ok(Ok(())) => Ok(h),

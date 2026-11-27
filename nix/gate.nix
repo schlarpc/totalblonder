@@ -110,18 +110,20 @@ let
       ${preamble}
       exec python3 -I tools/gate/film_gate.py "$@"
     '';
-    # The golden cases through the binary on either device: nix run .#gate-small -- --device cuda --golden
+    # The golden cases through the binary on any device: nix run .#gate-small -- --device cuda|hip --golden
     gate-small = ''
       export M2V_VERIFY=${verify}
       export LD_LIBRARY_PATH=/run/opengl-driver/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
       exec python3 -I tools/gate/gate_small.py --enc ${enc} "$@"
     '';
     # The golden cases on the card: every record (but the measured times) and every stream as
-    # the reference adapter recorded them: nix run .#gate-golden -- DIR
+    # the reference adapter recorded them: nix run .#gate-golden -- [--device cuda|hip] [DIR]
     gate-golden = ''
       [ -f crates/tb-golden/vectors/generate.sh ] || { echo "run from the repository root" >&2; exit 2; }
       export LD_LIBRARY_PATH=/run/opengl-driver/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-      TB_M2VENC=${enc} TB_PIPE=${pipe} exec bash crates/tb-golden/vectors/generate.sh --device cuda --check "''${1:-golden-cuda}"
+      device=cuda
+      if [ "''${1:-}" = --device ]; then device=''${2:?--device cuda|hip}; shift 2; fi
+      TB_M2VENC=${enc} TB_PIPE=${pipe} exec bash crates/tb-golden/vectors/generate.sh --device "$device" --check "''${1:-golden-$device}"
     '';
     # Capacity (tools/gate/bench_capacity.py): nix run .#gate-bench -- --mode free|paced|both --label NAME
     # (more builds or options to compare: --bin NAME="PATH --option ...", run interleaved)

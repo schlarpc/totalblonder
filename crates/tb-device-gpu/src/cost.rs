@@ -17,8 +17,8 @@ use tb_device::plan::{EventId, Op, Plan, StreamId};
 use tb_device::{ArenaSizes, DevBuf, Device, DeviceError, HostBuf, Kernel, Launch};
 use tb_kernel_abi::{Geo, SL_CUR, SL_ZERO};
 
-use crate::api::{self, CUdeviceptr, CUevent, CUfunction, CUresult, CUstream};
-use crate::{CudaDevice, WaitMode};
+use crate::runtime::{Handle, Status};
+use crate::{GpuDevice, Runtime, SUCCESS, WaitMode};
 
 /// Arena sizes the measurements need.
 pub const ARENAS: ArenaSizes = ArenaSizes {
@@ -164,15 +164,15 @@ pub fn plans() -> Vec<(&'static str, Plan)> {
     reason = "a vector built once per measured plan; the launch is the common case"
 )]
 enum Raw {
-    Memset(CUdeviceptr, u8, usize, CUstream),
-    HtoD(CUdeviceptr, *const c_void, usize, CUstream),
-    DtoH(*mut c_void, CUdeviceptr, usize, CUstream),
-    Launch(CUfunction, u32, u32, CUstream, Resolved),
-    Record(CUevent, CUstream),
-    Wait(CUstream, CUevent),
+    Memset(u64, u8, usize, Handle),
+    HtoD(u64, *const c_void, usize, Handle),
+    DtoH(*mut c_void, u64, usize, Handle),
+    Launch(Handle, u32, u32, Handle, Resolved),
+    Record(Handle, Handle),
+    Wait(Handle, Handle),
 }
 
-fn raw(dev: &CudaDevice, plan: &Plan) -> Result<Vec<Raw>, DeviceError> {
+fn raw<R: Runtime>(dev: &GpuDevice<R>, plan: &Plan) -> Result<Vec<Raw>, DeviceError> {
     plan.validate(dev.arenas)?;
     let mut out = Vec::with_capacity(plan.steps.len());
     for (i, s) in plan.steps.iter().enumerate() {
@@ -214,48 +214,36 @@ fn raw(dev: &CudaDevice, plan: &Plan) -> Result<Vec<Raw>, DeviceError> {
 }
 
 /// Make the calls; the time they took.
-fn direct(dev: &CudaDevice, raws: &mut [Raw]) -> Result<Duration, DeviceError> {
+fn direct<R: Runtime>(dev: &GpuDevice<R>, raws: &mut [Raw]) -> Result<Duration, DeviceError> {
     let api = &dev.api;
     let t = Instant::now();
     for (i, r) in raws.iter_mut().enumerate() {
         // SAFETY: the handles are the adapter's; the addresses were worked out from a
         // validated plan (`raw`); kernel argument pointers point into `a`, which lives across
         // the call.
-        let s: CUresult = unsafe {
+        let s: Status = unsafe {
             match r {
-                Raw::Memset(d, b, n, st) => (api.cuMemsetD8Async)(*d, *b, *n, *st),
-                Raw::HtoD(d, h, n, st) => (api.cuMemcpyHtoDAsync_v2)(*d, *h, *n, *st),
-                Raw::DtoH(h, d, n, st) => (api.cuMemcpyDtoHAsync_v2)(*h, *d, *n, *st),
+                Raw::Memset(d, b, n, st) => api.memset_d8(*d, *b, *n, *st),
+                Raw::HtoD(d, h, n, st) => api.htod(*d, *h, *n, *st),
+                Raw::DtoH(h, d, n, st) => api.dtoh(*h, *d, *n, *st),
                 Raw::Launch(f, g, b, st, a) => {
                     let mut p = a.pointers();
-                    (api.cuLaunchKernel)(
-                        *f,
-                        *g,
-                        1,
-                        1,
-                        *b,
-                        1,
-                        1,
-                        0,
-                        *st,
-                        p.as_mut_ptr(),
-                        std::ptr::null_mut(),
-                    )
+                    api.launch(*f, *g, *b, *st, p.as_mut_ptr())
                 }
-                Raw::Record(e, st) => (api.cuEventRecord)(*e, *st),
-                Raw::Wait(st, e) => (api.cuStreamWaitEvent)(*st, *e, 0),
+                Raw::Record(e, st) => api.event_record(*e, *st),
+                Raw::Wait(st, e) => api.stream_wait_event(*st, *e),
             }
         };
-        if s != api::CUDA_SUCCESS {
-            return Err(crate::device_error(i, s));
+        if s != SUCCESS {
+            return Err(crate::device_error::<R>(i, s));
         }
     }
     let d = t.elapsed();
     for st in dev.streams {
         // SAFETY: a stream of the adapter.
-        let s = unsafe { (api.cuStreamSynchronize)(st) };
-        if s != api::CUDA_SUCCESS {
-            return Err(crate::device_error(raws.len(), s));
+        let s = unsafe { api.stream_sync(st) };
+        if s != SUCCESS {
+            return Err(crate::device_error::<R>(raws.len(), s));
         }
     }
     Ok(d)
@@ -267,7 +255,7 @@ fn median(v: &mut [f64]) -> f64 {
 }
 
 /// Measure every shape of [`plans`], `reps` repetitions each, alternating protocol and direct.
-pub fn measure(dev: &mut CudaDevice, reps: usize) -> Result<Vec<Row>, DeviceError> {
+pub fn measure<R: Runtime>(dev: &mut GpuDevice<R>, reps: usize) -> Result<Vec<Row>, DeviceError> {
     let mut rows = Vec::new();
     for (name, plan) in plans() {
         let n = plan.steps.len() as f64;
@@ -323,7 +311,10 @@ fn thread_cpu_ns() -> u64 {
 
 /// Run a plan of eight `k_pyr` launches over 16 1920x1088 planes (about 2 ms on the RTX 2000)
 /// `iters` times in each wait mode, alternating the modes in blocks of `iters / 4`.
-pub fn measure_wait(dev: &mut CudaDevice, iters: usize) -> Result<Vec<WaitRow>, DeviceError> {
+pub fn measure_wait<R: Runtime>(
+    dev: &mut GpuDevice<R>,
+    iters: usize,
+) -> Result<Vec<WaitRow>, DeviceError> {
     const N: usize = 16;
     const SW: usize = 1920;
     const SH: usize = 1088;
