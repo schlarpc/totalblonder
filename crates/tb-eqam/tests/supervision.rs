@@ -251,6 +251,33 @@ fn apply_mode_fixes_drift_once_after_confirmation() {
 }
 
 #[test]
+fn an_assigned_slot_without_input_alarms_until_it_arrives() {
+    let slot = Slot::new(1).unwrap();
+    let mut s = Sim::new(
+        ReconcileMode::Apply,
+        one_stream(),
+        FakeDevice::surveyed(),
+        |_| {},
+    );
+    s.run_until(secs(600), |_, _| {});
+    let absent = |s: &Sim| {
+        s.alarms()
+            .into_iter()
+            .filter(|a| **a == Alarm::InputAbsent(slot))
+            .count()
+    };
+    assert_eq!(absent(&s), 1, "raised once, not on every poll");
+    s.dev.present = vec![1];
+    s.run_until(secs(700), |_, _| {});
+    assert!(
+        s.actions
+            .iter()
+            .any(|(_, a)| *a == Action::Clear(AlarmKey::InputAbsent(slot)))
+    );
+    assert_eq!(s.ctl.supervisor().metrics().alarms_active, 0);
+}
+
+#[test]
 fn rf_drift_is_applied_as_the_four_module_sequence() {
     let mut dev = FakeDevice::surveyed();
     dev.modules[3].on[2] = false; // someone turned carrier 15 off

@@ -87,6 +87,8 @@ pub struct FakeDevice {
     pub module4_unknown: bool,
     /// Render slot 3's Pro:Idiom box checked and disabled.
     pub pro_idiom3_checked_disabled: bool,
+    /// Assigned slots whose input is present (green); the others are red.
+    pub present: Vec<usize>,
 }
 
 impl FakeDevice {
@@ -116,6 +118,7 @@ impl FakeDevice {
             statusedit_extra: String::new(),
             module4_unknown: false,
             pro_idiom3_checked_disabled: false,
+            present: vec![],
         }
     }
 
@@ -272,9 +275,14 @@ impl FakeDevice {
                     &format!("<td rowspan=\"2\" align=\"center\" bgcolor=\"#C0C0C0\">{name}</td>"),
                     1,
                 );
+                let color = if self.present.contains(&n) {
+                    "#00FF00"
+                } else {
+                    "#FF0000"
+                };
                 tail = tail.replacen(
                     "<td rowspan=\"2\" bgcolor=\"#C0C0C0\"></td>",
-                    "<td rowspan=\"2\" bgcolor=\"#FF0000\"></td>",
+                    &format!("<td rowspan=\"2\" bgcolor=\"{color}\"></td>"),
                     1,
                 );
             }

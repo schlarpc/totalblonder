@@ -132,6 +132,8 @@ pub enum Alarm {
         /// What the box detects.
         detected: Vec<DetectedProgram>,
     },
+    /// The status page shows no input for a slot the desired state assigns a stream to.
+    InputAbsent(Slot),
     /// The Diagnostics page reports an input as oversubscribed (its cell text, verbatim).
     Oversubscribed(Slot, String),
     /// A slot's TS Sync Errors count went up since the last poll.
@@ -168,6 +170,8 @@ pub enum AlarmKey {
     ProgramsMismatch(Slot),
     /// [`Alarm::Oversubscribed`].
     Oversubscribed(Slot),
+    /// [`Alarm::InputAbsent`].
+    InputAbsent(Slot),
 }
 
 /// Something the supervisor wants done or known.
@@ -756,6 +760,18 @@ impl Supervisor {
                 InputState::NotAssigned | InputState::Unknown(_) => None,
             };
             self.metrics.bitrate_bps[i] = row.bitrate.map(|(avg, _)| avg.0);
+            let assigned = matches!(
+                self.desired.streams.get(row.slot),
+                crate::plan::SlotConfig::Assigned { .. }
+            );
+            if assigned && row.input == InputState::Absent {
+                out.extend(self.raise(
+                    AlarmKey::InputAbsent(row.slot),
+                    Alarm::InputAbsent(row.slot),
+                ));
+            } else {
+                out.extend(self.clear(AlarmKey::InputAbsent(row.slot)));
+            }
         }
         for m in RfModule::all() {
             let locked = p.modules[m.index()] == ModuleState::Locked;
