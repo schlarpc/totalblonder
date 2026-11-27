@@ -2,7 +2,8 @@
 
 State of 2026-11-25 (after package X1). This document describes the Rust workspace at the
 repository root: what each crate is for, where the line between pure logic and I/O runs, how
-the GPU is modeled, how the CUDA kernels are built, and how the encoder is checked.
+the GPU is modeled, how the kernels are built for NVIDIA and AMD cards, and how the encoder is
+checked.
 `docs/SPEC.md` says what the server must do; this says how the code is laid out to do it.
 
 The workspace began as the port of the host side of a CUDA MPEG-2 encoder written as a C++
@@ -20,7 +21,7 @@ needs a measurement or the owner. Work packages (`E4`, `K3`, …) are the steps 
    It has no clock, thread, socket, file, FFI, global state or async runtime. Time is an
    argument. Every such crate has `#![forbid(unsafe_code)]` and its tests run in the Nix
    sandbox with no GPU.
-2. **The device is a protocol.** [decided] The core does not call CUDA. It writes a plan for
+2. **The device is a protocol.** [decided] The core does not call CUDA or HIP. It writes a plan for
    each phase of a tick and reads a completion record. Adapters execute plans (§4, §5).
 3. **One definition of the kernel ABI.** [decided] Records shared by host and kernels are
    defined once, in Rust; the C header is generated (§3).
@@ -47,7 +48,7 @@ needs a measurement or the owner. Work packages (`E4`, `K3`, …) are the steps 
                           |             |
    sans-io  ──────────────┼─────────────┼──────────────────────────────────────────
    adapters               |        tb-device-ref   (host-compiled kernels)
-                          |        tb-device-cuda  (CUDA driver API)      tb-decode (libav)
+                          |        tb-device-gpu   (CUDA driver API, HIP)  tb-decode (libav)
                           |             |                                     |
                                    tb-engine  (Engine: adapter + encoder + plan)
                                         /                    \
@@ -72,7 +73,7 @@ needs a measurement or the owner. Work packages (`E4`, `K3`, …) are the steps 
 | `tb-convert` | pure | Filter taps, color matrices, which conversion launches a tick needs (`Converter`), and their plan steps (`Lowerer`) | the host half of the C++ conversion |
 | `tb-timeline` | pure | Timestamp mapper, frame clock, fallback selector (SPEC §5.3, §5.4, §9.5); which frame and rows a channel shows (`select`); film mode: the selections per output field grouped into pictures that say how long they are shown (`film`, §7.6); the decode thread's decisions (`ingest`: pacing, degrade, resync, frame times); captions through drops, repeats and pictures of different display times (`captions`); admission to the hardware decoder (`admission`) | the C++ harness's frame selection and decoder decisions; otherwise new |
 | `tb-device-ref` | adapter | Executes plans with the kernels compiled for the host | none (new) |
-| `tb-device-cuda` | adapter | Executes plans through the CUDA driver API | the encoder's CUDA runtime calls |
+| `tb-device-gpu` | adapter | Executes plans on a card: the CUDA driver API (NVIDIA) or HIP (AMD), one implementation of the protocol over both | the encoder's CUDA runtime calls |
 | `tb-decode` | adapter | Inputs demuxed and decoded through libavcodec: NVDEC by the `cuda` hwaccel inside the CUDA adapter's context, or software with swscale; one thread per input | the C++ harness's decoder threads |
 | `tb-media` | pure | The plain-data contract of ingest: codecs, streams, packets (`InputEvent`), decoded-frame descriptors | none |
 | `tb-decoder-proto` | pure | The sandboxed decoder's wire protocol, input ring and output pool accounting, validation of everything the worker says, restart and watchdog policy, exit classification (§5.5) | none |
@@ -241,7 +242,7 @@ adapter does not own. The protocol names it without holding an address:
   when a slot is not bound or an offset lies outside its space. The host region is consumed by
   the upload (the CUDA adapter resolves in place); in a recording the upload appears in
   handle form, so traces stay deterministic.
-- Binding is the adapter's own interface, not the protocol's: `CudaDevice::bind_foreign(slot,
+- Binding is the adapter's own interface, not the protocol's: `GpuDevice::bind_foreign(slot,
   base, len)` is `unsafe` with one rule, which is the lifetime rule of the design: the memory
   stays valid until the slot is bound anew or unbound **and** every plan submitted meanwhile
   has completed. `RefDevice::bind_foreign(slot, len)` owns stand-in memory, so the whole path
@@ -333,8 +334,10 @@ the contract; tests `tick_golden.rs`, `tick_model.rs`):
   the sessions again from `Encoder::snapshot` with `Encoder::restore`.
   [measured, D1] A fault on the device (illegal address, launch failure, trap) poisons the
   whole process on driver 595: after `cuDevicePrimaryCtxReset` the driver refuses any new
-  context with the same status, so `CudaDevice::restore` returns
-  `CudaError::ProcessPoisoned` and only a new process can use the card. In-process restore
+  context with the same status, so `GpuDevice::restore` returns
+  `GpuError::ProcessPoisoned` and only a new process can use the card. On an AMD card (ROCm
+  7.2) the same fault is worse: ROCm's runtime prints "Memory access fault by GPU" and aborts
+  the process, so no `Lost` reaches the driver at all (§5.2). In-process restore
   works only for losses that do not poison. So the tick thread and the adapter belong in a
   child process that a supervisor restarts, or the server restarts as a whole [open].
   What the driver does today [built in G1, `tb-m2venc`]: after `Lost` it takes no more input,
@@ -387,15 +390,31 @@ a block as `ucontext` fibers in lockstep: every thread runs to its next `__synct
 Integer kernels are bit-exact by construction; the four that use `float` are bit-exact because
 both builds compute the same fused operations (§7.3).
 
-### 5.2 `tb-device-cuda` [decided, built for the proof]
+### 5.2 `tb-device-gpu` [decided, built; HIP added after the port]
+
+One implementation of the protocol, `GpuDevice<R: Runtime>`, over two runtimes: `Cuda`
+(`libcuda.so.1`, NVIDIA) and `Hip` (`libamdhip64.so`, AMD, ROCm 6.2 or later). The adapter is
+written against the thirty-odd operations it needs (`runtime::sys::Api`: module load, launch,
+copies, memset, streams, events, pinned memory, context enter / leave / reset), which HIP
+mirrors nearly name for name and numbers its statuses after the CUDA runtime's (600 not ready,
+700 illegal address, 709 context destroyed); each runtime implements them with one forwarding
+call each, so the monomorphized adapter makes the driver calls it made when it knew only
+CUDA. `CudaDevice` and `HipDevice` are the two instances; one binary embeds both images and runs
+on either vendor's card, chosen at run time (`--device cuda|hip`, `video.device`).
+
+Differences the runtimes keep to themselves: HIP's primary-context functions are deprecated, so
+`Hip` enters with `hipSetDeviceFlags(hipDeviceScheduleBlockingSync)` and `hipSetDevice`, and
+resets with `hipDeviceReset`; `hipDeviceptr_t` is a pointer, converted from the arena's integer
+addresses. `GpuDevice::context()` (the `CUcontext` for libav) exists on `CudaDevice` only.
 
 Primary context with blocking-sync scheduling, the kernel image loaded with
-`cuModuleLoadData`, three streams, two events, one `cuMemAlloc` and one `cuMemHostAlloc`.
+`cuModuleLoadData` / `hipModuleLoadData`, three streams, two events, one device allocation and
+one pinned host allocation.
 `submit` validates the plan, queues every step and records a completion event of the plan's
 own behind it on the wait stream; it returns without waiting. Up to 64 plans may be in flight;
 each is waited for by its own event, so they complete in any order. A plan without steps (the
 tick's wait for the upload stream, a settle) is waited for on its stream directly
-(`cuStreamQuery` / `cuStreamSynchronize`; an event recorded on an idle stream needs a round
+(stream query / synchronize; an event recorded on an idle stream needs a round
 trip to the device before it reads as complete) and without the hybrid wait's nap: what is
 left of a stream's work at an arbitrary moment has no stable length, and the nap sized by the
 average was the 1 % by which the port's free-running throughput trailed the C++ (§8.1).
@@ -406,12 +425,25 @@ caller gives (`submit_class`) or the plan's wait stream and length. An error whi
 reported at the wait, after the stream has drained, so the caller's loop has one shape.
 Optional timing events around each plan give its device-side duration (`set_timing`,
 `last_device_time`). `restore` tears the context's objects down and makes them again. Which
-statuses arrive where is documented in the crate and tested on the card: an out-of-resources
-launch is refused synchronously (`Failed` at its step, the context stays usable); a fault in a
-kernel surfaces at the wait (`Lost`, and the process is poisoned, §4.5).
+statuses arrive where is documented in the crate and tested on both cards
+(`tests/plumbing.rs`, every test instantiated as `cuda::…` and `hip::…`; what differs is the
+test's `Card` trait):
 
-**Bindings [decided]: thin own bindings to `libcuda.so.1`**, about thirty functions in
-`src/api.rs`, loaded with `libloading`. Evaluated on 2026-11-25:
+| | RTX 2000 Ada, driver 595.71.05 | RX 7900 XTX, ROCm 7.2 |
+|---|---|---|
+| A launch the card refuses | `k_me` with 1024 threads per block: `cuLaunchKernel` returns 701 (out of resources); `Failed` at its step, the context stays usable | `k_me` runs with 1024 threads (192 VGPRs fit a workgroup processor); a grid of 2^31 such blocks is refused with 1 (`hipErrorInvalidValue`); `Failed`, the context stays usable |
+| A kernel reading far outside the arena | 700 at the wait, `Lost`; the process is poisoned (`restore` returns `ProcessPoisoned`) | 2^36 bytes past the arena is still mapped (the read returns whatever is there); 2^37 below it faults, and ROCm prints "Memory access fault by GPU node-1 … Page not present" and calls `abort()`: the process ends with SIGABRT |
+
+The second row is a real difference for the server: on AMD a fault in a kernel kills the
+process instead of ending its streams cleanly (§4.5). Plan validation keeps every buffer a plan
+names inside the arenas, so a fault is a kernel bug either way; the supervisor restarts the
+process in both cases. ROCm's runtime offers a system event handler for memory faults
+(`hsa_amd_register_system_event_handler`); whether one can keep the process alive is
+[unknown].
+
+**Bindings [decided]: thin own bindings to `libcuda.so.1` and `libamdhip64.so`**, about thirty
+functions each in `src/cuda.rs` and `src/hip.rs` (macros of `src/runtime.rs`), loaded with
+`libloading`. The CUDA choice, evaluated on 2026-11-25: Evaluated on 2026-11-25:
 
 | Option | Finding | Verdict |
 |---|---|---|
@@ -419,13 +451,16 @@ kernel surfaces at the wait (`Lost`, and the process is poisoned, §4.5).
 | `cudarc` 0.19.10 | Maintained (September 2026), has CUDA 13.2 bindings and run-time loading | Rejected for now: a missing library or symbol panics instead of returning an error; `CUresult` is a Rust enum, so a status the bindings do not list is undefined behavior; its safe layer owns one allocation per slice and has no arenas, pinned memory or events in the form the plans need, so only its raw layer would be used |
 | own bindings | The driver API's `_v2` names have been stable since CUDA 4; status is an `i32`; loading returns a `Result`; the program builds and starts without a driver | Chosen |
 
-The bindings are checked against `cuda.h` of the pinned toolkit [decided, D1]: a test of the
-crate generates `crates/tb-device-cuda/api_check.cc` from the binding lists (and fails when the
-committed copy is stale), and the check `kernels/cuda-api` compiles it against the header. It
+The same reasons hold for HIP (crates for it are fewer and younger still). The bindings are
+checked against the pinned toolkits' headers [decided, D1]: a test of the crate generates
+`crates/tb-device-gpu/cuda_api_check.cc` and `hip_api_check.cc` from the binding lists (and
+fails when a committed copy is stale), and the checks `kernels/cuda-api` and `kernels/hip-api`
+compile them against `cuda.h` and `hip/hip_runtime_api.h`. It
 asserts that each unversioned name resolves to the symbol the adapter loads (`cuMemAlloc` →
 `cuMemAlloc_v2`; in 13.x `cuEventElapsedTime` is `cuEventElapsedTime_v2`, which a binding by
 the plain name would have missed), the
-exact function types, the constants and the layout of `CUDA_MEMCPY2D`. The cost is one line
+exact function types (through a cast to the bound type: HIP's C++ header overloads `hipMalloc`
+and `hipHostMalloc` with templates), the constants and the layout of `CUDA_MEMCPY2D`. The cost is one line
 per function when a function is added.
 
 For other users of the context [G2]: `CudaDevice::context()` gives the `CUcontext`,
@@ -435,10 +470,20 @@ there, so that they neither wait for nor hold up the adapter's streams), `bind_f
 
 ### 5.3 The image and the GPU's presence
 
-The crate embeds the cubin and the symbol table at compile time
-(`include_bytes!(env!("TB_KERNEL_IMAGE"))`), so the binary is self-contained and Nix rebuilds
-only this crate when a kernel changes. The crate compiles on a machine without a GPU; making
-a `CudaDevice` there returns `CudaError::Driver`.
+The crate embeds both images and their symbol tables at compile time
+(`include_bytes!(env!("TB_KERNEL_IMAGE_CUDA"))`, `…_HIP`), so the binary is self-contained and
+Nix rebuilds only this crate when a kernel changes. The crate compiles on a machine without a
+GPU; making a `GpuDevice` there returns `GpuError::Driver`.
+
+The HIP image is the same kernel sources through `kernels/shim/hip/cuda_runtime.h`, the device
+counterpart of the host shim: HIP's runtime header; HIP's own `__shfl_*_sync` disabled (they
+take a 64-bit mask and the wave's width) and replaced by shuffles 32 lanes wide, so the warp
+code (`lane = threadIdx & 31`) means on AMD what it means on the card, on wave32 and wave64
+parts alike; `__vsadu4` and `__vavgu4` as `v_sad_u8` and `v_lerp_u8`, `__dp4a` from its
+definition. `fmaf_nc`'s inline PTX has had a portable branch from the start. No kernel source
+changed. Built for the RDNA targets (gfx1030, gfx1100-1102, gfx1150/1151, gfx1200/1201, all
+wave32) into one offload bundle; `k_me` spills (1872 bytes of scratch per thread on gfx1100),
+a cost not yet measured against capacity [unknown].
 
 ### 5.4 `tb-decode` [decided, built in G2]
 
@@ -502,12 +547,18 @@ by `tb-sandbox` and takes decoded frames back from shared memory.
   converted in the worker: video by libswscale to the program's size in the encoder's host
   layout (Lanczos, fit or stretch, bob, BT.601/BT.709), audio by libswresample to 48 kHz
   stereo or 5.1 in A/52 order.
-- **GPU**: NVDEC through the `cuda` hwaccel in the worker, frames copied to host
-  (`av_hwframe_transfer_data`); a wider seccomp profile and Landlock rules for the driver;
-  passing on nixark. Keeping pictures on the card across processes (CUDA IPC into foreign
+- **GPU**: NVDEC through the `cuda` hwaccel in the worker where an NVIDIA card is, else VA-API
+  through the `vaapi` hwaccel (AMD: Mesa's radeonsi VA driver on the DRM render node), frames
+  copied to host (`av_hwframe_transfer_data`); a wider seccomp profile and Landlock rules for
+  the driver (NVIDIA's device nodes, the render nodes); passing on nixark (NVDEC) and bagel
+  (VA-API, the same profile, seccomp in kill mode). Keeping pictures on the card across processes (CUDA IPC into foreign
   slots, §4.2) is designed in the log, not built.
 - **Cost** (bagel, 1080p30 H.264, software): 0.105 cores per stream in the worker against
   0.099-0.103 in-process (`tb-decode`), plus 0.002 in the server; start-up 9 ms.
+
+`tb-pipe` on an AMD card (`--device hip`) decodes in software: NVDEC's surfaces in the adapter's
+own context have no counterpart there yet (VA-API surfaces would have to be exported as DMA-BUFs
+and imported into HIP) [open].
 
 `tb-decode` (§5.4) stays as the in-process path of the test harnesses (`tb-pipe`) and of the
 device-resident pipeline until the CUDA-IPC variant exists.
@@ -534,6 +585,11 @@ crates/tb-golden/vectors/            the golden vectors and their generator
     `crates/tb-kernel-abi/kernels/tb_kernels.cu`, CUDA 13.2 pinned as in the spike; plus `tb_kernels.sym`, the
     mangled name of each kernel read from the image, and a check that every kernel of
     `crates/tb-kernel-abi/kernels/tb_kernel_list.h` is present.
+  - `deviceImageHip`: `hipcc -x hip -O3 -std=c++17 -ffp-contract=off --genco` for the RDNA
+    targets of `hipArchs` (ROCm 7.2 of the pinned nixpkgs, from the binary cache; about three
+    minutes), with `-Ikernels/shim/hip`: `tb_kernels.hsaco`, an offload bundle, plus
+    `tb_kernels.sym` read from the first target's code object, and checks that every kernel
+    of the list is present and compiled for 32-lane waves.
   - `refLib`: `libtbkernels_ref.a` from `crates/tb-kernel-abi/kernels/tb_kernels_ref.cc` with
     `-fno-strict-aliasing -ffp-contract=off` (`fmaf` is libm's, correctly rounded), no C++
     runtime needed.
@@ -544,11 +600,12 @@ crates/tb-golden/vectors/            the golden vectors and their generator
   ```nix
   packages.tb-kernel-abi.env.TB_ABI_LAYOUT = kernels.abiLayout;
   packages.tb-device-ref.env.TB_KERNELS_REF = kernels.refLib;        # build.rs links it
-  packages.tb-device-cuda.env = { TB_KERNEL_IMAGE = "…/tb_kernels.cubin"; TB_KERNEL_SYMBOLS = "…/tb_kernels.sym"; };
+  packages.tb-device-gpu.env = { TB_KERNEL_IMAGE_CUDA = "…/tb_kernels.cubin"; TB_KERNEL_SYMBOLS_CUDA = "…";
+                                 TB_KERNEL_IMAGE_HIP = "…/tb_kernels.hsaco"; TB_KERNEL_SYMBOLS_HIP = "…"; };
   packages.tb-golden.extraSources = [ "vectors" ];
   ```
 
-  A kernel edit rebuilds the image, `tb-device-cuda` and what links it; nothing else.
+  A kernel edit rebuilds the images, `tb-device-gpu` and what links it; nothing else.
 - **Unfree**: `config.allowUnfreePredicate` in the flake's own `import nixpkgs` admits packages
   whose license is the CUDA EULA. No global setting on either machine.
 - **Evaluation** needs import-from-derivation (breakbulk reads Cargo's plan at evaluation time
@@ -560,30 +617,32 @@ crates/tb-golden/vectors/            the golden vectors and their generator
 |---|---|
 | `nix flake check` | Every product, every test binary's run under nextest, doctests, clippy `-D warnings`, `cargo fmt --check`, the kernel builds, the header freshness check, the golden vectors' freshness (`golden/fresh`), the small gates on the reference adapter (`gate/ref-small`, `gate/pipe-ref-small`), the verifier's checks. 256 checks; no GPU |
 | `nix develop` | Shell where plain `cargo build`, `cargo clippy`, `cargo nextest run` work: the toolchain of `rust-toolchain.toml`, the `TB_*` variables, nextest, cbindgen |
-| `nix run .#gpu-plumbing` | The GPU tests of `tb-device-cuda`, outside the sandbox (breakbulk's test app with `--include-ignored`) |
-| `nix run .#gpu-bench` | The protocol-cost bench of `tb-device-cuda` on the card (release build; §8.1) |
-| `nix run .#tb-m2venc -- plumb ref\|cuda` | The plumbing proof as a program |
-| `nix run .#tb-m2venc -- --device ref\|cuda --input …` | The encoder (`crates/tb-m2venc/src/opts.rs`; `--golden FILE` writes the golden records) |
+| `nix run .#gpu-plumbing -- cuda::\|hip::` | The GPU tests of `tb-device-gpu` for the machine's card, outside the sandbox (breakbulk's test app with `--include-ignored`) |
+| `nix run .#gpu-bench [-- --runtime cuda\|hip]` | The protocol-cost bench of `tb-device-gpu` on the card (release build; §8.1) |
+| `nix run .#tb-m2venc -- plumb ref\|cuda\|hip` | The plumbing proof as a program |
+| `nix run .#tb-m2venc -- --device ref\|cuda\|hip --input …` | The encoder (`crates/tb-m2venc/src/opts.rs`; `--golden FILE` writes the golden records) |
 | `nix run .#gate-check -- [--quick] [--out NAME]` | The correctness gate (`tools/gate/check.py`) on the card: corpus at broadcast sizes, torture cases, features; strict decode in two decoders, both buffer models, reconstruction against decode, quality against `tools/gate/baselines/`, the conformance verifier on every stream |
 | `nix run .#gate-film -- [--only REGEX] [--measure]` | The film-mode gate on the card (`tools/gate/film_gate.py`, §7.6): `tb-m2venc --film` and `tb-pipe film=auto` at broadcast sizes, the cadence on both decoders and the displayed fields, both buffer models, the verifier; `--measure` compares rate and quality with the coded pulldown. Needs `gate-prep film` once |
 | `nix run .#gate-pipe -- [--only REGEX]` | The pipeline's gate (`tools/gate/pipe_check.py`: device input, repeats, run-time sessions, conversions against CPU references and analytic patterns), verifier on every stream |
-| `nix run .#gate-small -- --device ref\|cuda --golden` | The twelve golden cases through the binary, each stream on its own merits, and the committed digests. With `ref` it is the check `gate/ref-small` |
-| `nix run .#gate-golden -- DIR` | The golden cases on the card: every record (but the measured times) and every stream equal to the committed ones (`crates/tb-golden/vectors/README.md`) |
+| `nix run .#gate-small -- --device ref\|cuda\|hip --golden` | The twelve golden cases through the binary, each stream on its own merits, and the committed digests. With `ref` it is the check `gate/ref-small` |
+| `nix run .#gate-golden -- [--device cuda\|hip] DIR` | The golden cases on the card: every record (but the measured times) and every stream equal to the committed ones (`crates/tb-golden/vectors/README.md`) |
 | `nix run .#gate-bench -- --mode free\|paced\|both --label NAME` | Capacity (`tools/gate/bench_capacity.py`): free-running macroblocks per second with spread, on-time fraction and cap99 / cap999 around given points; watches `nvidia-smi pmon` itself and repeats disturbed runs; more builds compared interleaved with `--bin NAME="PATH …"` |
 | `nix run .#gate-lineup -- …`, `.#gate-contend -- …`, `.#gate-prep -- media\|inputs` | The pipeline's paced line-ups, the encoder next to other users of the card (with `gpucomp`), the corpus (`tools/gate/README.md`) |
 | `nix run .#gate-tb-pipe -- --in … --ch …` | The pipeline harness itself |
 | `nix run .#verify-streams -- …` | The conformance verifier on any streams |
 | `nix build .#gate-tools` | The gate programs in one store path, to `nix copy` to the GPU host and run there |
 | `nix run .#abi-header` | Rewrite the committed ABI header (`crates/tb-kernel-abi/kernels/tb_kernel_abi.h`) |
-| `nix build .#kernels-device` / `.#kernels-ref` / `.#gpucomp` / `.#nsys` / `.#ncu` | The pieces; Nsight Systems and Compute of the pinned toolkit |
+| `nix build .#kernels-device` / `.#kernels-device-hip` / `.#kernels-ref` / `.#gpucomp` / `.#nsys` / `.#ncu` | The pieces; Nsight Systems and Compute of the pinned toolkit |
 
 GPU tests are `#[ignore]`d tests in adapter crates: `nix flake check` and a bare `cargo test`
 build them and run nothing; the app runs them where the card is.
 
 ### 6.3 Machines
 
-Both evaluate and build the flake [measured]. bagel has no NVIDIA GPU: it compiles the image
-and runs everything but the GPU tests. nixark has the card (driver 595, libraries in
+Both evaluate and build the flake [measured]. bagel has no NVIDIA GPU but an AMD one (RX 7900
+XTX, gfx1100, ROCm 7.2 in `/run/opengl-driver/lib`): it compiles both images, runs everything
+but the CUDA tests, and the HIP side of the GPU tests (`gpu-plumbing -- hip::`, the golden
+cases with `--device hip`, the worker's VA-API test). nixark has the card (driver 595, libraries in
 `/run/opengl-driver/lib`, which the adapter tries after the loader's own search path).
 
 On nixark, memory-hungry runs go through `tools/gate/capped.sh` (transient systemd scope,
@@ -707,7 +766,7 @@ part of them in the PTX, `ptxas` the rest) and checked the same way:
   `make bench` within noise (free-run macroblocks/s, old / new / old: 1080i 11.84 / 11.83 /
   11.82 M, 720p 13.16 / 13.13 / 13.13 M, 480i 10.93 / 10.86 / 10.87 M, mixed 11.68 / 11.66 /
   11.66 M; spreads 0.03 to 0.8 %).
-- Card against reference adapter (`tb-device-cuda` test `float_parity`, in
+- Card against reference adapter (`tb-device-gpu` test `float_parity`, in
   `nix run .#gpu-plumbing`; real content with `TB_PARITY_MEDIA`): one batch coding an I, a P
   and a B picture of crowd_run 480i, mobcal (bottom field first) 480i and park_joy 720p, two
   ticks (the second with the temporal candidate fed by the first), four sets of row
@@ -730,6 +789,15 @@ average are both 0, where the card's conversion gives 0 and x86's `INT_MIN`; bot
 to the same quantizer index 1 by `mb_qcode`, and a NaN `m` fails `m >= 1` on both; the
 SIMD-in-a-word shims (`__vsadu4`, `__vavgu4`, `__funnelshift_r`, `__dp4a`) follow the CUDA
 definitions and `k_me`, `k_xf` (half-sample prediction) match on the card test above.
+
+The AMD image keeps it too [measured, 2026-11-26, RX 7900 XTX, ROCm 7.2]: hipcc with
+`-ffp-contract=off` contracts nothing the source does not write, `fmaf` is `v_fma_f32`
+(correctly rounded), division is IEEE and denormals are kept by default, and the conversion of
+NaN to `int` gives 0 as on the card. `float_parity` (`gpu-plumbing -- hip::`): every output
+buffer of every clip identical to the reference adapter (synthetic content; the gate's clips
+not yet run there). The golden cases through the binary (`generate.sh --device hip --check`):
+every record and every stream equal to the committed ones (all but `deadline`, compared on no
+card).
 
 A change to the float arithmetic of the kernels must keep this: write any new multiply-add as
 the card should compute it (`fmaf`, or a separate multiply and add), and the GPU test and the
@@ -822,7 +890,7 @@ In brief:
 The core has no threads. The edges follow SPEC §3 and the scheduler shape measured in the
 spike (§C.7):
 
-- **One tick thread** owns the `CudaDevice` (the context is current there; the type is not
+- **One tick thread** owns the `GpuDevice` (the context is current there; the type is not
   `Send`) and the `Encoder`. At the field rate it runs: frame clock per channel, conversion
   steps, `begin_tick` → (`submit`, `wait`, `resume`)* → access units to the mux through a
   bounded channel that never blocks the tick (a full queue drops and counts).
