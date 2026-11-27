@@ -114,6 +114,15 @@
               };
             };
             amd = eval { settings.video.device = "hip"; };
+            tel = eval {
+              settings.video.device = "ref";
+              telemetry.logs = "https://192.0.2.2/insert/opentelemetry/v1/logs";
+            };
+            telOwn = eval {
+              settings.video.device = "ref";
+              telemetry.logs = "https://192.0.2.2/insert/opentelemetry/v1/logs";
+              settings.telemetry.logs = "http://127.0.0.1:4318/v1/logs";
+            };
             open = eval {
               openFirewall = true;
               settings = {
@@ -134,6 +143,10 @@
             grep -q 'credentials_file = "/run/credentials/totalblonder.service/eqam"' ${conf creds}
             grep -q 'credentials_file = "/etc/eqam"' ${conf own}
             ! grep -q credentials_file ${conf plain}
+            grep -q 'logs = "https://192.0.2.2/insert/opentelemetry/v1/logs"' ${conf tel}
+            grep -q '"service.version" = ' ${conf tel}
+            grep -q 'logs = "http://127.0.0.1:4318/v1/logs"' ${conf telOwn}
+            ! grep -q '^logs' ${conf plain}
             ${check (lib.elem "/dev/kfd rw" (svc amd).DeviceAllow) "AMD: /dev/kfd"}
             ${check (lib.elem "render" (svc amd).SupplementaryGroups) "AMD: render group"}
             ${check (lib.elem "/dev/nvidia0 rw" (svc plain).DeviceAllow) "NVIDIA nodes by default"}
@@ -146,7 +159,10 @@
       };
 
       # services.totalblonder (nix/module.nix).
-      nixosModules.default = import ./nix/module.nix { packages = self.packages; };
+      nixosModules.default = import ./nix/module.nix {
+        packages = self.packages;
+        rev = self.shortRev or self.dirtyShortRev or "unknown";
+      };
 
       packages.${system} = repo.flake.packages // {
         default = ws.packages.tb-m2venc;

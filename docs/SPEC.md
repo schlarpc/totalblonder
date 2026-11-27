@@ -1118,6 +1118,8 @@ model, so that one error cannot hide in both **[proposed]**. It costs one pass o
 
 `tracing` with spans per carrier, program and input. Metrics are atomic counters and gauges
 per component, rendered by hand as Prometheus text at `/api/metrics`. The names below are the first set.
+With `[telemetry]` the same series, the log lines and one wide event per unit of work go out
+over OTLP/HTTP **[built]** (SERVER.md §6 "Telemetry").
 
 | Area | Metrics (labels) |
 |---|---|

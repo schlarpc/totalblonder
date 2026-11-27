@@ -3,7 +3,11 @@
 # The decoder worker (tb-avworker) confines itself further inside its own namespaces, so the
 # unit must leave user, mount, PID, network, IPC and UTS namespaces available to it
 # (RestrictNamespaces stays off); everything else is shut.
-{ packages }:
+{
+  packages,
+  # The flake's revision, reported as service.version.
+  rev ? "unknown",
+}:
 {
   config,
   lib,
@@ -16,9 +20,19 @@ let
   system = pkgs.stdenv.hostPlatform.system;
   # Where systemd puts the credential `eqam` (LoadCredential below).
   credentialPath = "/run/credentials/totalblonder.service/eqam";
+  # [telemetry] from the module's options, under what `settings` says (settings win).
+  telemetry = {
+    telemetry = lib.filterAttrs (_: v: v != null) {
+      inherit (cfg.telemetry) logs metrics;
+      instance = config.networking.hostName;
+    }
+    // {
+      resource."service.version" = cfg.telemetry.version;
+    };
+  };
   # The settings as written, with device.credentials_file filled in when the credential is
   # given through deviceCredentialsFile and the [device] section does not name one.
-  settings =
+  withCredentials =
     if
       cfg.deviceCredentialsFile != null
       && cfg.settings ? device
@@ -27,6 +41,7 @@ let
       lib.recursiveUpdate cfg.settings { device.credentials_file = credentialPath; }
     else
       cfg.settings;
+  settings = lib.recursiveUpdate telemetry withCredentials;
   configFile =
     if cfg.configFile != null then cfg.configFile else toml.generate "totalblonder.toml" settings;
   # The GPU's device nodes: NVIDIA's (CUDA, NVDEC), or AMD's (HIP through /dev/kfd, VA-API and
@@ -113,6 +128,34 @@ in
       type = lib.types.nullOr lib.types.package;
       default = packages.${system}.tb-avworker or null;
       description = "The sandboxed decoder worker (`tb-avworker`); `null` for none (no live inputs).";
+    };
+    telemetry = {
+      logs = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "https://monitoring.example:9428/insert/opentelemetry/v1/logs";
+        description = ''
+          The OTLP/HTTP logs URL, whole (`[telemetry] logs`): log lines and wide events, among
+          them one per carrier, service, input and the process every 10 s. VictoriaLogs takes
+          them at `/insert/opentelemetry/v1/logs`, a collector at `/v1/logs`. `null`: not
+          exported (wide events then go to the journal).
+        '';
+      };
+      metrics = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "https://monitoring.example:9428/opentelemetry/v1/metrics";
+        description = ''
+          The OTLP/HTTP metrics URL, whole (`[telemetry] metrics`): every series of
+          `/api/metrics`. VictoriaMetrics takes them at `/opentelemetry/v1/metrics`, a collector
+          at `/v1/metrics`. `null`: not exported.
+        '';
+      };
+      version = lib.mkOption {
+        type = lib.types.str;
+        default = rev;
+        description = "The `service.version` resource attribute: by default the flake's revision.";
+      };
     };
     openFirewall = lib.mkOption {
       type = lib.types.bool;

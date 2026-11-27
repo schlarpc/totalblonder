@@ -113,6 +113,55 @@ sets it), or `tb-avworker` beside the `totalblonder` binary.
 `crates/totalblonder/totalblonder.example.toml` lists every key. The control API (default
 `127.0.0.1:8090`) serves `/healthz`, `/api/metrics` (Prometheus) and `/api/state`.
 
+### Telemetry
+
+`[telemetry]` sends OpenTelemetry over OTLP/HTTP (protobuf), from `tb-telemetry` (the
+OpenTelemetry SDK; reqwest over rustls for https). Each signal has its own whole URL and is off
+until it has one:
+
+| Signal | What | VictoriaLogs / VictoriaMetrics path |
+|---|---|---|
+| `logs` | log lines at `log_level` and above, and every wide event | `/insert/opentelemetry/v1/logs` |
+| `metrics` | every `/api/metrics` series, every `metrics_interval_s` | `/opentelemetry/v1/metrics` |
+
+A series whose name ends in `_total` is a counter, any other a gauge; labels become attributes.
+Resource attributes are `service.name`, `service.instance.id` and `host.name` (the host's name
+unless `instance` is set), and those in `[telemetry.resource]`. Exporting never blocks the
+stream: records go to a bounded queue that drops when the collector is behind.
+
+A **wide event** is one record per unit of work, with every field that describes it and the
+fields of the context it ran in (`carrier`, `service`, `program`, `channel`, `input`, `role`,
+`peer`). Each thread and program has a context span, so ordinary log lines carry the same
+fields. Code makes one with `tb_telemetry::wide!("noun.verb", key = value, …)`, fills it with
+`set`, `add` and `error`, and it is reported when dropped, with `duration_ms`; `emit()`
+reports an instant one.
+
+| Event | When | Notable fields |
+|---|---|---|
+| `server.start`, `server.run` | start; exit | config path, mode, carriers, programs, video device; `stop` (signal, duration), `outcome` |
+| `input.session` | an input's `Streams` … `End` | `stream.N.codec`, `.size`, `.fps`, `.sample_rate`; packets, keyframes, bytes; `outcome` (closed, transport, protocol, local) and `reason` |
+| `rtmp.connection` | an RTMP publisher's connection | `peer`, `rtmp.app`, `rtmp.close` |
+| `decoder.worker` | a sandboxed decoder's life | generation, confinement, pictures, audio blocks, `exit` |
+| `decoder.circuit_open`, `decoder.violation` | the worker keeps failing; it lies | pause, what |
+| `source.switch` | a program changes source | `from`, `to` (live, standby, slate), `held_s`, health of each feed; WARN going down |
+| `video.step` | the overload governor steps a program | direction, from and to format, rung, starting rate |
+| `device.request` | one HTTP exchange with the modulator | method, request kind, status, `outcome` |
+| `device.alarm`, `device.alarm_cleared`, `device.write` | the supervisor's actions | alarm, detail |
+| `tables.cycle` | each table rebuild (10 s) | schedule reloaded, sets delivered, queue full, failed, versions saved |
+| `carrier.interval`, `service.interval`, `input.interval`, `process.interval` | every `summary_interval_s` | every series of that entity: a counter's gain over the interval (name without `_total`), a gauge's value; `service.interval` adds its `format` and `source`, `process.interval` the CPU share of each thread |
+
+The interval events are on by default only when logs are exported. Without a logs URL, wide
+events are written to stderr as one line each; with one, only those at WARN or worse are.
+
+In VictoriaLogs every field is queryable, for example:
+
+```
+event.name:service.interval | stats by (service) sum(encoder_shed) shed, sum(late_au) late
+event.name:process.interval | stats max(thread_cpu_pct.video-hub) hub, max(process_resident_bytes) rss
+event.name:source.switch to:slate | fields _time, service, from, held_s
+event.name:input.session -outcome:closed | fields _time, input, peer, outcome, reason, duration_ms
+```
+
 ## 7. Measured
 
 - Real time on nixark, RTX 2000 Ada, 3 carriers and 7 programs (720p, 1080i, 1080p, 480i)
