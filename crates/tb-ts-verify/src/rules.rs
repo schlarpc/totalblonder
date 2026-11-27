@@ -375,6 +375,14 @@ rules! {
         "The STT repeats more often than every 1 s (the terrestrial maximum, and what receivers are commonly designed around).";
     RrtInterval, "RRT-INTERVAL", Psip, S3, Yes, "SCTE 54 §7.8.1.2 Table 1; A/65 Table 7.1", "17; 83",
         "An RRT, when present, repeats at most every 60 s.";
+    RrtSyntax, "RRT-SYNTAX", Psip, S3, Yes, "A/65 §6.4, Table 6.10", "38-40",
+        "An RRT: rating_region not 0 and the reserved byte of table_id_extension 0xFF, at least one dimension of 1 to 15 values, value 0 of each dimension with null strings, every string well formed, and nothing after the descriptors.";
+    AdvisorySyntax, "ADVISORY-SYNTAX", Psip, S3, Yes, "A/65 §6.9.3, Table 6.27", "69-70",
+        "A content_advisory_descriptor: 1 to 8 rating regions, each once, rating dimensions in increasing order, rating_description_length at most 80 and its text well formed, and its length exactly what its fields take.";
+    AdvisoryNoRrt, "ADVISORY-NO-RRT", Psip, S3, Yes, "A/65 §6.4", "38",
+        "A content advisory that rates in a region other than 1 (US) and 2 (Canada), whose systems CTA-766 defines, needs that region's RRT in the transport stream.";
+    AdvisoryUndefined, "ADVISORY-UNDEFINED", Psip, S3, Yes, "A/65 §6.9.3", "70",
+        "A content advisory's dimensions and values in a region with an RRT are ones that RRT defines.";
     Eit0Interval, "EIT0-INTERVAL", Psip, S4, Yes, "SCTE 54 §7.8.1.2; A/65 §7.1", "17; 83",
         "Each section of EIT-0 repeats at most every 500 ms (recommended).";
     PsipRate, "PSIP-RATE", Psip, S3, Yes, "SCTE 54 §7.8.1.2 Table 2; A/65 Table 7.2", "18; 83",

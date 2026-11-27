@@ -83,11 +83,11 @@ elementary stream (the framing the buffer model depends on).
 | descriptor | 1 | 2 | 10 | 1 | 14 | 14 |
 | PES | 3 | 6 | 5 | 0 | 14 | 14 |
 | PCR and rate | 2 | 1 | 2 | 4 | 9 | 9 |
-| PSIP | 0 | 0 | 30 | 4 | 34 | 34 |
+| PSIP | 0 | 0 | 34 | 4 | 38 | 38 |
 | cross-check | 2 | 1 | 9 | 2 | 14 | 14 |
 | buffer model | 0 | 9 | 2 | 0 | 11 | 11 |
 | elementary stream | 0 | 1 | 0 | 1 | 2 | 2 |
-| **all** | 25 | 35 | 70 | 17 | 147 | 147 |
+| **all** | 25 | 35 | 74 | 17 | 151 | 151 |
 
 ## Scope: packet
 
@@ -218,6 +218,10 @@ elementary stream (the framing the buffer model depends on).
 | `VCT-INTERVAL` | S3 | SCTE 54 §7.8.1.2 Table 1; A/65 Table 7.1 | 17; 83 | Each section of the CVCT (or TVCT) repeats at most every 400 ms. | yes |
 | `STT-INTERVAL` | S3 | SCTE 54 §7.8.1.2 Table 1 | 17 | The STT repeats at most every 10 s (cable). | yes |
 | `RRT-INTERVAL` | S3 | SCTE 54 §7.8.1.2 Table 1; A/65 Table 7.1 | 17; 83 | An RRT, when present, repeats at most every 60 s. | yes |
+| `RRT-SYNTAX` | S3 | A/65 §6.4, Table 6.10 | 38-40 | An RRT: rating_region not 0 and the reserved byte of table_id_extension 0xFF, at least one dimension of 1 to 15 values, value 0 of each dimension with null strings, every string well formed, and nothing after the descriptors. | yes |
+| `ADVISORY-SYNTAX` | S3 | A/65 §6.9.3, Table 6.27 | 69-70 | A content_advisory_descriptor: 1 to 8 rating regions, each once, rating dimensions in increasing order, rating_description_length at most 80 and its text well formed, and its length exactly what its fields take. | yes |
+| `ADVISORY-NO-RRT` | S3 | A/65 §6.4 | 38 | A content advisory that rates in a region other than 1 (US) and 2 (Canada), whose systems CTA-766 defines, needs that region's RRT in the transport stream. | yes |
+| `ADVISORY-UNDEFINED` | S3 | A/65 §6.9.3 | 70 | A content advisory's dimensions and values in a region with an RRT are ones that RRT defines. | yes |
 | `PSIP-RATE` | S3 | SCTE 54 §7.8.1.2 Table 2; A/65 Table 7.2 | 18; 83 | 0x1FFB and every EIT and ETT PID carry at most 250,000 bit/s over any 1 s (measured in 100 ms slices). | yes |
 | `STT-HEADER` | S3 | A/65 §6.1, Table 6.1 | 24 | The STT has table_id_extension 0x0000 and version_number 0. | yes |
 | `STT-TIME` | S3 | A/65 §6.1 | 24-25 | system_time advances with the stream: between two STTs it moves by the elapsed stream time within +-2 s (each value is accurate to +-1 s). | yes |

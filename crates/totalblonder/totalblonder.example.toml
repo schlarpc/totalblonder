@@ -129,3 +129,19 @@ kind = "rtmp"                 # rtmp | ts_udp | file
 bind = "127.0.0.1:1935"
 app = "live"
 key = "wall"
+
+# A rating system of our own (SPEC §7.7), sent as a Rating Region Table. Receivers list it
+# among their parental controls ("downloadable" or "open V-chip" ratings); schedule events rate
+# in it with "ratings" (src/schedule.rs). Region 3..=255 (1 is the US, 2 Canada); at most
+# 255 dimensions of 1..=14 values; names up to 32 (region) and 20 (dimension) characters,
+# abbreviations up to 8, texts up to 150. The whole table must fit 1024 bytes.
+[[rating_system]]
+region = 16
+name = "Japan (Eirin)"
+  [[rating_system.dimension]]
+  name = "Eirin"
+  graduated = true            # higher values mean more restricted (the default)
+  values = [ { abbrev = "G", text = "General audiences" },
+             { abbrev = "PG12", text = "Parental guidance under 12" },
+             { abbrev = "R15+", text = "Restricted to 15 and over" },
+             { abbrev = "R18+", text = "Restricted to 18 and over" } ]

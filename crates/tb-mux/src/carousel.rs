@@ -46,6 +46,8 @@ pub struct Periods {
     pub ett_near: u64,
     /// Later event ETTs.
     pub ett_far: u64,
+    /// Each RRT (≤ 60 s, A/65 Table 7.1).
+    pub rrt: u64,
 }
 
 impl Default for Periods {
@@ -63,6 +65,7 @@ impl Default for Periods {
             eit_far: 30_000 * MS,
             ett_near: 10_000 * MS,
             ett_far: 60_000 * MS,
+            rrt: 10_000 * MS,
         }
     }
 }
@@ -79,6 +82,7 @@ impl Periods {
             TableKind::Eit(_) => self.eit_far,
             TableKind::EventEtt(k) if k < 4 => self.ett_near,
             TableKind::EventEtt(_) => self.ett_far,
+            TableKind::Rrt(_) => self.rrt,
         }
     }
 }

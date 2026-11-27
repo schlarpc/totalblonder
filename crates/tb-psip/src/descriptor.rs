@@ -4,7 +4,7 @@
 use tb_ts::Pid;
 
 use crate::Error;
-use crate::rating::UsRating;
+use crate::rating::Advisory;
 use crate::text::{Lang, Mss};
 
 /// A descriptor to write.
@@ -30,7 +30,7 @@ pub enum Descriptor {
     CaptionService(Vec<CaptionService>),
     /// `content_advisory_descriptor` (A/65 §6.9.3 Table 6.27, p.70), tag 0x87, for region 0x01
     /// with no description text (CTA-766-D §4.1, p.6).
-    ContentAdvisory(UsRating),
+    ContentAdvisory(Advisory),
     /// `extended_channel_name_descriptor` (A/65 §6.9.4 Table 6.28, p.71), tag 0xA0.
     ExtendedChannelName(Mss),
     /// `service_location_descriptor` (A/65 §6.9.5 Table 6.29, p.72), tag 0xA1.
@@ -203,17 +203,43 @@ impl Descriptor {
                     b.push(0xFF);
                 }
             }
-            Descriptor::ContentAdvisory(r) => {
-                let dims = r.dimensions();
-                // reserved '11', rating_region_count 1.
-                b.push(0xC1);
-                b.push(0x01); // rating_region: US
-                b.push(dims.len() as u8);
-                for (d, v) in dims {
-                    b.push(d);
-                    b.push(0xF0 | (v & 0x0F));
+            Descriptor::ContentAdvisory(a) => {
+                a.check()?;
+                let count = usize::from(a.us.is_some()) + a.regions.len();
+                // reserved '11', rating_region_count.
+                b.push(0xC0 | count as u8);
+                if let Some(us) = a.us {
+                    let dims = us.dimensions();
+                    b.push(0x01); // rating_region: US
+                    b.push(dims.len() as u8);
+                    for (d, v) in dims {
+                        b.push(d);
+                        b.push(0xF0 | (v & 0x0F));
+                    }
+                    b.push(0); // rating_description_length 0 (CTA-766-D §4.1)
                 }
-                b.push(0); // rating_description_length 0 (CTA-766-D §4.1)
+                for r in &a.regions {
+                    b.push(r.region);
+                    b.push(
+                        u8::try_from(r.values.len())
+                            .map_err(|_| Error::TooLong("rated_dimensions"))?,
+                    );
+                    for &(d, v) in &r.values {
+                        b.push(d);
+                        b.push(0xF0 | (v & 0x0F));
+                    }
+                    if r.description.is_empty() {
+                        b.push(0);
+                    } else {
+                        let t = crate::text::Mss::eng(&r.description).to_bytes()?;
+                        // rating_description_length: 0 to 80 (A/65 §6.9.3)
+                        if t.len() > 80 {
+                            return Err(Error::TooLong("rating_description_text"));
+                        }
+                        b.push(t.len() as u8);
+                        b.extend_from_slice(&t);
+                    }
+                }
             }
             Descriptor::ExtendedChannelName(m) | Descriptor::ComponentName(m) => m.write(&mut b)?,
             Descriptor::ServiceLocation { pcr_pid, elements } => {
@@ -311,8 +337,44 @@ mod tests {
             ..Dlsv::default()
         });
         assert_eq!(
-            bytes(Descriptor::ContentAdvisory(r)),
+            bytes(Descriptor::ContentAdvisory(r.into())),
             vec![0x87, 10, 0xC1, 0x01, 3, 0, 0xF4, 2, 0xF1, 4, 0xF1, 0]
+        );
+    }
+
+    /// A US rating and one of our own regions, with its description text.
+    #[test]
+    fn content_advisory_with_a_region_of_our_own() {
+        use crate::rating::{Advisory, RegionRating};
+        let a = Advisory {
+            us: Some(UsRating::Tv14(Dlsv::default())),
+            regions: vec![RegionRating {
+                region: 0x10,
+                values: vec![(1, 3)],
+                description: "R15+".into(),
+            }],
+        };
+        let mut want = vec![0x87, 0, 0xC2, 0x01, 1, 0, 0xF4, 0];
+        want.extend_from_slice(&[0x10, 1, 1, 0xF3]);
+        // the description: one English string, one segment, Latin-1
+        let mss = [1, b'e', b'n', b'g', 1, 0, 0, 4, b'R', b'1', b'5', b'+'];
+        want.push(mss.len() as u8);
+        want.extend_from_slice(&mss);
+        want[1] = (want.len() - 2) as u8;
+        assert_eq!(bytes(Descriptor::ContentAdvisory(a.clone())), want);
+        // nine regions cannot be written
+        let mut nine = a;
+        nine.regions = (3..11)
+            .map(|region| RegionRating {
+                region,
+                values: vec![],
+                description: "x".into(),
+            })
+            .collect();
+        assert!(
+            Descriptor::ContentAdvisory(nine)
+                .write(&mut Vec::new())
+                .is_err()
         );
     }
 

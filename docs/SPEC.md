@@ -567,7 +567,7 @@ standards-digest §2.8.
 | EIT-4 and later | window PIDs | 30 s | none | Guide |
 | Event ETT | window PIDs | 10–60 s | none | Guide |
 | Channel ETT | 0x1E80 | 60 s | none | Guide |
-| RRT | — | not sent | optional for US region 1 | — |
+| RRT | 0x1FFB | 10 s (≤ 60 s) | only for rating systems of our own (`[[rating_system]]`); never for regions 1 and 2, which CTA-766 defines | Ratings |
 
 Maxima are from standards-digest §2.3; our cycles follow its recommendation and leave margin
 because the box may shift packets. The loopback run of the spike pipeline measured MGT gaps up
@@ -641,8 +641,17 @@ section boundary.
 
 ### 7.7 Later increments
 
-- Ratings: `content_advisory_descriptor` for region 0x01 in the PMT and EIT, restricted to
-  the 54 permitted combinations; no RRT (standards-digest §3.4).
+- Ratings **[built]**: `content_advisory_descriptor` in the PMT (current event) and EIT, with
+  the US rating (region 0x01) restricted to the 54 permitted combinations (standards-digest
+  §3.4), and up to seven ratings in rating systems of our own. Each `[[rating_system]]` of the
+  configuration (region 3..=255, dimensions with up to 14 values) is sent as an RRT and listed
+  in the MGT (A/65 §6.4); schedule events rate in it by dimension name and value abbreviation,
+  with an optional `rating_description_text` of up to 16 characters that receivers may show.
+  A/65 asks for ATSC-assigned region numbers and only 1 and 2 are assigned, so any region of
+  our own is unassigned: harmless on a private plant, and the reason the receiver lists it as
+  "downloadable" or "open V-chip" ratings (47 CFR §15.120(d): receivers respond to changes in
+  the rating system). `tb-ts-verify` checks the RRT's syntax and that every region an advisory
+  uses has its RRT with the values used.
 - Captions: CEA-608 and CEA-708 bytes built with `cea608-types` and `cea708-types`, attached
   to frames as A/53 side data so the encoder writes them, at the fixed counts per frame rate;
   `caption_service_descriptor` in the PMT and EIT (standards-digest §6; software-survey §1).

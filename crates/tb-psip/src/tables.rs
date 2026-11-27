@@ -63,8 +63,8 @@ pub fn pat(c: &Carrier, version: Version) -> Result<Section, Error> {
 /// ISO 639 descriptor and the component name when one is set. The PCR PID is the video PID.
 pub fn pmt(p: &Program, version: Version) -> Result<Section, Error> {
     let mut prog = vec![Descriptor::Registration(*b"GA94")];
-    if let Some(r) = p.rating {
-        prog.push(Descriptor::ContentAdvisory(r));
+    if let Some(r) = &p.rating {
+        prog.push(Descriptor::ContentAdvisory(r.clone()));
     }
     let prog = descriptor::write_all(&prog)?;
     let mut b = Vec::new();
@@ -218,6 +218,8 @@ pub enum TableType {
     Eit(u8),
     /// 0x0200 + k: event ETT-k, k < 128.
     EventEtt(u8),
+    /// 0x0300 + r: the RRT of rating region r, r ≥ 1.
+    Rrt(u8),
 }
 
 impl TableType {
@@ -228,6 +230,7 @@ impl TableType {
             TableType::ChannelEtt => Some(0x0004),
             TableType::Eit(k) if k < 128 => Some(0x0100 + u16::from(k)),
             TableType::EventEtt(k) if k < 128 => Some(0x0200 + u16::from(k)),
+            TableType::Rrt(r) if r >= 1 => Some(0x0300 + u16::from(r)),
             _ => None,
         }
     }
@@ -266,6 +269,46 @@ pub fn mgt(entries: &[MgtEntry], version: Version) -> Result<Section, Error> {
     Ok(Section::long(
         Kind::Private,
         one(TableId::MGT, 0, version),
+        &b,
+    )?)
+}
+
+/// The RRT of a rating system of our own (A/65 §6.4, Table 6.10): one section of at most 1024
+/// bytes on the base PID, `table_id_extension` 0xFF00 + the region, no descriptors. Value 0 of
+/// each dimension gets the null string (an empty multiple-string structure, A/65 §6.10).
+pub fn rrt(sys: &crate::rating::RatingSystem, version: Version) -> Result<Section, Error> {
+    use crate::text::Mss;
+    let text = |b: &mut Vec<u8>, m: &Mss, what: &'static str| -> Result<(), Error> {
+        let t = m.to_bytes()?;
+        b.push(u8::try_from(t.len()).map_err(|_| Error::TooLong(what))?);
+        b.extend_from_slice(&t);
+        Ok(())
+    };
+    let mut b = vec![0u8]; // protocol_version
+    text(&mut b, &Mss::eng(sys.name()), "rating_region_name_text")?;
+    let dims = sys.dimensions();
+    b.push(u8::try_from(dims.len()).map_err(|_| Error::TooLong("dimensions_defined"))?);
+    for d in dims {
+        text(&mut b, &Mss::eng(&d.name), "dimension_name_text")?;
+        // values_defined counts value 0
+        let n = d.values.len() + 1;
+        if n > 15 {
+            return Err(Error::TooLong("values_defined"));
+        }
+        // reserved '111', graduated_scale, values_defined
+        b.push(0xE0 | (u8::from(d.graduated) << 4) | n as u8);
+        text(&mut b, &Mss::default(), "abbrev_rating_value_text")?;
+        text(&mut b, &Mss::default(), "rating_value_text")?;
+        for v in &d.values {
+            text(&mut b, &Mss::eng(&v.abbrev), "abbrev_rating_value_text")?;
+            text(&mut b, &Mss::eng(&v.text), "rating_value_text")?;
+        }
+    }
+    // reserved '111111', descriptors_length 0
+    b.extend_from_slice(&[0xFC, 0x00]);
+    Ok(Section::long(
+        Kind::Private1024,
+        one(TableId::RRT, 0xFF00 | u16::from(sys.region()), version),
         &b,
     )?)
 }
@@ -416,6 +459,58 @@ pub fn ett(extension: u16, version: Version, id: EtmId, text: &Mss) -> Result<Se
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    /// The RRT parsed back by the layout of A/65 Table 6.10.
+    #[test]
+    fn rrt_of_a_system_of_our_own() {
+        use crate::text::parse_mss;
+        let sys = crate::rating::tests::cursed();
+        let sec = rrt(&sys, Version::new(3)).unwrap();
+        let p = Parsed::parse(sec.bytes()).unwrap();
+        assert_eq!(sec.bytes()[0], 0xCA);
+        assert_eq!(p.header.extension, 0xFF10);
+        assert_eq!(p.header.version.get(), 3);
+        assert!(sec.bytes().len() <= 1024);
+        let b = p.body;
+        assert_eq!(b[0], 0); // protocol_version
+        let mut i = 1;
+        let text = |i: &mut usize| {
+            let n = usize::from(b[*i]);
+            let (s, used) = parse_mss(&b[*i + 1..*i + 1 + n]).unwrap();
+            assert_eq!(used, n);
+            *i += 1 + n;
+            s.into_iter().map(|(_, t)| t).collect::<Vec<_>>()
+        };
+        assert_eq!(text(&mut i), ["Schlarp Broadcasting Standards"]);
+        assert_eq!(b[i], 2); // dimensions_defined
+        i += 1;
+        assert_eq!(text(&mut i), ["Cursed"]);
+        assert_eq!(b[i], 0xE0 | 0x10 | 3); // graduated, values 0..=2
+        i += 1;
+        // value 0: null strings
+        assert!(text(&mut i).is_empty());
+        assert!(text(&mut i).is_empty());
+        assert_eq!(text(&mut i), ["C1"]);
+        assert_eq!(text(&mut i), ["Mildly cursed"]);
+        assert_eq!(text(&mut i), ["C3"]);
+        assert_eq!(text(&mut i), ["Moderately cursed: contains Garfield"]);
+        assert_eq!(text(&mut i), ["Eirin"]);
+        assert_eq!(b[i] & 0x0F, 5);
+        i += 1;
+        for want in [
+            vec![],
+            vec![],
+            vec!["G".to_string()],
+            vec!["Eirin G".to_string()],
+        ] {
+            assert_eq!(text(&mut i), want);
+        }
+        for _ in 0..6 {
+            text(&mut i);
+        }
+        assert_eq!(&b[i..], [0xFC, 0x00]);
+        assert_eq!(TableType::Rrt(0x10).code(), Some(0x0310));
+    }
     use crate::descriptor::{Ac3Descriptor, CaptionKind, CaptionService, ServiceNumber};
     use crate::lineup::*;
     use crate::text::{Lang, ShortName};

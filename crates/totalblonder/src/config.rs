@@ -60,6 +60,39 @@ struct File {
     services: Vec<ServiceFile>,
     #[serde(default, rename = "input")]
     inputs: Vec<InputFile>,
+    #[serde(default, rename = "rating_system")]
+    rating_systems: Vec<RatingSystemFile>,
+}
+
+/// A rating system of our own (SPEC §7.7): sent as an RRT, used by schedule events.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RatingSystemFile {
+    region: u8,
+    name: String,
+    #[serde(rename = "dimension")]
+    dimensions: Vec<RatingDimensionFile>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RatingDimensionFile {
+    name: String,
+    #[serde(default = "yes")]
+    graduated: bool,
+    values: Vec<RatingValueFile>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RatingValueFile {
+    abbrev: String,
+    #[serde(default)]
+    text: String,
+}
+
+fn yes() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize)]
@@ -625,6 +658,8 @@ pub struct Plant {
     pub carriers: Vec<CarrierPlan>,
     /// Inputs.
     pub inputs: Vec<InputPlan>,
+    /// Rating systems of our own, one RRT each, regions distinct.
+    pub ratings: Vec<tb_psip::rating::RatingSystem>,
 }
 
 /// The modulator's supervisor settings (SPEC §10, §13.2 `[device]`).
@@ -1097,6 +1132,40 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
         });
     }
 
+    let mut ratings: Vec<tb_psip::rating::RatingSystem> = Vec::new();
+    for r in &f.rating_systems {
+        let dims = r
+            .dimensions
+            .iter()
+            .map(|d| tb_psip::rating::RatingDimension {
+                name: d.name.clone(),
+                graduated: d.graduated,
+                values: d
+                    .values
+                    .iter()
+                    .map(|v| tb_psip::rating::RatingValue {
+                        abbrev: v.abbrev.clone(),
+                        text: v.text.clone(),
+                    })
+                    .collect(),
+            })
+            .collect();
+        let sys = tb_psip::rating::RatingSystem::new(r.region, &r.name, dims)?;
+        // the RRT must fit its one section
+        tb_psip::tables::rrt(&sys, tb_ts::section::Version::new(0))
+            .map_err(|e| rule(format!("rating system {} ({}): {e}", r.region, r.name)))?;
+        if ratings
+            .iter()
+            .any(|o| o.region() == sys.region() || o.name() == sys.name())
+        {
+            return Err(rule(format!(
+                "rating system {} ({}): region and name must be unique",
+                r.region, r.name
+            )));
+        }
+        ratings.push(sys);
+    }
+
     Ok(Plant {
         output: OutputPlan {
             rate,
@@ -1127,6 +1196,7 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
             .transpose()?,
         carriers,
         inputs,
+        ratings,
     })
 }
 
@@ -1142,6 +1212,43 @@ mod tests {
         assert_eq!(p.carriers.len(), 2);
         assert_eq!(p.carriers[0].programs.len(), 2);
         assert_eq!(p.carriers[0].lineup.tsid(), 0x0101);
+        assert_eq!(p.ratings.len(), 1);
+        assert_eq!(p.ratings[0].lookup("Eirin", "R15+"), Some((0, 3)));
+    }
+
+    #[test]
+    fn rating_system_refusals() {
+        let sys = |region: u8, name: &str| {
+            format!(
+                "[[rating_system]]\nregion = {region}\nname = \"{name}\"\n[[rating_system.dimension]]\nname = \"D\"\nvalues = [ {{ abbrev = \"A\" }} ]\n"
+            )
+        };
+        assert!(load(&sys(16, "X")).is_ok());
+        for (t, want) in [
+            (sys(1, "X"), "CTA-766"),
+            (sys(2, "X"), "CTA-766"),
+            (sys(16, "X") + &sys(16, "Y"), "unique"),
+            (sys(16, "X") + &sys(17, "X"), "unique"),
+            (sys(16, &"n".repeat(33)), "1 to 32"),
+        ] {
+            let e = load(&t).unwrap_err().to_string();
+            assert!(e.contains(want), "{t}: {e}");
+        }
+        // too many bytes for one section: 14 dimensions of 14 values with 150-character texts
+        let mut big = String::from("[[rating_system]]\nregion = 16\nname = \"Big\"\n");
+        for d in 0..14 {
+            big += &format!("[[rating_system.dimension]]\nname = \"D{d}\"\nvalues = [");
+            for v in 0..14 {
+                big += &format!("{{ abbrev = \"V{v}\", text = \"{}\" }},", "t".repeat(150));
+            }
+            big += "]\n";
+        }
+        assert!(
+            load(&big)
+                .unwrap_err()
+                .to_string()
+                .contains("rating system 16")
+        );
     }
 
     #[test]

@@ -308,7 +308,12 @@ struct AudioInfo {
 }
 
 /// Checks a PMT's contents (run when a PMT is new or changed).
-pub(crate) fn check_pmt(pmt: &Pmt, pmt_pid: u16, sink: &mut Sink) -> BTreeMap<u16, Ac3Desc> {
+pub(crate) fn check_pmt(
+    pmt: &Pmt,
+    pmt_pid: u16,
+    sink: &mut Sink,
+    advisories: &mut Vec<crate::psip::RegionRating>,
+) -> BTreeMap<u16, Ac3Desc> {
     let mut ac3_map = BTreeMap::new();
     let pp = Some(pmt_pid);
     let prog = pmt.program;
@@ -330,6 +335,14 @@ pub(crate) fn check_pmt(pmt: &Pmt, pmt_pid: u16, sink: &mut Sink) -> BTreeMap<u1
             for (t, b) in &ds {
                 if *t == 0x86 {
                     caption_desc(b, pmt_pid, sink);
+                }
+                if *t == 0x87 {
+                    advisories.extend(crate::psip::content_advisory(
+                        b,
+                        &format!("program {prog}"),
+                        pmt_pid,
+                        sink,
+                    ));
                 }
             }
         }

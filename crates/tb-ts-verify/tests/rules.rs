@@ -39,6 +39,23 @@ fn splice(spec_a: &Spec, spec_b: &Spec, t: f64) -> Stream {
     Stream { packets }
 }
 
+/// A hook body: appends descriptor `d` to the program_info loop of every PMT section, fixing
+/// program_info_length and section_length.
+fn pmt_info(s: &mut Vec<u8>, d: &[u8]) {
+    if s[0] != 0x02 {
+        return;
+    }
+    let pil = (usize::from(s[10] & 0x0F) << 8) | usize::from(s[11]);
+    let at = 12 + pil;
+    s.splice(at..at, d.iter().copied());
+    let pil = pil + d.len();
+    s[10] = (s[10] & 0xF0) | (pil >> 8) as u8;
+    s[11] = pil as u8;
+    let sl = ((usize::from(s[1] & 0x0F) << 8) | usize::from(s[2])) + d.len();
+    s[1] = (s[1] & 0xF0) | (sl >> 8) as u8;
+    s[2] = sl as u8;
+}
+
 fn first_of(s: &Stream, pid: u16, from: usize) -> usize {
     s.of_pid(pid).into_iter().find(|&i| i >= from).unwrap()
 }
@@ -1215,6 +1232,56 @@ static CASES: &[Case] = &[
                 rate: 400_000,
                 ett: false,
                 events0: Vec::new(),
+                ..Spec::default()
+            })
+        },
+    },
+    Case {
+        // The RRT of the synthetic stream is not listed in its MGT.
+        name: "RRT for rating_region 0",
+        rules: &["RRT-SYNTAX", "MGT-UNLISTED"],
+        make: || {
+            std(&Spec {
+                rrt_once: true,
+                hook: Some(|s| {
+                    if s[0] == 0xCA {
+                        s[4] = 0;
+                    }
+                }),
+                ..Spec::default()
+            })
+        },
+    },
+    Case {
+        name: "content advisory with no region",
+        rules: &["ADVISORY-SYNTAX"],
+        make: || {
+            std(&Spec {
+                hook: Some(|s| pmt_info(s, &[0x87, 1, 0xC0])),
+                ..Spec::default()
+            })
+        },
+    },
+    Case {
+        name: "content advisory in region 16 without its RRT",
+        rules: &["ADVISORY-NO-RRT"],
+        make: || {
+            std(&Spec {
+                // region 16, no dimension, no description
+                hook: Some(|s| pmt_info(s, &[0x87, 4, 0xC1, 0x10, 0, 0])),
+                ..Spec::default()
+            })
+        },
+    },
+    Case {
+        // The synthetic RRT (region 5) defines value 0 only; the advisory uses value 1. The
+        // RRT is not listed in the MGT.
+        name: "content advisory with a value its RRT does not define",
+        rules: &["ADVISORY-UNDEFINED", "MGT-UNLISTED"],
+        make: || {
+            std(&Spec {
+                rrt_once: true,
+                hook: Some(|s| pmt_info(s, &[0x87, 6, 0xC1, 0x05, 1, 0, 0xF1, 0])),
                 ..Spec::default()
             })
         },

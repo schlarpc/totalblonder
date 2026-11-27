@@ -58,6 +58,8 @@ pub enum TableKind {
     Eit(u8),
     /// Event ETT-k.
     EventEtt(u8),
+    /// The RRT of a rating region of our own.
+    Rrt(u8),
 }
 
 /// One table: its PID, kind, version and sections.
@@ -116,6 +118,21 @@ pub fn build(
     carrier: &Carrier,
     schedules: &[Schedule],
     guide: &GuideConfig,
+    now: GpsSeconds,
+    leap: LeapSeconds,
+    versions: &mut Versions,
+) -> Result<TableSet, Error> {
+    build_with_ratings(carrier, schedules, guide, &[], now, leap, versions)
+}
+
+/// [`build`], and the RRT of each rating system of our own in `ratings`, listed in the MGT.
+/// A/65 §6.4 asks for the RRT of every region an advisory in use refers to; sending one for a
+/// region nothing refers to is allowed.
+pub fn build_with_ratings(
+    carrier: &Carrier,
+    schedules: &[Schedule],
+    guide: &GuideConfig,
+    ratings: &[crate::rating::RatingSystem],
     now: GpsSeconds,
     leap: LeapSeconds,
     versions: &mut Versions,
@@ -268,6 +285,29 @@ pub fn build(
         }
     }
 
+    for sys in ratings {
+        let ext = 0xFF00 | u16::from(sys.region());
+        let key = Key {
+            pid: Pid::PSIP_BASE.get(),
+            table_id: TableId::RRT.get(),
+            extension: Some(ext),
+        };
+        let (v, s) = versions.stamp(key, |v| tables::rrt(sys, v).map(one))?;
+        let t = Table {
+            pid: Pid::PSIP_BASE,
+            kind: TableKind::Rrt(sys.region()),
+            version: v,
+            sections: s,
+        };
+        mgt.push(MgtEntry {
+            table_type: TableType::Rrt(sys.region()),
+            pid: t.pid,
+            version: v,
+            number_bytes: t.bytes(),
+        });
+        psip.push(t);
+    }
+
     let key = Key {
         pid: Pid::PSIP_BASE.get(),
         table_id: TableId::MGT.get(),
@@ -304,6 +344,50 @@ mod tests {
 
     fn now() -> GpsSeconds {
         GpsSeconds::from_unix(1_795_660_000, LEAP).unwrap()
+    }
+
+    /// A rating system of our own: its RRT on the base PID, listed in the MGT with its bytes
+    /// and version.
+    #[test]
+    fn rrt_is_built_and_listed() {
+        let mut v = Versions::new();
+        let sys = crate::rating::tests::cursed();
+        let set = build_with_ratings(
+            &carrier(),
+            &[],
+            &GuideConfig::default(),
+            std::slice::from_ref(&sys),
+            now(),
+            LEAP,
+            &mut v,
+        )
+        .unwrap();
+        let rrt = set
+            .tables
+            .iter()
+            .find(|t| t.kind == TableKind::Rrt(0x10))
+            .unwrap();
+        assert_eq!(rrt.pid, Pid::PSIP_BASE);
+        let mgt = set
+            .tables
+            .iter()
+            .find(|t| t.kind == TableKind::Mgt)
+            .unwrap();
+        let p = Parsed::parse(mgt.sections[0].bytes()).unwrap();
+        let n = usize::from(u16::from_be_bytes([p.body[1], p.body[2]]));
+        let mut found = false;
+        let mut i = 3;
+        for _ in 0..n {
+            let e = &p.body[i..i + 11];
+            if u16::from_be_bytes([e[0], e[1]]) == 0x0310 {
+                found = true;
+                assert_eq!(u16::from_be_bytes([e[2], e[3]]) & 0x1FFF, 0x1FFB);
+                assert_eq!(e[4] & 0x1F, rrt.version.get());
+                assert_eq!(u32::from_be_bytes([e[5], e[6], e[7], e[8]]), rrt.bytes());
+            }
+            i += 11 + usize::from(u16::from_be_bytes([e[9], e[10]]) & 0x0FFF);
+        }
+        assert!(found, "the MGT lists the RRT");
     }
 
     #[test]

@@ -496,12 +496,22 @@ pub fn run(plant: Plant, mode: Mode) -> anyhow::Result<()> {
                 .collect();
             let (guide, leap) = (plant.guide, plant.leap);
             let vfile = plant.versions.clone().map(tables::VersionFile::new);
+            let ratings = plant.ratings.clone();
             let sfile = plant
                 .schedule
                 .clone()
-                .map(crate::schedule::ScheduleFile::new);
+                .map(|p| crate::schedule::ScheduleFile::with_ratings(p, ratings.clone()));
             let tables = std::thread::spawn(move || {
-                tables::run(targets, guide, leap, 10 * HZ, &tworker, vfile, sfile)
+                tables::run(
+                    targets,
+                    guide,
+                    &ratings,
+                    leap,
+                    10 * HZ,
+                    &tworker,
+                    vfile,
+                    sfile,
+                )
             });
             std::fs::create_dir_all(&dir)?;
             let mut files: Vec<FileSink> = Vec::new();
@@ -636,13 +646,23 @@ pub fn run(plant: Plant, mode: Mode) -> anyhow::Result<()> {
                 .collect();
             let (guide, leap) = (plant.guide, plant.leap);
             let vfile = plant.versions.clone().map(tables::VersionFile::new);
+            let ratings = plant.ratings.clone();
             let sfile = plant
                 .schedule
                 .clone()
-                .map(crate::schedule::ScheduleFile::new);
+                .map(|p| crate::schedule::ScheduleFile::with_ratings(p, ratings.clone()));
             let tclock = RealClock::new(epoch, stop.clone());
             let tables = std::thread::spawn(move || {
-                tables::run(targets, guide, leap, 10 * HZ, &tclock, vfile, sfile)
+                tables::run(
+                    targets,
+                    guide,
+                    &ratings,
+                    leap,
+                    10 * HZ,
+                    &tclock,
+                    vfile,
+                    sfile,
+                )
             });
 
             // Pacers: one per interface, plus one for carriers on none.

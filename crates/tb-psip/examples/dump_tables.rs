@@ -63,11 +63,14 @@ fn program(n: u16) -> Program {
             audio_type: 0,
             component_name: None,
         }],
-        rating: (n == 1).then_some(UsRating::Tv14(Dlsv {
-            l: true,
-            v: true,
-            ..Dlsv::default()
-        })),
+        rating: (n == 1).then_some(
+            UsRating::Tv14(Dlsv {
+                l: true,
+                v: true,
+                ..Dlsv::default()
+            })
+            .into(),
+        ),
         channel: Channel {
             number: ChannelNumber::new(50, n).unwrap(),
             short_name: ShortName::new(&format!("TB-{n}")).unwrap(),
@@ -97,7 +100,7 @@ fn main() {
             title: Mss::eng("The test pattern hour"),
             description: Some(Mss::eng("Color bars and a tone, with captions.")),
             descriptors: vec![tb_psip::descriptor::Descriptor::ContentAdvisory(
-                UsRating::TvG,
+                UsRating::TvG.into(),
             )],
         }],
     };

@@ -4,7 +4,7 @@
 
 use std::sync::mpsc::SyncSender;
 
-use tb_psip::build::{GuideConfig, build};
+use tb_psip::build::{GuideConfig, build_with_ratings};
 use tb_psip::gps::{GpsSeconds, LeapSeconds};
 use tb_psip::guide::Schedule;
 use tb_psip::lineup::Carrier;
@@ -101,9 +101,11 @@ impl VersionFile {
 
 /// Rebuilds every `period` of process time until the clock stops, saving versions to `file`
 /// whenever one changed.
+#[allow(clippy::too_many_arguments, reason = "the table thread's whole setup")]
 pub fn run(
     mut targets: Vec<TableTarget>,
     guide: GuideConfig,
+    ratings: &[tb_psip::rating::RatingSystem],
     leap: LeapSeconds,
     period: u64,
     clock: &dyn Clock,
@@ -144,7 +146,15 @@ pub fn run(
                     }
                     None => (c.lineup.clone(), Vec::<Schedule>::new()),
                 };
-                match build(&lineup, &schedules, &guide, now, leap, &mut c.versions) {
+                match build_with_ratings(
+                    &lineup,
+                    &schedules,
+                    &guide,
+                    ratings,
+                    now,
+                    leap,
+                    &mut c.versions,
+                ) {
                     Ok(set) => {
                         if c.tx.try_send(CarrierMsg::Tables(set)).is_err() {
                             tracing::warn!(

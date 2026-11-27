@@ -268,6 +268,10 @@ pub struct Checker {
     vct_seen: bool,
     stt: Option<SttState>,
     stt_seen: bool,
+    /// RRTs seen: region -> values_defined per dimension.
+    rrts: BTreeMap<u8, Vec<u8>>,
+    /// Content advisories seen (EIT and PMT): region -> (dimension, value) pairs used.
+    advisories: BTreeMap<u8, std::collections::BTreeSet<(u8, u8)>>,
     stt_body: u64,
     eit: BTreeMap<(u16, u16), EitInst>,
     ett: BTreeMap<u16, BTreeMap<u32, u64>>,
@@ -323,6 +327,8 @@ impl Checker {
             vct_seen: false,
             stt: None,
             stt_seen: false,
+            rrts: BTreeMap::new(),
+            advisories: BTreeMap::new(),
             stt_body: 0,
             eit: BTreeMap::new(),
             ett: BTreeMap::new(),
@@ -1311,7 +1317,9 @@ impl Checker {
         let Some(pmt) = psi::parse_pmt(&sec.data, pid, &mut self.sink) else {
             return;
         };
-        let ac3 = psi::check_pmt(&pmt, pid, &mut self.sink);
+        let mut adv = Vec::new();
+        let ac3 = psi::check_pmt(&pmt, pid, &mut self.sink, &mut adv);
+        self.note_advisories(adv);
         for es in &pmt.streams {
             if !(0x0030..=0x1FEF).contains(&es.pid) {
                 let e = es.pid;
@@ -1391,7 +1399,44 @@ impl Checker {
             &RRT_LIMITS,
             sec.end_pos,
         );
-        let _ = self.track(0x1FFB, u32::from(h.ext), h, &sec.data, sec.end_pos);
+        if self.track(0x1FFB, u32::from(h.ext), h, &sec.data, sec.end_pos)
+            && let Some(rrt) = psip::parse_rrt(&sec.data, h.ext, 0x1FFB, &mut self.sink)
+        {
+            self.rrts.insert(rrt.region, rrt.values);
+        }
+    }
+
+    fn note_advisories(&mut self, list: Vec<psip::RegionRating>) {
+        for (region, dims) in list {
+            self.advisories.entry(region).or_default().extend(dims);
+        }
+    }
+
+    /// Every region an advisory rated in has its RRT (CTA-766 defines 1 and 2), and the
+    /// dimensions and values used are ones it defines.
+    fn check_advisories(&mut self) {
+        let advisories = std::mem::take(&mut self.advisories);
+        for (region, used) in &advisories {
+            if *region <= 2 {
+                continue;
+            }
+            let Some(values) = self.rrts.get(region) else {
+                let r = *region;
+                self.sink.emit(Rule::AdvisoryNoRrt, Some(0x1FFB), || {
+                    format!("content advisories rate in region {r}, and no RRT for it was seen")
+                });
+                continue;
+            };
+            for &(d, v) in used {
+                if values.get(usize::from(d)).is_none_or(|&n| v >= n) {
+                    let r = *region;
+                    self.sink.emit(Rule::AdvisoryUndefined, Some(0x1FFB), || {
+                        format!("region {r}: dimension {d} value {v} is not defined by its RRT")
+                    });
+                }
+            }
+        }
+        self.advisories = advisories;
     }
 
     fn on_stt(&mut self, sec: &SectionOut, h: &Hdr) {
@@ -1467,7 +1512,10 @@ impl Checker {
         if !changed {
             return;
         }
-        let Some(events) = psip::parse_eit(&sec.data, pid, source, &mut self.sink) else {
+        let mut adv = Vec::new();
+        let events = psip::parse_eit(&sec.data, pid, source, &mut self.sink, &mut adv);
+        self.note_advisories(adv);
+        let Some(events) = events else {
             return;
         };
         let inst = self.eit.entry((pid, source)).or_default();
@@ -2425,6 +2473,7 @@ impl Checker {
             });
         }
         self.tick(end, true);
+        self.check_advisories();
         let params = PcrParams {
             target_ms: self.opts.pcr_target_ms,
             nominal: self.opts.rate,

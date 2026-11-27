@@ -432,7 +432,13 @@ pub(crate) struct Event {
 }
 
 /// Parses an EIT section; checks titles, descriptors and the order within the section.
-pub(crate) fn parse_eit(d: &[u8], pid: u16, source: u16, sink: &mut Sink) -> Option<Vec<Event>> {
+pub(crate) fn parse_eit(
+    d: &[u8],
+    pid: u16,
+    source: u16,
+    sink: &mut Sink,
+    advisories: &mut Vec<RegionRating>,
+) -> Option<Vec<Event>> {
     let p = Some(pid);
     let end = d.len().checked_sub(4)?;
     let mut r = Rd::new(d.get(9..end)?);
@@ -477,6 +483,7 @@ pub(crate) fn parse_eit(d: &[u8], pid: u16, source: u16, sink: &mut Sink) -> Opt
                         0x81 => {
                             let _ = ac3_desc(b, pid, sink);
                         }
+                        0x87 => advisories.extend(content_advisory(b, &what, pid, sink)),
                         _ => {}
                     }
                 }
@@ -511,4 +518,187 @@ pub(crate) fn parse_ett(d: &[u8], pid: u16, sink: &mut Sink) -> Option<u32> {
     let id = r.u32()?;
     let _ = mss::decode(r.rest(), &format!("ETM 0x{id:08X}"), pid, sink);
     Some(id)
+}
+
+/// What an RRT defines: its region and the values_defined of each dimension.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Rrt {
+    pub(crate) region: u8,
+    pub(crate) values: Vec<u8>,
+}
+
+/// Parses an RRT (A/65 Table 6.10) and checks its syntax.
+pub(crate) fn parse_rrt(d: &[u8], ext: u16, pid: u16, sink: &mut Sink) -> Option<Rrt> {
+    let p = Some(pid);
+    let region = (ext & 0xFF) as u8;
+    let what = format!("RRT region {region}");
+    let bad = |sink: &mut Sink, m: String| sink.emit(Rule::RrtSyntax, p, || m);
+    if ext >> 8 != 0xFF {
+        bad(
+            sink,
+            format!(
+                "{what}: the reserved byte of table_id_extension is 0x{:02X}, not 0xFF",
+                ext >> 8
+            ),
+        );
+    }
+    if region == 0 {
+        bad(sink, format!("{what}: rating_region 0 shall not be used"));
+    }
+    let end = d.len().checked_sub(4)?;
+    let mut r = Rd::new(d.get(8..end)?);
+    let short = |sink: &mut Sink| {
+        sink.emit(Rule::RrtSyntax, p, || {
+            format!("RRT region {region}: runs past the section")
+        })
+    };
+    // protocol_version: PSIP-PROTOCOL-VERSION checks it for every PSIP table
+    if r.u8().is_none() {
+        short(sink);
+        return None;
+    }
+    let text = |r: &mut Rd<'_>, name: &str, sink: &mut Sink| -> Option<String> {
+        let n = usize::from(r.u8()?);
+        let t = r.take(n)?;
+        Some(mss::decode(t, &format!("{what} {name}"), pid, sink))
+    };
+    if text(&mut r, "rating_region_name_text", sink).is_none() {
+        short(sink);
+        return None;
+    }
+    let Some(nd) = r.u8() else {
+        short(sink);
+        return None;
+    };
+    if nd == 0 {
+        bad(sink, format!("{what}: dimensions_defined 0"));
+    }
+    let mut values = Vec::new();
+    for k in 0..nd {
+        if text(&mut r, "dimension_name_text", sink).is_none() {
+            short(sink);
+            return None;
+        }
+        let Some(b) = r.u8() else {
+            short(sink);
+            return None;
+        };
+        let nv = b & 0x0F;
+        if nv == 0 {
+            bad(sink, format!("{what}: dimension {k}: values_defined 0"));
+        }
+        for j in 0..nv {
+            let (Some(a), Some(t)) = (
+                text(&mut r, "abbrev_rating_value_text", sink),
+                text(&mut r, "rating_value_text", sink),
+            ) else {
+                short(sink);
+                return None;
+            };
+            if j == 0 && !(a.is_empty() && t.is_empty()) {
+                bad(
+                    sink,
+                    format!(
+                        "{what}: dimension {k}: value 0 must have null strings, has {a:?} / {t:?}"
+                    ),
+                );
+            }
+        }
+        values.push(nv);
+    }
+    let Some(dl) = r.u16() else {
+        short(sink);
+        return None;
+    };
+    let dl = usize::from(dl & 0x03FF);
+    if r.take(dl).is_none() {
+        short(sink);
+        return None;
+    }
+    if !r.rest().is_empty() {
+        bad(sink, format!("{what}: bytes after the descriptors"));
+    }
+    Some(Rrt { region, values })
+}
+
+/// One region's rating in a content advisory: (dimension, value) pairs.
+pub(crate) type RegionRating = (u8, Vec<(u8, u8)>);
+
+/// Parses a content_advisory_descriptor's payload (A/65 Table 6.27) and checks its syntax.
+pub(crate) fn content_advisory(
+    b: &[u8],
+    what: &str,
+    pid: u16,
+    sink: &mut Sink,
+) -> Vec<RegionRating> {
+    let p = Some(pid);
+    let mut out: Vec<RegionRating> = Vec::new();
+    let mut r = Rd::new(b);
+    let short = |sink: &mut Sink| {
+        sink.emit(Rule::AdvisorySyntax, p, || {
+            format!("{what}: content_advisory_descriptor runs past its length")
+        })
+    };
+    let Some(h) = r.u8() else {
+        short(sink);
+        return out;
+    };
+    let n = h & 0x3F;
+    if !(1..=8).contains(&n) {
+        sink.emit(Rule::AdvisorySyntax, p, || {
+            format!("{what}: rating_region_count {n}")
+        });
+    }
+    for _ in 0..n {
+        let (Some(region), Some(nd)) = (r.u8(), r.u8()) else {
+            short(sink);
+            return out;
+        };
+        let mut dims = Vec::new();
+        for _ in 0..nd {
+            let (Some(dim), Some(v)) = (r.u8(), r.u8()) else {
+                short(sink);
+                return out;
+            };
+            dims.push((dim, v & 0x0F));
+        }
+        if !dims.windows(2).all(|w| w[0].0 < w[1].0) {
+            sink.emit(Rule::AdvisorySyntax, p, || {
+                format!("{what}: region {region}: rating dimensions not in increasing order")
+            });
+        }
+        let Some(dl) = r.u8() else {
+            short(sink);
+            return out;
+        };
+        if dl > 80 {
+            sink.emit(Rule::AdvisorySyntax, p, || {
+                format!("{what}: region {region}: rating_description_length {dl}")
+            });
+        }
+        let Some(t) = r.take(usize::from(dl)) else {
+            short(sink);
+            return out;
+        };
+        if !t.is_empty() {
+            let _ = mss::decode(
+                t,
+                &format!("{what} region {region} rating_description_text"),
+                pid,
+                sink,
+            );
+        }
+        if out.iter().any(|(g, _)| *g == region) {
+            sink.emit(Rule::AdvisorySyntax, p, || {
+                format!("{what}: region {region} twice")
+            });
+        }
+        out.push((region, dims));
+    }
+    if !r.rest().is_empty() {
+        sink.emit(Rule::AdvisorySyntax, p, || {
+            format!("{what}: bytes after the last region")
+        });
+    }
+    out
 }

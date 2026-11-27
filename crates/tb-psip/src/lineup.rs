@@ -16,7 +16,7 @@ use tb_ts::Pid;
 
 use crate::Error;
 use crate::descriptor::{Ac3Descriptor, CaptionService};
-use crate::rating::UsRating;
+use crate::rating::Advisory;
 use crate::text::{Lang, Mss, ShortName};
 
 /// A `program_number`, never 0.
@@ -231,7 +231,7 @@ pub struct Program {
     /// Audio streams, at most three.
     pub audio: Vec<Audio>,
     /// The current event's rating, if rated (PMT program loop, SCTE 54 §7.9.3.11).
-    pub rating: Option<UsRating>,
+    pub rating: Option<Advisory>,
     /// The channel map entry.
     pub channel: Channel,
 }
