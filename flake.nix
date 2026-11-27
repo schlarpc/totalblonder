@@ -77,27 +77,70 @@
       # Every sandbox-safe check: each product, each test binary's run (nextest), doctests,
       # clippy with warnings denied, rustfmt, and the kernel builds.
       checks.${system} = repo.flake.checks // gate.checks // verify.checks // tsverify.checks // {
-        # The NixOS module evaluates to a unit with the expected command line.
+        # The NixOS module evaluates to a unit with the expected command line; the credential
+        # is wired into [device], AMD cards get their nodes and groups, the inputs' ports open.
         module-eval =
           let
-            sys = lib.nixosSystem {
-              inherit system;
-              modules = [
-                self.nixosModules.default
-                {
-                  boot.isContainer = true;
-                  system.stateVersion = "26.05";
-                  services.totalblonder = {
-                    enable = true;
-                    settings.video.device = "ref";
-                  };
-                }
-              ];
+            eval =
+              tb:
+              (lib.nixosSystem {
+                inherit system;
+                modules = [
+                  self.nixosModules.default
+                  {
+                    boot.isContainer = true;
+                    system.stateVersion = "26.05";
+                    services.totalblonder = { enable = true; } // tb;
+                  }
+                ];
+              }).config;
+            plain = eval { settings.video.device = "ref"; };
+            device = {
+              base_url = "http://192.0.2.1";
+              rf_module = [ ];
             };
-            unit = sys.config.systemd.services.totalblonder;
+            creds = eval {
+              deviceCredentialsFile = "/run/secrets/eqam";
+              settings = {
+                video.device = "ref";
+                inherit device;
+              };
+            };
+            own = eval {
+              deviceCredentialsFile = "/run/secrets/eqam";
+              settings = {
+                video.device = "ref";
+                device = device // { credentials_file = "/etc/eqam"; };
+              };
+            };
+            amd = eval { settings.video.device = "hip"; };
+            open = eval {
+              openFirewall = true;
+              settings = {
+                video.device = "ref";
+                input = [
+                  { id = "a"; kind = "rtmp"; bind = "0.0.0.0:1935"; }
+                  { id = "b"; kind = "ts_udp"; bind = "[::]:5004"; }
+                  { id = "c"; kind = "file"; path = "/x.ts"; }
+                ];
+              };
+            };
+            svc = c: c.systemd.services.totalblonder.serviceConfig;
+            conf = c: lib.last (lib.splitString " " (svc c).ExecStart);
+            check = cond: msg: lib.optionalString (!cond) "echo FAIL: ${msg}; exit 1";
           in
           pkgs.runCommand "module-eval" { } ''
-            echo ${lib.escapeShellArg unit.serviceConfig.ExecStart} | grep -q -- '--config /nix/store/.*totalblonder.toml'
+            echo ${lib.escapeShellArg (svc plain).ExecStart} | grep -q -- '--config /nix/store/.*totalblonder.toml'
+            grep -q 'credentials_file = "/run/credentials/totalblonder.service/eqam"' ${conf creds}
+            grep -q 'credentials_file = "/etc/eqam"' ${conf own}
+            ! grep -q credentials_file ${conf plain}
+            ${check (lib.elem "/dev/kfd rw" (svc amd).DeviceAllow) "AMD: /dev/kfd"}
+            ${check (lib.elem "render" (svc amd).SupplementaryGroups) "AMD: render group"}
+            ${check (lib.elem "/dev/nvidia0 rw" (svc plain).DeviceAllow) "NVIDIA nodes by default"}
+            ${check (lib.elem 1935 open.networking.firewall.allowedTCPPorts) "RTMP port"}
+            ${check (lib.elem 5004 open.networking.firewall.allowedUDPPorts) "TS/UDP port"}
+            ${check (!lib.elem 1935 plain.networking.firewall.allowedTCPPorts) "closed by default"}
+            echo ${lib.escapeShellArg plain.systemd.services.totalblonder.environment.TB_AVWORKER} | grep -q tb-avworker
             touch $out
           '';
       };

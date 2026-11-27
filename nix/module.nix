@@ -13,8 +13,50 @@
 let
   cfg = config.services.totalblonder;
   toml = pkgs.formats.toml { };
+  system = pkgs.stdenv.hostPlatform.system;
+  # Where systemd puts the credential `eqam` (LoadCredential below).
+  credentialPath = "/run/credentials/totalblonder.service/eqam";
+  # The settings as written, with device.credentials_file filled in when the credential is
+  # given through deviceCredentialsFile and the [device] section does not name one.
+  settings =
+    if
+      cfg.deviceCredentialsFile != null
+      && cfg.settings ? device
+      && !(cfg.settings.device ? credentials_file)
+    then
+      lib.recursiveUpdate cfg.settings { device.credentials_file = credentialPath; }
+    else
+      cfg.settings;
   configFile =
-    if cfg.configFile != null then cfg.configFile else toml.generate "totalblonder.toml" cfg.settings;
+    if cfg.configFile != null then cfg.configFile else toml.generate "totalblonder.toml" settings;
+  # The GPU's device nodes: NVIDIA's (CUDA, NVDEC), or AMD's (HIP through /dev/kfd, VA-API and
+  # HIP through the DRM render nodes).
+  vendor =
+    if cfg.gpuVendor != null then
+      cfg.gpuVendor
+    else if (cfg.settings.video.device or "cuda") == "hip" then
+      "amd"
+    else
+      "nvidia";
+  gpuDevices =
+    {
+      nvidia = [
+        "/dev/nvidiactl rw"
+        "/dev/nvidia0 rw"
+        "/dev/nvidia-uvm rw"
+        "/dev/nvidia-uvm-tools rw"
+        "/dev/nvidia-modeset rw"
+      ];
+      amd = [
+        "/dev/kfd rw"
+        "char-drm rw"
+      ];
+    }
+    .${vendor};
+  # The listeners' ports, for openFirewall: [[input]] binds of kind rtmp (TCP) and ts_udp (UDP).
+  inputs = cfg.settings.input or [ ];
+  portOf = i: lib.toInt (lib.last (lib.splitString ":" i.bind));
+  portsOf = kind: map portOf (lib.filter (i: (i.kind or "") == kind && i ? bind) inputs);
 in
 {
   options.services.totalblonder = {
@@ -43,18 +85,51 @@ in
       default = null;
       description = ''
         A file with the modulator's user name and password on two lines, passed to the unit as
-        the systemd credential `eqam` (readable as $CREDENTIALS_DIRECTORY/eqam; set
-        `device.credentials_file` to "/run/credentials/totalblonder.service/eqam").
+        the systemd credential `eqam`. With `settings`, `device.credentials_file` points at it
+        unless the [device] section names another file; with `configFile`, set it to
+        "/run/credentials/totalblonder.service/eqam" yourself.
       '';
     };
     gpu = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Give the unit the NVIDIA device nodes (video.device = \"cuda\").";
+      description = "Give the unit the GPU's device nodes (see `gpuVendor`).";
+    };
+    gpuVendor = lib.mkOption {
+      type = lib.types.nullOr (
+        lib.types.enum [
+          "nvidia"
+          "amd"
+        ]
+      );
+      default = null;
+      description = ''
+        Whose device nodes the unit gets: NVIDIA's (`/dev/nvidia*`) or AMD's (`/dev/kfd` and
+        the DRM nodes, with the `render` and `video` groups). `null`: AMD when
+        `settings.video.device` is "hip", else NVIDIA.
+      '';
+    };
+    workerPackage = lib.mkOption {
+      type = lib.types.nullOr lib.types.package;
+      default = packages.${system}.tb-avworker or null;
+      description = "The sandboxed decoder worker (`tb-avworker`); `null` for none (no live inputs).";
+    };
+    openFirewall = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Open the firewall for the inputs in `settings`: the TCP port of each `rtmp` input and
+        the UDP port of each `ts_udp` input. The control API is never opened: it has no
+        authentication.
+      '';
     };
   };
 
   config = lib.mkIf cfg.enable {
+    networking.firewall = lib.mkIf cfg.openFirewall {
+      allowedTCPPorts = portsOf "rtmp";
+      allowedUDPPorts = portsOf "ts_udp";
+    };
     systemd.services.totalblonder = {
       description = "totalblonder MPTS server";
       wantedBy = [ "multi-user.target" ];
@@ -95,16 +170,15 @@ in
         ];
         UMask = "0077";
         PrivateDevices = !cfg.gpu;
-        DeviceAllow = lib.optionals cfg.gpu [
-          "/dev/nvidiactl rw"
-          "/dev/nvidia0 rw"
-          "/dev/nvidia-uvm rw"
-          "/dev/nvidia-uvm-tools rw"
-          "/dev/nvidia-modeset rw"
+        DeviceAllow = lib.optionals cfg.gpu gpuDevices;
+        # AMD's nodes belong to these groups (NVIDIA's are world-accessible)
+        SupplementaryGroups = lib.optionals (cfg.gpu && vendor == "amd") [
+          "render"
+          "video"
         ];
       };
-      environment = lib.optionalAttrs (packages.${pkgs.stdenv.hostPlatform.system} ? tb-avworker) {
-        TB_AVWORKER = lib.getExe' packages.${pkgs.stdenv.hostPlatform.system}.tb-avworker "tb-avworker";
+      environment = lib.optionalAttrs (cfg.workerPackage != null) {
+        TB_AVWORKER = lib.getExe' cfg.workerPackage "tb-avworker";
       };
     };
   };
