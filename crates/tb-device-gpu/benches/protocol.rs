@@ -70,11 +70,15 @@ fn bench<R: Runtime>(reps: usize) -> Result<(), Box<dyn std::error::Error>> {
         "| Wait | submit + wait per plan, µs | device time, µs (median) | host CPU per plan, µs |"
     );
     println!("|---|---|---|---|");
-    for w in cost::measure_wait(&mut dev, 400)? {
-        println!(
-            "| {:?} | {:.0} | {:.0} | {:.0} |",
-            w.mode, w.loop_us, w.device_us, w.cpu_us
-        );
+    // A short plan (8 launches of k_pyr: about 1.7 ms on the RTX 2000 Ada, 0.15 ms on the RX 7900
+    // XTX) and a long one (a tick phase's length on the faster card).
+    for (launches, iters) in [(8, 400), (200, 100)] {
+        for w in cost::measure_wait(&mut dev, iters, launches)? {
+            println!(
+                "| {:?}, {launches} launches | {:.0} | {:.0} | {:.0} |",
+                w.mode, w.loop_us, w.device_us, w.cpu_us
+            );
+        }
     }
     println!();
     Ok(())

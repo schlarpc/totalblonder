@@ -627,6 +627,7 @@ name = "tb-device-gpu"
 version = "0.0.0"
 dependencies = [
  "bytemuck",
+ "libc",
  "libloading 0.9.1",
  "tb-device",
  "tb-device-ref",

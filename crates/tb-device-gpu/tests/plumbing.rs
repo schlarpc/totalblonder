@@ -38,11 +38,6 @@ fn card() -> MutexGuard<'static, ()> {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-/// SIGABRT (6 on Linux).
-const fn libc_sigabrt() -> i32 {
-    6
-}
-
 /// What differs between the vendors' cards, as measured.
 trait Card: Runtime {
     /// The test module of this runtime (for running one test in a child process).
@@ -55,8 +50,6 @@ trait Card: Runtime {
     /// and the status that read surfaces with.
     const FAULT_SESSION: i32;
     const FAULT_STATUS: i32;
-    /// Whether the runtime aborts the process on that fault instead of returning a status.
-    const FAULT_ABORTS: bool;
 }
 
 impl Card for Cuda {
@@ -67,7 +60,6 @@ impl Card for Cuda {
     const TOO_BIG_STATUS: i32 = tb_device_gpu::cuda::CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES;
     const FAULT_SESSION: i32 = 1 << 30;
     const FAULT_STATUS: i32 = tb_device_gpu::cuda::CUDA_ERROR_ILLEGAL_ADDRESS;
-    const FAULT_ABORTS: bool = false;
 }
 
 impl Card for Hip {
@@ -80,10 +72,9 @@ impl Card for Hip {
     // 2^36 bytes past the arena is still mapped in the GPU's view of the process on ROCm (the
     // read returns whatever is there); 2^37 bytes below it is not.
     const FAULT_SESSION: i32 = i32::MIN;
+    // A status rather than abort(), because the adapter turns core files off
+    // (`hip::no_core_dumps`).
     const FAULT_STATUS: i32 = tb_device_gpu::hip::hipErrorIllegalAddress;
-    // ROCm's runtime prints "Memory access fault by GPU node-N ... Page not present" and calls
-    // abort(): no status reaches the adapter (ROCm 7.2, RX 7900 XTX).
-    const FAULT_ABORTS: bool = true;
 }
 
 /// Large enough for the self-test's layout and a slow upload beside it.
@@ -464,35 +455,14 @@ fn device_fault_is_lost_and_poisons_the_process<R: Card>() {
         R::MODULE
     );
     if let Some(out) = child(&name) {
-        if R::FAULT_ABORTS {
-            use std::os::unix::process::ExitStatusExt;
-            assert_eq!(
-                out.status.signal(),
-                Some(libc_sigabrt()),
-                "{:?}",
-                out.status
-            );
-            assert!(
-                String::from_utf8_lossy(&out.stderr).contains("Memory access fault"),
-                "the runtime's message"
-            );
-        } else {
-            assert!(
-                out.status.success(),
-                "child process failed: {:?}",
-                out.status
-            );
-        }
+        assert!(
+            out.status.success(),
+            "child process failed: {:?}",
+            out.status
+        );
         return;
     }
     let mut dev = GpuDevice::<R>::new(0, selftest::ARENAS, &R::IMAGE).unwrap();
-    if R::FAULT_ABORTS {
-        let p = faulting_plan(&mut dev);
-        let t = dev.submit(&p).unwrap();
-        // The runtime aborts the process inside the wait.
-        let c = dev.wait(t, None);
-        panic!("the runtime did not abort the process: {:?}", c.status);
-    }
     selftest::fill_host(dev.host_mut()).unwrap();
     // A plan in flight beside the faulting one also ends lost.
     let other = dev.submit(&selftest::plan()).unwrap();

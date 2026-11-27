@@ -335,9 +335,8 @@ the contract; tests `tick_golden.rs`, `tick_model.rs`):
   [measured, D1] A fault on the device (illegal address, launch failure, trap) poisons the
   whole process on driver 595: after `cuDevicePrimaryCtxReset` the driver refuses any new
   context with the same status, so `GpuDevice::restore` returns
-  `GpuError::ProcessPoisoned` and only a new process can use the card. On an AMD card (ROCm
-  7.2) the same fault is worse: ROCm's runtime prints "Memory access fault by GPU" and aborts
-  the process, so no `Lost` reaches the driver at all (§5.2). In-process restore
+  `GpuError::ProcessPoisoned` and only a new process can use the card. The AMD card (ROCm 7.2)
+  behaves the same, provided the process writes no core files (§5.2). In-process restore
   works only for losses that do not poison. So the tick thread and the adapter belong in a
   child process that a supervisor restarts, or the server restarts as a whole [open].
   What the driver does today [built in G1, `tb-m2venc`]: after `Lost` it takes no more input,
@@ -432,14 +431,17 @@ test's `Card` trait):
 | | RTX 2000 Ada, driver 595.71.05 | RX 7900 XTX, ROCm 7.2 |
 |---|---|---|
 | A launch the card refuses | `k_me` with 1024 threads per block: `cuLaunchKernel` returns 701 (out of resources); `Failed` at its step, the context stays usable | `k_me` runs with 1024 threads (192 VGPRs fit a workgroup processor); a grid of 2^31 such blocks is refused with 1 (`hipErrorInvalidValue`); `Failed`, the context stays usable |
-| A kernel reading far outside the arena | 700 at the wait, `Lost`; the process is poisoned (`restore` returns `ProcessPoisoned`) | 2^36 bytes past the arena is still mapped (the read returns whatever is there); 2^37 below it faults, and ROCm prints "Memory access fault by GPU node-1 … Page not present" and calls `abort()`: the process ends with SIGABRT |
+| A kernel reading far outside the arena | 700 at the wait, `Lost`; the process is poisoned (`restore` returns `ProcessPoisoned`) | 2^36 bytes past the arena is still mapped (the read returns whatever is there); 2^37 below it faults: 700 (`hipErrorIllegalAddress`) at the wait, `Lost`, the process poisoned, as on CUDA |
 
-The second row is a real difference for the server: on AMD a fault in a kernel kills the
-process instead of ending its streams cleanly (§4.5). Plan validation keeps every buffer a plan
-names inside the arenas, so a fault is a kernel bug either way; the supervisor restarts the
-process in both cases. ROCm's runtime offers a system event handler for memory faults
-(`hsa_amd_register_system_event_handler`); whether one can keep the process alive is
-[unknown].
+The second row holds on AMD only because the HIP runtime turns core files off
+(`hip::no_core_dumps`, soft `RLIMIT_CORE` 0, with a warning in the log). HIP's own handler of
+GPU faults (`BackendErrorCallBackHandler` in ROCm's `rocclr/device/rocm/rocdevice.cpp`) records
+the fault so that the wait returns 700, unless the process would write a core file
+(`Os::DumpCoreFile`: `RLIMIT_CORE` nonzero); then it leaves the fault to ROCr's default handler
+(`Runtime::VMFaultHandler`), which prints "Memory access fault by GPU node-1 … Page not present"
+and calls `abort()` so that the core holds the fault. Measured both ways on the RX 7900 XTX: with
+core files on, SIGABRT; off, `Lost { code: 700 }` and the process lives. A server that wants
+core files of its own crashes gives this up on AMD.
 
 **Bindings [decided]: thin own bindings to `libcuda.so.1` and `libamdhip64.so`**, about thirty
 functions each in `src/cuda.rs` and `src/hip.rs` (macros of `src/runtime.rs`), loaded with
@@ -950,13 +952,17 @@ same bench): 1.713 ms against 1.776–1.786 ms from submit to return (the wake-u
 device finishes falls from about 75 µs to about 10 µs), at 0.32 ms of host CPU per wait
 against 0.04 ms: the trade of optlog experiment 19, reproduced.
 
-On the AMD card [measured, 2026-11-26, RX 7900 XTX, ROCm 7.2, `gpu-bench -- --runtime hip`,
-500 repetitions]: driver calls are cheaper (0.8 to 1.6 µs per step) and the protocol adds 0.1 to
-0.28 µs per step, as on CUDA. But the waits spin: a 0.15 ms plan costs 0.17 ms of host CPU with
-the blocking wait as with the hybrid one, although the device is made with
-`hipDeviceScheduleBlockingSync` and the completion events with `hipEventBlockingSync`
-(`ROC_ACTIVE_WAIT_TIMEOUT=0` changes nothing). Host CPU at capacity on AMD is therefore about one
-core for the tick thread until a sleeping wait is found [open].
+On the AMD card [measured, 2026-11-26, RX 7900 XTX, ROCm 7.2, `gpu-bench -- --runtime hip`]:
+driver calls are cheaper (0.8 to 1.6 µs per step) and the protocol adds 0.1 to 0.28 µs per step,
+as on CUDA. HIP's blocking wait spins before it sleeps, by design (ROCm's source): 100 µs of
+active wait in HIP (`WaitForSignal`, `rocclr/device/rocm/rocvirtual.hpp`), then up to 200 µs of
+`mwaitx` in ROCr (`InterruptSignal::WaitRelaxed`), then a sleep in the kernel until the card's
+interrupt (`hsaKmtWaitOnEvent`). So a wait shorter than about 0.3 ms costs its whole length in
+CPU, and a longer one about 0.3 ms plus the wake-up: on a 16 ms plan, 1.1 ms of host CPU per
+wait (submit included) with the blocking wait, 2.6 ms with the hybrid one, whose polling after
+the nap is the trade of optlog experiment 19 as on CUDA. (`ROC_ACTIVE_WAIT_TIMEOUT=0` changes
+nothing: it governs another path.) Not a core per tick thread; how it compares with CUDA at
+capacity is to be measured with the encoder [open].
 
 Measured [G2, 2026-11-25, the encoder alone from host memory, next to Plex transcodes; spike
 notes §R.2 has the tables]:

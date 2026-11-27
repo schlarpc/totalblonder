@@ -314,6 +314,7 @@ fn thread_cpu_ns() -> u64 {
 pub fn measure_wait<R: Runtime>(
     dev: &mut GpuDevice<R>,
     iters: usize,
+    launches: usize,
 ) -> Result<Vec<WaitRow>, DeviceError> {
     const N: usize = 16;
     const SW: usize = 1920;
@@ -341,7 +342,7 @@ pub fn measure_wait<R: Runtime>(
         dst: list,
         src: hlist,
     });
-    for _ in 0..8 {
+    for _ in 0..launches {
         p.main(Op::Launch(Launch::covering(
             Kernel::Pyr(Pyr {
                 src,

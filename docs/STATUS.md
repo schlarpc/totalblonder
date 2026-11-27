@@ -40,7 +40,7 @@ tonight apart from captions from text (`--cc-text`).
 | Film mode | 24 fps sources coded as film frames with display flags (not yet used by the server) | tests and gate |
 | Captions | Caption bytes per frame validated and written; text captions from SubRip/WebVTT through `tb-captions` | Gate caption case |
 | Capacity, card to itself | 67 × 1080i, 75 × 1080p, 90 × 720p, 400 × 480i | `docs/SPEC.md` §14.x |
-| AMD cards (HIP) | Same kernels, same output: golden cases and float parity identical on an RX 7900 XTX; a kernel fault aborts the process there; capacity not measured | `docs/ARCHITECTURE.md` §5.2, §7.3 |
+| AMD cards (HIP) | Same kernels, same output: golden cases and float parity identical on an RX 7900 XTX; a kernel fault is `Lost` as on CUDA (core files turned off for that); capacity not measured | `docs/ARCHITECTURE.md` §5.2, §7.3 |
 
 ### 1.2 Input pipeline (on the GPU) and timeline
 

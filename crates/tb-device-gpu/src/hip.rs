@@ -168,6 +168,35 @@ fn dptr(a: u64) -> hipDeviceptr_t {
     std::ptr::with_exposed_provenance_mut(a as usize)
 }
 
+/// Sets the soft core-dump limit of the process to 0, so that a fault in a kernel is a status
+/// and not the end of the process.
+///
+/// HIP (ROCm 7.2, `rocclr/device/rocm/rocdevice.cpp`) handles a GPU memory fault in its system
+/// event handler: it records the error, so that the wait returns `hipErrorIllegalAddress`, but
+/// only when the process would not write a core file (`RLIMIT_CORE` 0, `Os::DumpCoreFile`);
+/// otherwise it hands the fault to ROCr's default handler, which prints "Memory access fault by
+/// GPU" and calls `abort()` so that the core file holds the fault. The adapter prefers the
+/// status (errors are values, docs/ARCHITECTURE.md §1): the server keeps running, reports the
+/// device `Lost` and ends its streams. The hard limit is untouched, so core files can be turned
+/// back on by the process; nothing in the workspace does.
+fn no_core_dumps() {
+    let mut r = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+    // SAFETY: plain system calls with a pointer to a local.
+    unsafe {
+        if libc::getrlimit(libc::RLIMIT_CORE, &mut r) == 0 && r.rlim_cur != 0 {
+            r.rlim_cur = 0;
+            if libc::setrlimit(libc::RLIMIT_CORE, &r) == 0 {
+                tracing::warn!(
+                    "core files turned off for this process: HIP aborts on a GPU fault otherwise"
+                );
+            }
+        }
+    }
+}
+
 /// The HIP runtime: AMD's `libamdhip64.so` (ROCm).
 pub struct Hip(Lib);
 
@@ -203,6 +232,7 @@ impl sys::Api for Hip {
     }
 
     unsafe fn init(&self, ordinal: i32) -> Result<i32, Call> {
+        no_core_dumps();
         let mut device: hipDevice_t = 0;
         // SAFETY: hipInit is the first call; the out-pointer is to a local.
         unsafe {
