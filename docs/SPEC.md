@@ -658,16 +658,18 @@ section boundary.
   Where caption text comes from is [unknown].
 - Multi-audio: SAP and described-video signaling per standards-digest §4.3, including the
   unresolved labeling conflict noted there.
-- AFD **[built]**: every picture carries an Active Format Description (`DTG1` user data after
-  the captions; A/53-4 §6.2.4; standards-digest §7). The decoder worker reports the rectangle
-  it fitted the source into, and `tb_m2v_syntax::afd::code` picks by containment the smallest
-  area of interest that Table 6.14 offers for the frame's aspect and that still holds the
-  whole picture: in a 16:9 frame 1001 (4:3 pillarbox) or 1011 (14:9), in a 4:3 frame 1010
-  (16:9 letterbox) or 1011, otherwise 1000 (full frame); the slate is 1000. A receiver acting
-  on it crops bars, never picture. 0000 and 0100 are never sent: they need bar data, whose
-  line numbering (SMPTE 2016-1) we do not hold. The program's frame aspect is that of its
-  format (4:3 for 480i, 16:9 above), the aspect the encoder signals; live sources are fitted
-  into it.
+- AFD and bar data **[built]**: every picture carries an Active Format Description (`DTG1`
+  user data after the captions; A/53-4 §6.2.4; standards-digest §7), and a boxed picture also
+  `bar_data()` (GA94 0x06, §6.2.3.2). The decoder worker reports the rectangle it fitted the
+  source into; `tb_m2v_syntax::afd::describe` gives the code Table 6.14 names for its aspect
+  (1001 or 1011 pillarboxed in a 16:9 frame, 1010 or 1011 letterboxed in a 4:3 frame, 1000
+  for the full frame), else 0100 (wider than 16:9) or 0000, and the bars' line and pixel
+  numbers in SMPTE ST 2016-1:2009 Table 2's numbering: 1080i rows alternate field lines 21…
+  and 584… (Annex B, Table B.2), 720p and 1080p count from lines 26 and 42, 480i edges are
+  the first-field line (23…) of their row pair (§6.6 allows either field), and 480-line pixels
+  are numbered over 720 (coded pixel x is 8 + x). The slate is 1000. The program's frame aspect
+  is that of its format (4:3 for 480i, 16:9 above), the aspect the encoder signals; live
+  sources are fitted into it.
 - Emergency alert sections (SCTE 18) are not planned; standards-digest §9.3 gives the reasons
   and recommends program substitution.
 

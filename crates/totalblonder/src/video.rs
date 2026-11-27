@@ -42,8 +42,8 @@ pub trait FrameProvider: Send {
     }
     /// The Active Format Description of the picture handed out last (`tb_m2v_syntax::afd`;
     /// the slate fills the frame).
-    fn active_format(&self) -> u8 {
-        tb_m2v_syntax::afd::FULL
+    fn active_format(&self) -> tb_m2v_syntax::afd::ActiveFormat {
+        tb_m2v_syntax::afd::ActiveFormat::FULL
     }
     /// The program moves to another format: pictures of `w`×`h` from now on, at `cadence`.
     fn reformat(&mut self, _w: u32, _h: u32, _cadence: crate::source::Cadence) {}
@@ -394,7 +394,12 @@ fn statmux_setup(setup: &StatmuxSetup, sessions: &[HubSession]) -> Result<Statmu
 
 /// Gives a session the Active Format Description `af` for the frames submitted from now on,
 /// if it is not what it has.
-fn set_afd<D: TickDevice>(eng: &mut Engine<D>, sid: SessionId, af: u8, cur: &mut Option<u8>) {
+fn set_afd<D: TickDevice>(
+    eng: &mut Engine<D>,
+    sid: SessionId,
+    af: tb_m2v_syntax::afd::ActiveFormat,
+    cur: &mut Option<tb_m2v_syntax::afd::ActiveFormat>,
+) {
     if *cur == Some(af) {
         return;
     }
@@ -488,7 +493,7 @@ pub fn run<D: TickDevice>(
     }
     let mut first = vec![true; sessions.len()];
     // The Active Format Description each session writes, as last given to the encoder.
-    let mut afd: Vec<Option<u8>> = vec![None; sessions.len()];
+    let mut afd: Vec<Option<tb_m2v_syntax::afd::ActiveFormat>> = vec![None; sessions.len()];
     let mut cc: Vec<u8> = Vec::with_capacity(96);
     // Film mode: per session the assembler of display units (fields of an interlaced output,
     // frame periods of a progressive one) into pictures with their display durations.

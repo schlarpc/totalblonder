@@ -60,7 +60,7 @@ pub struct Frame {
     pub cc: Vec<u8>,
     /// The Active Format Description written in this frame's picture user data, if any
     /// ([`tb_m2v_syntax::afd`]).
-    pub afd: Option<u8>,
+    pub afd: Option<tb_m2v_syntax::afd::ActiveFormat>,
 }
 
 /// The GOP state of one session.

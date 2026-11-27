@@ -177,6 +177,7 @@ fn start_live(
                 .iter()
                 .map(|&f| crate::live::specs(&p.at(f)).0)
                 .collect(),
+            interlaced: p.ladder.iter().map(|f| f.interlaced()).collect(),
             rung: p.rung.clone(),
             delay,
         };

@@ -69,6 +69,8 @@ pub struct LiveTarget {
     pub audio_spec: Option<AudioSpec>,
     /// Pictures at each rung of the program's ladder (`video_spec` is rung 0).
     pub specs: Vec<VideoSpec>,
+    /// Whether each rung's format is interlaced (for the bar data's line numbers).
+    pub interlaced: Vec<bool>,
     /// The program's rung now: the thread follows it.
     pub rung: crate::config::Rung,
     /// Δ.
@@ -98,16 +100,27 @@ pub fn specs(p: &ProgramPlan) -> (VideoSpec, Option<AudioSpec>) {
     (video, audio)
 }
 
-/// The Active Format Description of a converted picture: the rectangle its source fills in a
-/// frame of `spec` (the whole frame when the worker does not say).
-pub fn active_format(spec: &VideoSpec, active: Option<(u32, u32)>) -> u8 {
-    let frame = f64::from(spec.display_aspect.num()) / f64::from(spec.display_aspect.den());
-    let (aw, ah) = active.unwrap_or((spec.width, spec.height));
-    let wide = frame > 1.5;
-    tb_m2v_syntax::afd::code(
-        wide,
-        tb_m2v_syntax::afd::content_aspect(frame, spec.width, spec.height, aw, ah),
-    )
+/// The Active Format Description and bar data of a converted picture: the rectangle its source
+/// fills in a frame of `spec`, interlaced or not (the whole frame when the worker does not
+/// say). The worker centers the rectangle on even coordinates (`tb-avworker`, its fit:
+/// `x = (w − aw) / 4 · 2`, likewise `y`).
+pub fn active_format(
+    spec: &VideoSpec,
+    interlaced: bool,
+    active: Option<(u32, u32)>,
+) -> tb_m2v_syntax::afd::ActiveFormat {
+    use tb_m2v_syntax::afd::{ActiveFormat, Raster, describe};
+    let (w, h) = (spec.width, spec.height);
+    let (aw, ah) = active.unwrap_or((w, h));
+    let Some(raster) = Raster::of(w, h, interlaced) else {
+        return ActiveFormat::FULL;
+    };
+    let wide = spec.display_aspect.num() * 3 > spec.display_aspect.den() * 4;
+    let (x, y) = (
+        (w.saturating_sub(aw)) / 4 * 2,
+        (h.saturating_sub(ah)) / 4 * 2,
+    );
+    describe(raster, wide, w, h, x, y, aw, ah)
 }
 
 /// The queue an ingest thread feeds and the decoder thread drains.
@@ -271,7 +284,8 @@ pub fn run_decoder(
                     if f.desc.width != spec.width || f.desc.height != spec.height {
                         continue;
                     }
-                    let afd = active_format(&spec, f.desc.active);
+                    let il = target.interlaced.get(rung).copied().unwrap_or(true);
+                    let afd = active_format(&spec, il, f.desc.active);
                     if target
                         .video
                         .try_send(LiveEvent::Frame {
@@ -390,7 +404,7 @@ mod tests {
 
     #[test]
     fn active_format_of_the_fitted_rectangle() {
-        use tb_m2v_syntax::afd::{FULL, LETTER_16_9, PILLAR_4_3};
+        use tb_m2v_syntax::afd::{ActiveFormat, Bars, LETTER_16_9, PILLAR_4_3, WIDER};
         let spec = |w, h, an, ad| VideoSpec {
             width: w,
             height: h,
@@ -399,11 +413,37 @@ mod tests {
             deinterlace: Deinterlace::Off,
         };
         let hd = spec(1920, 1080, 16, 9);
-        assert_eq!(active_format(&hd, Some((1440, 1080))), PILLAR_4_3);
-        assert_eq!(active_format(&hd, Some((1920, 1080))), FULL);
-        assert_eq!(active_format(&hd, None), FULL);
+        assert_eq!(
+            active_format(&hd, true, Some((1440, 1080))),
+            ActiveFormat {
+                afd: PILLAR_4_3,
+                bars: Some(Bars::LeftRight {
+                    left_end: 239,
+                    right_start: 1680
+                })
+            }
+        );
+        assert_eq!(
+            active_format(&hd, true, Some((1920, 1080))),
+            ActiveFormat::FULL
+        );
+        assert_eq!(active_format(&hd, true, None), ActiveFormat::FULL);
+        // 2.4:1 in 1080i: 800 lines, the bars of ST 2016-1 Table B.3
+        assert_eq!(
+            active_format(&hd, true, Some((1920, 800))),
+            ActiveFormat {
+                afd: WIDER,
+                bars: Some(Bars::TopBottom {
+                    top_end: 653,
+                    bottom_start: 491
+                })
+            }
+        );
         let sd = spec(704, 480, 4, 3);
-        assert_eq!(active_format(&sd, Some((704, 360))), LETTER_16_9);
-        assert_eq!(active_format(&sd, Some((704, 480))), FULL);
+        assert_eq!(active_format(&sd, true, Some((704, 360))).afd, LETTER_16_9);
+        assert_eq!(
+            active_format(&sd, true, Some((704, 480))),
+            ActiveFormat::FULL
+        );
     }
 }

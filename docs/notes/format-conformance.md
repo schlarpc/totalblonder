@@ -679,6 +679,10 @@ These are only the requirements the held texts state.
 6. **H.262 C.10 to C.12.** The field-based VBV examination intervals for interlaced sequences
    with repeat_first_field were not re-read for this note. Read them before the film work.
 
-**Standards not held:** SMPTE 2016-1 (AFD and bar data line numbering), CEA-CEB16 (receiver
+**Standards not held:** CEA-CEB16 (receiver
 handling of AFD), ETSI TS 101 154 (the AFD syntax origin; A/53-4 reproduces it), SCTE 20 and SCTE
 21 (only for legacy VBI carriage), and any MPEG-2 3D signaling standard.
+
+SMPTE ST 2016-1:2009 (AFD and bar data line numbering) is now held by the owner (not in the
+repository: a licensed copy); its Table 2 and Annex B are summarized in
+`crates/tb-m2v-syntax/src/afd.rs`.

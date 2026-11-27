@@ -1208,6 +1208,10 @@ crops; 0100 = wider than 16:9 (needs bar data). AFD takes precedence over bar da
 [Rec] Encode at the source's aspect ratio, send AFD 1000 always, and add AFD 1001 / 1010 only
 when we pillarbox or letterbox a source ourselves. Low priority.
 
+Bar data line numbering (SMPTE ST 2016-1:2009 Table 2): 480i lines 23–262 / 286–525, 720p
+26–745, 1080i 21–560 / 584–1123 (rows alternate fields, row 0 = line 21: Annex B Table B.2),
+1080p 42–1121; pixels from 0, over 720 for 480-line formats. Built as `tb_m2v_syntax::afd`.
+
 ---
 
 ---

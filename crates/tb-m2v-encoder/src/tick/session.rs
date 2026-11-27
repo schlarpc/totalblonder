@@ -104,7 +104,7 @@ pub(crate) struct Session {
     pub hold: bool,
     pub hold_prev: bool,
     /// The Active Format Description given to the frames submitted from now on.
-    pub afd: Option<u8>,
+    pub afd: Option<tb_m2v_syntax::afd::ActiveFormat>,
     pub shed_now: bool,
     /// The newest anchor is a repeat of the one before: B pictures in between repeat too.
     pub dup: bool,

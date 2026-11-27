@@ -220,6 +220,8 @@ struct Flags {
     cc_count: Option<u8>,
     /// active_format of the picture's afd_data(), if it has one.
     afd: Option<u8>,
+    /// Whether the picture has bar_data().
+    bars: bool,
 }
 
 fn bits(d: &[u8], at: usize, n: usize) -> u32 {
@@ -239,6 +241,7 @@ fn parse(a: &AccessUnit) -> Flags {
         prog: false,
         cc_count: None,
         afd: None,
+        bars: false,
     };
     let mut i = 0;
     let mut in_pic = false;
@@ -273,6 +276,7 @@ fn parse(a: &AccessUnit) -> Flags {
                 assert_eq!(bits(p, 22, 2), 3, "frame picture");
             }
             0xB2 if &p[..4] == b"GA94" && p[4] == 3 => f.cc_count = Some(p[5] & 31),
+            0xB2 if &p[..4] == b"GA94" && p[4] == 6 => f.bars = true,
             0xB2 if &p[..4] == b"DTG1" => {
                 assert_eq!(p[4], 0x41, "afd_data(): zero, flag set, reserved 00 0001");
                 assert_eq!(p[5] >> 4, 0xF, "afd_data(): reserved 1111");
@@ -888,11 +892,20 @@ fn a_restored_session_continues_the_display() {
 /// it.
 #[test]
 fn active_format_follows_the_submitted_frames() {
-    use tb_m2v_syntax::afd::{LETTER_16_9, PILLAR_4_3};
+    use tb_m2v_syntax::afd::{ActiveFormat, Bars, LETTER_16_9, PILLAR_4_3};
     let want = |n: u64| match n {
-        0..10 => Some(LETTER_16_9),
+        0..10 => Some(ActiveFormat {
+            afd: LETTER_16_9,
+            bars: None,
+        }),
         10..20 => None,
-        _ => Some(PILLAR_4_3),
+        _ => Some(ActiveFormat {
+            afd: PILLAR_4_3,
+            bars: Some(Bars::LeftRight {
+                left_end: 7,
+                right_start: 56,
+            }),
+        }),
     };
     let mut r = Rig::new(interlaced(), EncoderOptions::default(), 0);
     // a frame's worth at 29.97 Hz: the two CEA-608 constructs and 18 DTVCC padding constructs
@@ -914,10 +927,20 @@ fn active_format_follows_the_submitted_frames() {
     assert_eq!(r.aus.len(), 30);
     for a in &r.aus {
         let n = (a.pts / 3003) as u64;
-        assert_eq!(parse(a).afd, want(n), "frame {n}");
+        let f = parse(a);
+        assert_eq!(f.afd, want(n).map(|w| w.afd), "frame {n}");
+        assert_eq!(
+            f.bars,
+            want(n).is_some_and(|w| w.bars.is_some()),
+            "frame {n}"
+        );
     }
+    let wider_without_bars = ActiveFormat {
+        afd: 0b0100,
+        bars: None,
+    };
     assert!(matches!(
-        r.enc.set_active_format(r.s, Some(0b0100)),
-        Err(EncoderError::ActiveFormat(0b0100))
+        r.enc.set_active_format(r.s, Some(wider_without_bars)),
+        Err(EncoderError::ActiveFormat(_))
     ));
 }

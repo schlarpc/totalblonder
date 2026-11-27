@@ -134,7 +134,8 @@ pub fn write_headers(
 /// Part 4 picture user data after the captions (`'DTG1'`, afd_data() with active_format_flag
 /// set; §6.2.4, Table 6.13; the order of SCTE 43 §7.3). Written in every picture it is given
 /// for, so it always follows a sequence header before the next picture data, as §6.2.4
-/// requires. `afd` must be one of the values [`crate::afd::code`] gives.
+/// requires. A boxed picture's bars follow as `'GA94'` bar_data() (§6.2.3.2, Table 6.11).
+/// `afd` must be one this crate writes ([`crate::afd::ActiveFormat::is_written`]).
 pub fn write_headers_afd(
     out: &mut Vec<u8>,
     seq: &SeqInfo,
@@ -142,7 +143,7 @@ pub fn write_headers_afd(
     with_seq: bool,
     with_gop: bool,
     cc: &[u8],
-    afd: Option<u8>,
+    afd: Option<crate::afd::ActiveFormat>,
 ) {
     let mut b = BitWriter::new(out);
     let (w, h) = (seq.width, seq.height);
@@ -273,11 +274,32 @@ pub fn write_headers_afd(
         b.put(0xFF, 8); // marker_bits
     }
     if let Some(af) = afd {
-        debug_assert!(crate::afd::is_written(af), "active_format {af:04b}");
+        debug_assert!(af.is_written(), "active format {af:?}");
         b.start(0xB2);
         b.put(0x4454_4731, 32); // 'DTG1'
         b.put(0x41, 8); // zero '0', active_format_flag '1', reserved '00 0001'
-        b.put(0xF0 | u32::from(af & 0x0F), 8); // reserved '1111', active_format
+        b.put(0xF0 | u32::from(af.afd & 0x0F), 8); // reserved '1111', active_format
+        if let Some(bars) = af.bars {
+            use crate::afd::Bars;
+            b.start(0xB2);
+            b.put(0x4741_3934, 32); // 'GA94'
+            b.put(0x06, 8); // user_data_type_code: bar_data()
+            let (flags, v1, v2) = match bars {
+                Bars::TopBottom {
+                    top_end,
+                    bottom_start,
+                } => (0b1100, top_end, bottom_start),
+                Bars::LeftRight {
+                    left_end,
+                    right_start,
+                } => (0b0011, left_end, right_start),
+            };
+            // top, bottom, left, right flags; reserved '1111'
+            b.put((flags << 4) | 0x0F, 8);
+            for v in [v1, v2] {
+                b.put(0xC000 | u32::from(v & 0x3FFF), 16); // one_bits '11', 14-bit value
+            }
+        }
     }
     b.align();
 }
@@ -828,9 +850,26 @@ mod tests {
             let at = out.windows(4).position(|w| w == [0, 0, 1, 0xB2]);
             at.map(|a| out[a..].to_vec()).unwrap_or_default()
         };
+        use crate::afd::{ActiveFormat, Bars, LETTER_16_9, WIDER};
+        let letter = ActiveFormat {
+            afd: LETTER_16_9,
+            bars: None,
+        };
         let dtg1 = [0, 0, 1, 0xB2, 0x44, 0x54, 0x47, 0x31, 0x41, 0xFA];
-        assert_eq!(ud(&[], Some(crate::afd::LETTER_16_9)), dtg1);
-        let both = ud(&[0xFC, 0x80, 0x80], Some(crate::afd::LETTER_16_9));
+        assert_eq!(ud(&[], Some(letter)), dtg1);
+        // AFD 0100 with the bars of ST 2016-1 Table B.3: lines 653 and 491
+        let wide = ActiveFormat {
+            afd: WIDER,
+            bars: Some(Bars::TopBottom {
+                top_end: 653,
+                bottom_start: 491,
+            }),
+        };
+        let mut want = vec![0, 0, 1, 0xB2, 0x44, 0x54, 0x47, 0x31, 0x41, 0xF4];
+        want.extend_from_slice(&[0, 0, 1, 0xB2, 0x47, 0x41, 0x39, 0x34, 0x06, 0xCF]);
+        want.extend_from_slice(&[0xC2, 0x8D, 0xC1, 0xEB]);
+        assert_eq!(ud(&[], Some(wide)), want);
+        let both = ud(&[0xFC, 0x80, 0x80], Some(letter));
         assert_eq!(both[..15], user_data(&[0xFC, 0x80, 0x80])[..]);
         assert_eq!(both[15..], dtg1);
         // without AFD the output is what write_headers writes

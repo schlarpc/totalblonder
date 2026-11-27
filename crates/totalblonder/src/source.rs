@@ -36,7 +36,7 @@ pub enum LiveEvent {
         interlaced: bool,
         /// Its Active Format Description (`tb_m2v_syntax::afd`): where in the frame the
         /// source's picture is.
-        afd: u8,
+        afd: tb_m2v_syntax::afd::ActiveFormat,
     },
     /// The input's session ended (connection closed, decoder restarted).
     Closed,
@@ -100,7 +100,7 @@ struct Stored {
     id: FrameId,
     data: Arc<Vec<u8>>,
     interlaced: bool,
-    afd: u8,
+    afd: tb_m2v_syntax::afd::ActiveFormat,
 }
 
 /// One input feeding the program (live or standby): its queue, frame clock and frames.
@@ -183,7 +183,7 @@ pub struct LiveProvider {
     /// What was written into the encoder's buffer last: the source and frame.
     last: Option<(Source, Option<FrameId>)>,
     /// The Active Format Description of what was handed out last.
-    afd: u8,
+    afd: tb_m2v_syntax::afd::ActiveFormat,
     stats: SourceStats,
 }
 
@@ -225,7 +225,7 @@ impl LiveProvider {
             slate_shot: None,
             cadence,
             last: None,
-            afd: tb_m2v_syntax::afd::FULL,
+            afd: tb_m2v_syntax::afd::ActiveFormat::FULL,
             stats,
         }
     }
@@ -281,7 +281,7 @@ impl FrameProvider for LiveProvider {
         self.stats.source.get() == 3
     }
 
-    fn active_format(&self) -> u8 {
+    fn active_format(&self) -> tb_m2v_syntax::afd::ActiveFormat {
         self.afd
     }
 
@@ -297,7 +297,7 @@ impl FrameProvider for LiveProvider {
         self.slate_shot = None;
         self.cadence = cadence;
         self.last = None;
-        self.afd = tb_m2v_syntax::afd::FULL;
+        self.afd = tb_m2v_syntax::afd::ActiveFormat::FULL;
     }
 
     fn picture(&mut self, t: u64, out: &mut [u8]) -> Picture {
@@ -318,7 +318,7 @@ impl FrameProvider for LiveProvider {
         if switched {
             self.slate.invalidate();
         }
-        self.afd = tb_m2v_syntax::afd::FULL;
+        self.afd = tb_m2v_syntax::afd::ActiveFormat::FULL;
         self.last = Some((Source::Slate, None));
         if self.slate.render(t / crate::time::HZ, out) {
             Picture::Fresh
@@ -350,7 +350,7 @@ impl FrameProvider for LiveProvider {
             return Some(shot);
         }
         let sec = t / crate::time::HZ;
-        self.afd = tb_m2v_syntax::afd::FULL;
+        self.afd = tb_m2v_syntax::afd::ActiveFormat::FULL;
         if self
             .slate_shot
             .as_ref()
@@ -402,6 +402,13 @@ mod tests {
         );
         let mut out = vec![0u8; (w * h * 3 / 2) as usize];
         let frame = |n: u8| vec![n; (w * h * 3 / 2) as usize];
+        let pillar = tb_m2v_syntax::afd::ActiveFormat {
+            afd: tb_m2v_syntax::afd::PILLAR_4_3,
+            bars: Some(tb_m2v_syntax::afd::Bars::LeftRight {
+                left_end: 87,
+                right_start: 624,
+            }),
+        };
         let mut live_seen = false;
         // 20 s: input from second 2 to second 10 at 29.97, then nothing.
         for k in 0..600u64 {
@@ -415,7 +422,7 @@ mod tests {
                     at,
                     data: frame((k % 200) as u8 + 20),
                     interlaced: false,
-                    afd: tb_m2v_syntax::afd::PILLAR_4_3,
+                    afd: pillar,
                 })
                 .unwrap();
             }
@@ -424,14 +431,14 @@ mod tests {
                 live_seen = true;
                 if pic == Picture::Fresh {
                     assert!(out[0] >= 20, "a live frame, not the slate");
-                    assert_eq!(p.active_format(), tb_m2v_syntax::afd::PILLAR_4_3);
+                    assert_eq!(p.active_format(), pillar);
                 }
             }
         }
         assert!(live_seen, "live was promoted");
         // Back on the slate after the input stopped (hold + one GOP).
         assert_eq!(stats.source.get(), 3);
-        assert_eq!(p.active_format(), tb_m2v_syntax::afd::FULL);
+        assert_eq!(p.active_format(), tb_m2v_syntax::afd::ActiveFormat::FULL);
         assert!(stats.switches.get() >= 2);
     }
 }

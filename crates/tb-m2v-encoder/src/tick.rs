@@ -284,10 +284,10 @@ pub enum EncoderError {
     /// The caption bytes of a frame are not a legal `cc_data()`.
     #[error("captions: {0}")]
     Captions(#[from] tb_m2v_syntax::captions::CaptionError),
-    /// An active_format the encoder does not write (A/53 Part 4 Table 6.14; only the values
-    /// of `tb_m2v_syntax::afd::code`).
-    #[error("active_format {0:04b} is not one the encoder writes")]
-    ActiveFormat(u8),
+    /// An active format the encoder does not write (A/53 Part 4 Table 6.14; see
+    /// `tb_m2v_syntax::afd::ActiveFormat::is_written`).
+    #[error("active format {0:?} is not one the encoder writes")]
+    ActiveFormat(tb_m2v_syntax::afd::ActiveFormat),
     /// A value of the configuration is out of range.
     #[error("configuration: {0}")]
     Config(&'static str),
@@ -569,7 +569,7 @@ pub struct SessionSnapshot {
     /// The session is on hold.
     pub hold: bool,
     /// The Active Format Description given to submitted frames.
-    pub afd: Option<u8>,
+    pub afd: Option<tb_m2v_syntax::afd::ActiveFormat>,
     /// Only a key frame is coded on the device (after `Lost` or a restore).
     pub need_key: bool,
     /// `close` was called.
@@ -1397,12 +1397,16 @@ impl Encoder {
     }
 
     /// The Active Format Description written in the pictures of the frames submitted from now
-    /// on (`None`: none). One of the values of [`tb_m2v_syntax::afd::code`]; anything else is
-    /// refused.
-    pub fn set_active_format(&mut self, s: SessionId, afd: Option<u8>) -> Result<(), EncoderError> {
+    /// on, with the bar data of a boxed picture (`None`: none). Anything
+    /// [`tb_m2v_syntax::afd::ActiveFormat::is_written`] rejects is refused.
+    pub fn set_active_format(
+        &mut self,
+        s: SessionId,
+        afd: Option<tb_m2v_syntax::afd::ActiveFormat>,
+    ) -> Result<(), EncoderError> {
         let si = self.si(s)?;
         if let Some(af) = afd
-            && !tb_m2v_syntax::afd::is_written(af)
+            && !af.is_written()
         {
             return Err(EncoderError::ActiveFormat(af));
         }
