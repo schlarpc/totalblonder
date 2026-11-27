@@ -950,6 +950,14 @@ same bench): 1.713 ms against 1.776–1.786 ms from submit to return (the wake-u
 device finishes falls from about 75 µs to about 10 µs), at 0.32 ms of host CPU per wait
 against 0.04 ms: the trade of optlog experiment 19, reproduced.
 
+On the AMD card [measured, 2026-11-26, RX 7900 XTX, ROCm 7.2, `gpu-bench -- --runtime hip`,
+500 repetitions]: driver calls are cheaper (0.8 to 1.6 µs per step) and the protocol adds 0.1 to
+0.28 µs per step, as on CUDA. But the waits spin: a 0.15 ms plan costs 0.17 ms of host CPU with
+the blocking wait as with the hybrid one, although the device is made with
+`hipDeviceScheduleBlockingSync` and the completion events with `hipEventBlockingSync`
+(`ROC_ACTIVE_WAIT_TIMEOUT=0` changes nothing). Host CPU at capacity on AMD is therefore about one
+core for the tick thread until a sleeping wait is found [open].
+
 Measured [G2, 2026-11-25, the encoder alone from host memory, next to Plex transcodes; spike
 notes §R.2 has the tables]:
 
