@@ -11,6 +11,7 @@
 //! (02/2000).
 #![forbid(unsafe_code)]
 
+pub mod afd;
 pub mod bits;
 pub mod captions;
 pub mod headers;

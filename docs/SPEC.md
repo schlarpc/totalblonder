@@ -649,7 +649,16 @@ section boundary.
   Where caption text comes from is [unknown].
 - Multi-audio: SAP and described-video signaling per standards-digest §4.3, including the
   unresolved labeling conflict noted there.
-- AFD: always "full frame" unless we letterbox (standards-digest §7). Low priority.
+- AFD **[built]**: every picture carries an Active Format Description (`DTG1` user data after
+  the captions; A/53-4 §6.2.4; standards-digest §7). The decoder worker reports the rectangle
+  it fitted the source into, and `tb_m2v_syntax::afd::code` picks by containment the smallest
+  area of interest that Table 6.14 offers for the frame's aspect and that still holds the
+  whole picture: in a 16:9 frame 1001 (4:3 pillarbox) or 1011 (14:9), in a 4:3 frame 1010
+  (16:9 letterbox) or 1011, otherwise 1000 (full frame); the slate is 1000. A receiver acting
+  on it crops bars, never picture. 0000 and 0100 are never sent: they need bar data, whose
+  line numbering (SMPTE 2016-1) we do not hold. The program's frame aspect is that of its
+  format (4:3 for 480i, 16:9 above), the aspect the encoder signals; live sources are fitted
+  into it.
 - Emergency alert sections (SCTE 18) are not planned; standards-digest §9.3 gives the reasons
   and recommends program substitution.
 

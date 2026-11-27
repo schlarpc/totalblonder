@@ -58,6 +58,9 @@ pub struct Frame {
     pub tff: bool,
     /// `cc_data` triplets for this frame (3 bytes each, at most 31).
     pub cc: Vec<u8>,
+    /// The Active Format Description written in this frame's picture user data, if any
+    /// ([`tb_m2v_syntax::afd`]).
+    pub afd: Option<u8>,
 }
 
 /// The GOP state of one session.
@@ -217,6 +220,7 @@ mod tests {
             dur: 0,
             tff: false,
             cc: Vec::new(),
+            afd: None,
         }
     }
 

@@ -371,6 +371,15 @@ impl Format {
             _ => (30_000, 1001),
         }
     }
+    /// Display aspect ratio of the coded frame, width : height: what the encoder signals in
+    /// aspect_ratio_information (its default for the size: 4:3 at 480 lines, 16:9 above;
+    /// `tb_m2v_syntax::profile`).
+    pub fn display_aspect(self) -> (u32, u32) {
+        match self {
+            Format::F480i => (4, 3),
+            _ => (16, 9),
+        }
+    }
     /// Interlaced.
     pub fn interlaced(self) -> bool {
         matches!(self, Format::F1080i | Format::F480i)

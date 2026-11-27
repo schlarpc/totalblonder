@@ -284,6 +284,10 @@ pub enum EncoderError {
     /// The caption bytes of a frame are not a legal `cc_data()`.
     #[error("captions: {0}")]
     Captions(#[from] tb_m2v_syntax::captions::CaptionError),
+    /// An active_format the encoder does not write (A/53 Part 4 Table 6.14; only the values
+    /// of `tb_m2v_syntax::afd::code`).
+    #[error("active_format {0:04b} is not one the encoder writes")]
+    ActiveFormat(u8),
     /// A value of the configuration is out of range.
     #[error("configuration: {0}")]
     Config(&'static str),
@@ -564,6 +568,8 @@ pub struct SessionSnapshot {
     pub dup: bool,
     /// The session is on hold.
     pub hold: bool,
+    /// The Active Format Description given to submitted frames.
+    pub afd: Option<u8>,
     /// Only a key frame is coded on the device (after `Lost` or a restore).
     pub need_key: bool,
     /// `close` was called.
@@ -886,6 +892,7 @@ impl Encoder {
             closed: false,
             hold: false,
             hold_prev: false,
+            afd: None,
             shed_now: false,
             dup: false,
             repeats: 0,
@@ -1226,6 +1233,7 @@ impl Encoder {
             dur: shown.units,
             tff: shown.top_first,
             cc: cc[..3 * triplets].to_vec(),
+            afd: se.afd,
         };
         // two fields end on the other parity, so the next frame begins as this one did; three
         // fields end on the parity they began with, so the next begins on the other
@@ -1385,6 +1393,20 @@ impl Encoder {
         self.between_ticks()?;
         let si = self.si(s)?;
         self.sessions[si].hold = held;
+        Ok(())
+    }
+
+    /// The Active Format Description written in the pictures of the frames submitted from now
+    /// on (`None`: none). One of the values of [`tb_m2v_syntax::afd::code`]; anything else is
+    /// refused.
+    pub fn set_active_format(&mut self, s: SessionId, afd: Option<u8>) -> Result<(), EncoderError> {
+        let si = self.si(s)?;
+        if let Some(af) = afd
+            && !tb_m2v_syntax::afd::is_written(af)
+        {
+            return Err(EncoderError::ActiveFormat(af));
+        }
+        self.sessions[si].afd = afd;
         Ok(())
     }
 
@@ -2067,6 +2089,7 @@ impl Encoder {
             have_ref: se.have_ref,
             dup: se.dup,
             hold: se.hold,
+            afd: se.afd,
             need_key: se.need_key,
             closing: se.closing,
             closed: se.closed,
@@ -2121,6 +2144,7 @@ impl Encoder {
         se.dup = true;
         se.hold = snap.hold;
         se.hold_prev = snap.hold;
+        se.afd = snap.afd;
         se.ref_disp = snap.ref_disp;
         se.pictures = snap.stats.pictures;
         se.repeats = snap.stats.repeats;

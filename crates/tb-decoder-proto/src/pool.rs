@@ -141,6 +141,14 @@ pub enum Violation {
     /// Caption bytes that are not whole triplets.
     #[error("{0} caption bytes")]
     Captions(usize),
+    /// An active rectangle that is empty or larger than the frame.
+    #[error("active rectangle {width}x{height}")]
+    Active {
+        /// Width.
+        width: u32,
+        /// Height.
+        height: u32,
+    },
     /// Audio parameters outside the limits.
     #[error("audio {rate} Hz, {channels} channels, {samples} samples")]
     Audio {
@@ -650,6 +658,14 @@ fn check_video(d: &VideoFrameDesc, limits: &Limits) -> Result<(), Violation> {
     if !d.cc_data.len().is_multiple_of(3) {
         return Err(Violation::Captions(d.cc_data.len()));
     }
+    if let Some((aw, ah)) = d.active
+        && (aw == 0 || ah == 0 || aw > d.width || ah > d.height)
+    {
+        return Err(Violation::Active {
+            width: aw,
+            height: ah,
+        });
+    }
     Ok(())
 }
 
@@ -762,6 +778,7 @@ mod tests {
                 sample_aspect: None,
                 cc_data: vec![],
                 corrupt: false,
+                active: None,
             },
         }
     }
@@ -840,6 +857,18 @@ mod tests {
         p = picture(v.pool, 0);
         p.desc.cc_data = vec![0; 4];
         assert_eq!(t.accept_video(&p, &s, &l), Err(Violation::Captions(4)));
+        p = picture(v.pool, 0);
+        p.desc.active = Some((p.desc.width + 2, p.desc.height));
+        assert!(matches!(
+            t.accept_video(&p, &s, &l),
+            Err(Violation::Active { .. })
+        ));
+        p = picture(v.pool, 0);
+        p.desc.active = Some((0, p.desc.height));
+        assert!(matches!(
+            t.accept_video(&p, &s, &l),
+            Err(Violation::Active { .. })
+        ));
         p = picture(v.pool, 0);
         p.desc.planes[0].stride = u32::MAX;
         assert!(matches!(

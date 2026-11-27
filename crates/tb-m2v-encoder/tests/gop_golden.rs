@@ -115,6 +115,7 @@ fn replay(name: &str) -> Seen {
                     dur: r.int("units").map_or(s.per_frame, |u| u as u8),
                     tff: r.flag("top_first").unwrap_or(s.top_first),
                     cc: r.bytes("cc").unwrap(),
+                    afd: None,
                 };
                 s.gop
                     .enqueue(frame, params.0, params.1, params.2, released, s.per_frame);
@@ -163,6 +164,7 @@ fn replay(name: &str) -> Seen {
                     dur: r.int("units").map_or(per_frame, |u| u as u8),
                     tff: r.flag("top_first").unwrap_or(top_first),
                     cc: r.bytes("cc").unwrap(),
+                    afd: None,
                 };
                 seen.off_grid += usize::from(want.off_grid);
                 assert_eq!(f, want, "{at}");

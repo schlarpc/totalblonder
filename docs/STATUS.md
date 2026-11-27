@@ -39,6 +39,7 @@ tonight apart from captions from text (`--cc-text`).
 | Rate control | Constant rate, and a ceiling with a variable rate under it; the decoder buffer limit is never broken; rate changes mid-stream under one sequence | Gate torture cases |
 | Film mode | 24 fps sources coded as film frames with display flags (not yet used by the server) | tests and gate |
 | Captions | Caption bytes per frame validated and written; text captions from SubRip/WebVTT through `tb-captions` | Gate caption case |
+| Active Format Description | `DTG1` user data in every picture from the rectangle the converter fitted the source into, chosen by containment (SPEC §7.7); no bar data | unit tests; encoder test over coding order |
 | Capacity, card to itself | 67 × 1080i, 75 × 1080p, 90 × 720p, 400 × 480i | `docs/SPEC.md` §14.x |
 | AMD cards (HIP) | Same kernels, same output: golden cases and float parity identical on an RX 7900 XTX; a kernel fault is `Lost` as on CUDA (core files turned off for that); capacity not measured | `docs/ARCHITECTURE.md` §5.2, §7.3 |
 

@@ -74,10 +74,12 @@ pub struct LiveTarget {
 /// The worker's output specs for a program.
 pub fn specs(p: &ProgramPlan) -> (VideoSpec, Option<AudioSpec>) {
     let (w, h) = p.format.size();
+    let (an, ad) = p.format.display_aspect();
     let video = VideoSpec {
         width: w,
         height: h,
-        display_aspect: Rational::new(16, 9).unwrap_or(Rational::MILLIS),
+        // the coded frame's aspect: the source is fitted into what the TV will show
+        display_aspect: Rational::new(an, ad).unwrap_or(Rational::MILLIS),
         aspect: Aspect::Fit,
         // Interlaced outputs take frames as they come; the encoder codes them as frames.
         deinterlace: Deinterlace::Off,
@@ -90,6 +92,18 @@ pub fn specs(p: &ProgramPlan) -> (VideoSpec, Option<AudioSpec>) {
         },
     });
     (video, audio)
+}
+
+/// The Active Format Description of a converted picture: the rectangle its source fills in a
+/// frame of `spec` (the whole frame when the worker does not say).
+pub fn active_format(spec: &VideoSpec, active: Option<(u32, u32)>) -> u8 {
+    let frame = f64::from(spec.display_aspect.num()) / f64::from(spec.display_aspect.den());
+    let (aw, ah) = active.unwrap_or((spec.width, spec.height));
+    let wide = frame > 1.5;
+    tb_m2v_syntax::afd::code(
+        wide,
+        tb_m2v_syntax::afd::content_aspect(frame, spec.width, spec.height, aw, ah),
+    )
 }
 
 /// The queue an ingest thread feeds and the decoder thread drains.
@@ -231,12 +245,14 @@ pub fn run_decoder(
                             data.extend_from_slice(p);
                         }
                     }
+                    let afd = active_format(&target.video_spec, f.desc.active);
                     if target
                         .video
                         .try_send(LiveEvent::Frame {
                             at: at.0.max(0) as u64,
                             data,
                             interlaced: f.desc.interlaced,
+                            afd,
                         })
                         .is_ok()
                     {
@@ -344,5 +360,24 @@ mod tests {
         let t = out[199] + 1000 * p + p / 2;
         assert_eq!(g.snap(t), t);
         assert_eq!(g.snap(t + p + 13_000), t + p);
+    }
+
+    #[test]
+    fn active_format_of_the_fitted_rectangle() {
+        use tb_m2v_syntax::afd::{FULL, LETTER_16_9, PILLAR_4_3};
+        let spec = |w, h, an, ad| VideoSpec {
+            width: w,
+            height: h,
+            display_aspect: Rational::new(an, ad).unwrap(),
+            aspect: Aspect::Fit,
+            deinterlace: Deinterlace::Off,
+        };
+        let hd = spec(1920, 1080, 16, 9);
+        assert_eq!(active_format(&hd, Some((1440, 1080))), PILLAR_4_3);
+        assert_eq!(active_format(&hd, Some((1920, 1080))), FULL);
+        assert_eq!(active_format(&hd, None), FULL);
+        let sd = spec(704, 480, 4, 3);
+        assert_eq!(active_format(&sd, Some((704, 360))), LETTER_16_9);
+        assert_eq!(active_format(&sd, Some((704, 480))), FULL);
     }
 }

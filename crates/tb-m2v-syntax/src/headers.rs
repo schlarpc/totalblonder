@@ -127,6 +127,23 @@ pub fn write_headers(
     with_gop: bool,
     cc: &[u8],
 ) {
+    write_headers_afd(out, seq, pic, with_seq, with_gop, cc, None);
+}
+
+/// [`write_headers`], and when `afd` is given, the picture's Active Format Description as A/53
+/// Part 4 picture user data after the captions (`'DTG1'`, afd_data() with active_format_flag
+/// set; §6.2.4, Table 6.13; the order of SCTE 43 §7.3). Written in every picture it is given
+/// for, so it always follows a sequence header before the next picture data, as §6.2.4
+/// requires. `afd` must be one of the values [`crate::afd::code`] gives.
+pub fn write_headers_afd(
+    out: &mut Vec<u8>,
+    seq: &SeqInfo,
+    pic: &PicInfo,
+    with_seq: bool,
+    with_gop: bool,
+    cc: &[u8],
+    afd: Option<u8>,
+) {
     let mut b = BitWriter::new(out);
     let (w, h) = (seq.width, seq.height);
     let par = &seq.par;
@@ -254,6 +271,13 @@ pub fn write_headers(
             b.put(u32::from(v), 8);
         }
         b.put(0xFF, 8); // marker_bits
+    }
+    if let Some(af) = afd {
+        debug_assert!(crate::afd::is_written(af), "active_format {af:04b}");
+        b.start(0xB2);
+        b.put(0x4454_4731, 32); // 'DTG1'
+        b.put(0x41, 8); // zero '0', active_format_flag '1', reserved '00 0001'
+        b.put(0xF0 | u32::from(af & 0x0F), 8); // reserved '1111', active_format
     }
     b.align();
 }
@@ -785,6 +809,33 @@ mod tests {
         );
         let at = out.windows(4).position(|w| w == [0, 0, 1, 0xB2]).unwrap();
         out[at..].to_vec()
+    }
+
+    /// AFD follows the captions as its own user_data(), or stands alone without them.
+    #[test]
+    fn active_format_user_data() {
+        let ud = |cc: &[u8], afd| {
+            let mut out = Vec::new();
+            write_headers_afd(
+                &mut out,
+                &seq(720, 480, 30000, 1001),
+                &pic(PicType::P, 1),
+                false,
+                false,
+                cc,
+                afd,
+            );
+            let at = out.windows(4).position(|w| w == [0, 0, 1, 0xB2]);
+            at.map(|a| out[a..].to_vec()).unwrap_or_default()
+        };
+        let dtg1 = [0, 0, 1, 0xB2, 0x44, 0x54, 0x47, 0x31, 0x41, 0xFA];
+        assert_eq!(ud(&[], Some(crate::afd::LETTER_16_9)), dtg1);
+        let both = ud(&[0xFC, 0x80, 0x80], Some(crate::afd::LETTER_16_9));
+        assert_eq!(both[..15], user_data(&[0xFC, 0x80, 0x80])[..]);
+        assert_eq!(both[15..], dtg1);
+        // without AFD the output is what write_headers writes
+        assert_eq!(ud(&[0xFC, 0x80, 0x80], None), user_data(&[0xFC, 0x80, 0x80]));
+        assert!(ud(&[], None).is_empty());
     }
 
     /// At most 31 triplets: cc_count is 5 bits and the zero_bit stays 0.

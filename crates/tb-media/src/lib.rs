@@ -315,6 +315,9 @@ pub struct VideoFrameDesc {
     pub cc_data: Vec<u8>,
     /// The frame was decoded from a damaged or incomplete picture.
     pub corrupt: bool,
+    /// A converted picture: the width and height of the rectangle the source fills, centered
+    /// in the frame (the rest is bars). `None`: not known (a picture as decoded).
+    pub active: Option<(u32, u32)>,
 }
 
 /// A block of decoded audio as the worker describes it: 32-bit float, planar, one plane of

@@ -34,6 +34,9 @@ pub enum LiveEvent {
         /// Its two fields are from different instants (an interlaced source): in film mode
         /// each field is then content of its own, never repeated as a whole frame.
         interlaced: bool,
+        /// Its Active Format Description (`tb_m2v_syntax::afd`): where in the frame the
+        /// source's picture is.
+        afd: u8,
     },
     /// The input's session ended (connection closed, decoder restarted).
     Closed,
@@ -97,6 +100,7 @@ struct Stored {
     id: FrameId,
     data: Arc<Vec<u8>>,
     interlaced: bool,
+    afd: u8,
 }
 
 /// One input feeding the program (live or standby): its queue, frame clock and frames.
@@ -126,6 +130,7 @@ impl Feed {
                     at,
                     data,
                     interlaced,
+                    afd,
                 }) => {
                     self.frames_in.inc();
                     let id = FrameId(self.next_id);
@@ -135,6 +140,7 @@ impl Feed {
                         id,
                         data: Arc::new(data),
                         interlaced,
+                        afd,
                     });
                     while self.frames.len() > STORE {
                         self.frames.pop_front();
@@ -176,6 +182,8 @@ pub struct LiveProvider {
     cadence: Cadence,
     /// What was written into the encoder's buffer last: the source and frame.
     last: Option<(Source, Option<FrameId>)>,
+    /// The Active Format Description of what was handed out last.
+    afd: u8,
     stats: SourceStats,
 }
 
@@ -217,6 +225,7 @@ impl LiveProvider {
             slate_shot: None,
             cadence,
             last: None,
+            afd: tb_m2v_syntax::afd::FULL,
             stats,
         }
     }
@@ -272,6 +281,10 @@ impl FrameProvider for LiveProvider {
         self.stats.source.get() == 3
     }
 
+    fn active_format(&self) -> u8 {
+        self.afd
+    }
+
     fn picture(&mut self, t: u64, out: &mut [u8]) -> Picture {
         if let (src, Some(id)) = self.choose(t) {
             if self.last == Some((src, Some(id))) {
@@ -281,6 +294,7 @@ impl FrameProvider for LiveProvider {
                 && f.data.len() == out.len()
             {
                 out.copy_from_slice(&f.data);
+                self.afd = f.afd;
                 self.last = Some((src, Some(id)));
                 return Picture::Fresh;
             }
@@ -289,6 +303,7 @@ impl FrameProvider for LiveProvider {
         if switched {
             self.slate.invalidate();
         }
+        self.afd = tb_m2v_syntax::afd::FULL;
         self.last = Some((Source::Slate, None));
         if self.slate.render(t / crate::time::HZ, out) {
             Picture::Fresh
@@ -303,6 +318,7 @@ impl FrameProvider for LiveProvider {
             && f.data.len() == len
         {
             let n = feed_index(src).unwrap_or(0) as u32;
+            let afd = f.afd;
             let key = if f.interlaced {
                 Key::Unique
             } else {
@@ -311,12 +327,15 @@ impl FrameProvider for LiveProvider {
                     idx: id.0 as i64,
                 }
             };
-            return Some(Shot {
+            let shot = Shot {
                 key,
                 data: f.data.clone(),
-            });
+            };
+            self.afd = afd;
+            return Some(shot);
         }
         let sec = t / crate::time::HZ;
+        self.afd = tb_m2v_syntax::afd::FULL;
         if self
             .slate_shot
             .as_ref()
@@ -381,6 +400,7 @@ mod tests {
                     at,
                     data: frame((k % 200) as u8 + 20),
                     interlaced: false,
+                    afd: tb_m2v_syntax::afd::PILLAR_4_3,
                 })
                 .unwrap();
             }
@@ -389,12 +409,14 @@ mod tests {
                 live_seen = true;
                 if pic == Picture::Fresh {
                     assert!(out[0] >= 20, "a live frame, not the slate");
+                    assert_eq!(p.active_format(), tb_m2v_syntax::afd::PILLAR_4_3);
                 }
             }
         }
         assert!(live_seen, "live was promoted");
         // Back on the slate after the input stopped (hold + one GOP).
         assert_eq!(stats.source.get(), 3);
+        assert_eq!(p.active_format(), tb_m2v_syntax::afd::FULL);
         assert!(stats.switches.get() >= 2);
     }
 }

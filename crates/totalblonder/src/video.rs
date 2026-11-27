@@ -39,6 +39,11 @@ pub trait FrameProvider: Send {
     fn on_slate(&self) -> bool {
         true
     }
+    /// The Active Format Description of the picture handed out last (`tb_m2v_syntax::afd`;
+    /// the slate fills the frame).
+    fn active_format(&self) -> u8 {
+        tb_m2v_syntax::afd::FULL
+    }
     /// Film mode: what is shown at display unit time `t` (a field of an interlaced output, a
     /// frame period of a progressive one), as a whole picture of `len` bytes and its sameness
     /// key. `None`: the provider has no film mode, the program is coded frame by frame.
@@ -366,6 +371,18 @@ fn statmux_setup(setup: &StatmuxSetup, sessions: &[HubSession]) -> Result<Statmu
     Ok(sm)
 }
 
+/// Gives a session the Active Format Description `af` for the frames submitted from now on,
+/// if it is not what it has.
+fn set_afd<D: TickDevice>(eng: &mut Engine<D>, sid: SessionId, af: u8, cur: &mut Option<u8>) {
+    if *cur == Some(af) {
+        return;
+    }
+    match eng.enc_mut().set_active_format(sid, Some(af)) {
+        Ok(()) => *cur = Some(af),
+        Err(e) => tracing::warn!("active format: {e}"),
+    }
+}
+
 /// Runs the hub until the clock stops. Returns why it ended.
 pub fn run<D: TickDevice>(
     mut eng: Engine<D>,
@@ -420,6 +437,8 @@ pub fn run<D: TickDevice>(
         }
     }
     let mut first = vec![true; sessions.len()];
+    // The Active Format Description each session writes, as last given to the encoder.
+    let mut afd: Vec<Option<u8>> = vec![None; sessions.len()];
     let mut cc: Vec<u8> = Vec::with_capacity(96);
     // Film mode: per session the assembler of display units (fields of an interlaced output,
     // frame periods of a progressive one) into pictures with their display durations.
@@ -465,6 +484,7 @@ pub fn run<D: TickDevice>(
                     }
                 }
                 let Some(pic) = asm.pull() else { continue };
+                set_afd(&mut eng, sid, s.provider.active_format(), &mut afd[i]);
                 let shown = tb_m2v_encoder::Shown {
                     units: pic.units,
                     top_first: pic.top_first,
@@ -514,6 +534,7 @@ pub fn run<D: TickDevice>(
                 Some(out) => s.provider.picture(t, out),
                 None => return Err("frame buffer outside the host arena".into()),
             };
+            set_afd(&mut eng, sid, s.provider.active_format(), &mut afd[i]);
             let src = if pic == Picture::Fresh || first[i] {
                 FrameSource::Host
             } else {

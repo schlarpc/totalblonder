@@ -7,7 +7,7 @@ use tb_kernel_abi::Geo;
 use tb_m2v_rate::RateControl;
 use tb_m2v_rate::control::RUNG_SKIP;
 use tb_m2v_syntax::PicType;
-use tb_m2v_syntax::headers::{PicInfo, SeqInfo, write_headers, write_skip_slices};
+use tb_m2v_syntax::headers::{PicInfo, SeqInfo, write_headers_afd, write_skip_slices};
 
 use crate::au::AccessUnit;
 use crate::config::SessionConfig;
@@ -103,6 +103,8 @@ pub(crate) struct Session {
     pub closed: bool,
     pub hold: bool,
     pub hold_prev: bool,
+    /// The Active Format Description given to the frames submitted from now on.
+    pub afd: Option<u8>,
     pub shed_now: bool,
     /// The newest anchor is a repeat of the one before: B pictures in between repeat too.
     pub dup: bool,
@@ -137,6 +139,7 @@ pub(crate) fn blank_frame() -> Frame {
         dur: 0,
         tff: false,
         cc: Vec::new(),
+        afd: None,
     }
 }
 
@@ -317,7 +320,7 @@ impl Session {
             alt_scan: geo.alt_scan != 0 && !self.zigzag(geo, f),
             progressive_frame: f.progressive,
         };
-        write_headers(out, &self.seq, &pic, seq_hdr, gop_hdr, &f.cc);
+        write_headers_afd(out, &self.seq, &pic, seq_hdr, gop_hdr, &f.cc, f.afd);
     }
 
     /// A repeated picture for frame `f`, made here and now: no kernel runs for it. An I

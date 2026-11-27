@@ -522,6 +522,7 @@ impl Worker {
                         sample_aspect: None,
                         cc_data: vec![],
                         corrupt: false,
+                        active: None,
                     },
                 }));
             }
@@ -819,6 +820,7 @@ impl Worker {
                 cc
             },
             corrupt: f.corrupt(),
+            active: None,
         };
         let pool_id = pool.id;
         if let Some(fr) = pool.free.get_mut(usize::from(slot)) {
@@ -1128,6 +1130,7 @@ impl Worker {
                 sample_aspect: sar,
                 cc_data: if k == 0 { cc.clone() } else { Vec::new() },
                 corrupt,
+                active: Some((rw, rh)),
             };
             self.stats.frames += 1;
             self.send(&FromWorker::Video(VideoOut {

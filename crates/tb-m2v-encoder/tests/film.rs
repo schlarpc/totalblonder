@@ -218,6 +218,8 @@ struct Flags {
     rff: bool,
     prog: bool,
     cc_count: Option<u8>,
+    /// active_format of the picture's afd_data(), if it has one.
+    afd: Option<u8>,
 }
 
 fn bits(d: &[u8], at: usize, n: usize) -> u32 {
@@ -236,6 +238,7 @@ fn parse(a: &AccessUnit) -> Flags {
         rff: false,
         prog: false,
         cc_count: None,
+        afd: None,
     };
     let mut i = 0;
     let mut in_pic = false;
@@ -270,6 +273,11 @@ fn parse(a: &AccessUnit) -> Flags {
                 assert_eq!(bits(p, 22, 2), 3, "frame picture");
             }
             0xB2 if &p[..4] == b"GA94" && p[4] == 3 => f.cc_count = Some(p[5] & 31),
+            0xB2 if &p[..4] == b"DTG1" => {
+                assert_eq!(p[4], 0x41, "afd_data(): zero, flag set, reserved 00 0001");
+                assert_eq!(p[5] >> 4, 0xF, "afd_data(): reserved 1111");
+                f.afd = Some(p[5] & 0x0F);
+            }
             // the first slice: the headers are over
             0x01 => break,
             _ => {}
@@ -873,4 +881,42 @@ fn a_restored_session_continues_the_display() {
     );
     assert_eq!(first_new.pic_type, PIC_I);
     check(&n, false);
+}
+
+/// The Active Format Description set on a session goes into the pictures of the frames
+/// submitted after it, whatever their coding order, with the captions before it; `None` stops
+/// it.
+#[test]
+fn active_format_follows_the_submitted_frames() {
+    use tb_m2v_syntax::afd::{LETTER_16_9, PILLAR_4_3};
+    let want = |n: u64| match n {
+        0..10 => Some(LETTER_16_9),
+        10..20 => None,
+        _ => Some(PILLAR_4_3),
+    };
+    let mut r = Rig::new(interlaced(), EncoderOptions::default(), 0);
+    // a frame's worth at 29.97 Hz: the two CEA-608 constructs and 18 DTVCC padding constructs
+    let mut cc = vec![0xFC, 0x80, 0x80, 0xFD, 0x80, 0x80];
+    for _ in 0..18 {
+        cc.extend_from_slice(&[0xFA, 0, 0]);
+    }
+    for n in 0..30u64 {
+        if n == 0 || n == 10 || n == 20 {
+            r.enc.set_active_format(r.s, want(n)).unwrap();
+        }
+        let s = r.enc.ordinary(r.s).unwrap();
+        r.feed(s, false, if n % 2 == 0 { &cc } else { &[] }).unwrap();
+        r.tick();
+    }
+    r.finish();
+    check(&r, true);
+    assert_eq!(r.aus.len(), 30);
+    for a in &r.aus {
+        let n = (a.pts / 3003) as u64;
+        assert_eq!(parse(a).afd, want(n), "frame {n}");
+    }
+    assert!(matches!(
+        r.enc.set_active_format(r.s, Some(0b0100)),
+        Err(EncoderError::ActiveFormat(0b0100))
+    ));
 }

@@ -19,7 +19,7 @@ use tb_media::{
 /// First four bytes of every message.
 pub const MAGIC: [u8; 4] = *b"TBAV";
 /// Protocol version. Both sides refuse any other.
-pub const VERSION: u16 = 1;
+pub const VERSION: u16 = 2;
 /// Bytes of the header.
 pub const HEADER_LEN: usize = 12;
 /// Largest message, header included.
@@ -1022,6 +1022,10 @@ fn put_video(w: &mut Writer<'_>, d: &VideoFrameDesc) -> Result<(), WireError> {
     w.opt_rational(d.sample_aspect);
     w.bytes16("cc_data", &d.cc_data, MAX_CC)?;
     w.bool(d.corrupt);
+    w.bool(d.active.is_some());
+    let (aw, ah) = d.active.unwrap_or((0, 0));
+    w.u32(aw);
+    w.u32(ah);
     Ok(())
 }
 
@@ -1050,6 +1054,9 @@ fn get_video(r: &mut Reader<'_>) -> Result<VideoFrameDesc, WireError> {
     let n = r.len16("cc_data", MAX_CC)?;
     let cc_data = r.take(n)?.to_vec();
     let corrupt = r.bool("corrupt")?;
+    let has_active = r.bool("active")?;
+    let (aw, ah) = (r.u32()?, r.u32()?);
+    let active = has_active.then_some((aw, ah));
     Ok(VideoFrameDesc {
         stream,
         pts,
@@ -1064,6 +1071,7 @@ fn get_video(r: &mut Reader<'_>) -> Result<VideoFrameDesc, WireError> {
         sample_aspect,
         cc_data,
         corrupt,
+        active,
     })
 }
 
@@ -1492,6 +1500,7 @@ mod tests {
             sample_aspect: Some(Rational::new(1, 1).unwrap()),
             cc_data: vec![0xfc, 0x80, 0x80],
             corrupt: false,
+            active: Some((640, 360)),
         }
     }
 
@@ -1675,8 +1684,8 @@ mod tests {
         b[0] = b'X';
         assert_eq!(FromWorker::decode(&b), Err(WireError::Magic));
         let mut b = buf.clone();
-        b[4] = 2;
-        assert_eq!(FromWorker::decode(&b), Err(WireError::Version(2)));
+        b[4] = (VERSION + 1) as u8;
+        assert_eq!(FromWorker::decode(&b), Err(WireError::Version(VERSION + 1)));
         assert!(FromWorker::decode(&vec![0; MAX_MESSAGE + 1]).is_err());
     }
 
