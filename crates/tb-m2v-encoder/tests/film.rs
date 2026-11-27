@@ -905,7 +905,8 @@ fn active_format_follows_the_submitted_frames() {
             r.enc.set_active_format(r.s, want(n)).unwrap();
         }
         let s = r.enc.ordinary(r.s).unwrap();
-        r.feed(s, false, if n % 2 == 0 { &cc } else { &[] }).unwrap();
+        r.feed(s, false, if n % 2 == 0 { &cc } else { &[] })
+            .unwrap();
         r.tick();
     }
     r.finish();

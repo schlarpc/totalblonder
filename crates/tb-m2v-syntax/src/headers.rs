@@ -834,7 +834,10 @@ mod tests {
         assert_eq!(both[..15], user_data(&[0xFC, 0x80, 0x80])[..]);
         assert_eq!(both[15..], dtg1);
         // without AFD the output is what write_headers writes
-        assert_eq!(ud(&[0xFC, 0x80, 0x80], None), user_data(&[0xFC, 0x80, 0x80]));
+        assert_eq!(
+            ud(&[0xFC, 0x80, 0x80], None),
+            user_data(&[0xFC, 0x80, 0x80])
+        );
         assert!(ud(&[], None).is_empty());
     }
 

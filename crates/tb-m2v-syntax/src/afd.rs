@@ -97,12 +97,27 @@ mod tests {
     #[test]
     fn rounding_of_the_converter_is_tolerated() {
         // 1440x1080 of 1920x1080 at 16:9 (a 4:3 source), and 1436 after rounding to 8
-        assert_eq!(code(true, content_aspect(16.0 / 9.0, 1920, 1080, 1440, 1080)), PILLAR_4_3);
-        assert_eq!(code(true, content_aspect(16.0 / 9.0, 1920, 1080, 1436, 1080)), PILLAR_4_3);
+        assert_eq!(
+            code(true, content_aspect(16.0 / 9.0, 1920, 1080, 1440, 1080)),
+            PILLAR_4_3
+        );
+        assert_eq!(
+            code(true, content_aspect(16.0 / 9.0, 1920, 1080, 1436, 1080)),
+            PILLAR_4_3
+        );
         // 704x480 at 4:3 with a 16:9 source: 360 lines, and a line pair either way
-        assert_eq!(code(false, content_aspect(4.0 / 3.0, 704, 480, 704, 360)), LETTER_16_9);
-        assert_eq!(code(false, content_aspect(4.0 / 3.0, 704, 480, 704, 358)), LETTER_16_9);
-        assert_eq!(code(false, content_aspect(4.0 / 3.0, 704, 480, 704, 362)), LETTER_16_9);
+        assert_eq!(
+            code(false, content_aspect(4.0 / 3.0, 704, 480, 704, 360)),
+            LETTER_16_9
+        );
+        assert_eq!(
+            code(false, content_aspect(4.0 / 3.0, 704, 480, 704, 358)),
+            LETTER_16_9
+        );
+        assert_eq!(
+            code(false, content_aspect(4.0 / 3.0, 704, 480, 704, 362)),
+            LETTER_16_9
+        );
     }
 
     #[test]
