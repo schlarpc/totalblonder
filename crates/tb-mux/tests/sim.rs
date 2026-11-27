@@ -165,3 +165,95 @@ fn skip_keeps_pcr_exact() {
     assert_eq!((r.cc_errors, r.pcr_wrong), (0, 0));
     assert_eq!(m.stats().skipped, 4000);
 }
+
+/// A program stepped to another format: one GOP under the High-level parameters, a gap of the
+/// new buffer delay and more, then a GOP whose first access unit carries the Main-level ones.
+/// Everything is delivered, nothing is dropped, the new parameters apply once, and no access
+/// unit of the new stream enters the buffer before its `DTS − D` of the new delay, nor before
+/// the old stream's last picture is decoded.
+#[test]
+fn a_stream_in_another_format_starts_under_its_own_parameters() {
+    use tb_mux::VideoReconfig;
+    let mut m = mux(1, 8_000_000);
+    let now = m.clock().stc(0).0;
+    let mut old = FakeVideo {
+        t0: now + D,
+        coded: 0,
+        es_bps: 8_000_000,
+    };
+    let mut last_old_dts = 0;
+    for _ in 0..15 {
+        let au = old.next_au();
+        last_old_dts = au.dts.0;
+        m.push_video(0, au).unwrap();
+    }
+    let d_new = 12_420_000; // 0.46 s
+    let gap = d_new + 3 * FRAME;
+    let mut new = FakeVideo {
+        t0: last_old_dts + gap,
+        coded: 0,
+        es_bps: 4_000_000,
+    };
+    let first_new_dts = new.t0;
+    for k in 0..15 {
+        let mut au = new.next_au();
+        if k == 0 {
+            au.reconfig = Some(VideoReconfig {
+                rx_bps: 18_000_000,
+                buffer_delay: d_new,
+                rate_bps: tb_mux::ts_rate_for(4_000_000, 30_000, 1001, 30),
+            });
+        }
+        m.push_video(0, au).unwrap();
+    }
+    // Run until both GOPs are out, noting when each PES starts on the video PID.
+    let mut starts: Vec<(u64, u64)> = Vec::new(); // (slot STC, DTS)
+    for _ in 0..(38_800_000 / 1504 * 3) {
+        let (n, p) = m.next_slot();
+        let b = &p.0;
+        let pid = (u16::from(b[1] & 0x1F) << 8) | u16::from(b[2]);
+        if pid == 0x31 && b[1] & 0x40 != 0 {
+            let afc = (b[3] >> 4) & 3;
+            let off = if afc == 3 { 5 + usize::from(b[4]) } else { 4 };
+            let h = &b[off..];
+            if h[..3] == [0, 0, 1] && h[7] & 0x80 != 0 {
+                // the DTS follows the PTS; without one it equals the PTS
+                let t = if h[7] & 0x40 != 0 {
+                    &h[14..19]
+                } else {
+                    &h[9..14]
+                };
+                let dts = (u64::from(t[0] >> 1 & 7) << 30)
+                    | (u64::from(t[1]) << 22)
+                    | (u64::from(t[2] >> 1) << 15)
+                    | (u64::from(t[3]) << 7)
+                    | u64::from(t[4] >> 1);
+                starts.push((m.clock().stc(n).0, dts * 300));
+            }
+        }
+    }
+    let s = m.program_stats(0).unwrap();
+    assert_eq!(
+        (s.video_aus, s.video_dropped, s.reconfigs),
+        (30, 0, 1),
+        "{s:?}"
+    );
+    // (the STC here is far below the 33-bit wrap of the 90 kHz clock)
+    // (a DTS read back is in 90 kHz units: up to 299 ticks below the 27 MHz value)
+    let news: Vec<_> = starts
+        .iter()
+        .filter(|(_, dts)| *dts + 300 > first_new_dts)
+        .collect();
+    assert_eq!(news.len(), 15);
+    for &&(at, dts) in &news {
+        assert!(
+            at + d_new >= dts,
+            "a new AU (DTS {dts}) entered {} ticks early",
+            dts - d_new - at
+        );
+        assert!(
+            at >= last_old_dts,
+            "a new AU entered before the old stream's last DTS"
+        );
+    }
+}

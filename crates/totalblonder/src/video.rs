@@ -13,12 +13,13 @@ use std::time::{Duration, Instant};
 use tb_device::ArenaSizes;
 use tb_engine::{Engine, TickDevice};
 use tb_m2v_encoder::{Encoder, EncoderOptions, FrameSource, SessionConfig, SessionId};
-use tb_mux::VideoAu;
+use tb_mux::{VideoAu, VideoReconfig};
 use tb_ts::Stc;
 
 use crate::carrier::CarrierMsg;
 use crate::config::{Format, ProgramPlan};
-use crate::metrics::Counter;
+use crate::metrics::{Counter, Gauge};
+use crate::overload::{Candidate, Governor, Step};
 use crate::time::{Clock, HZ};
 
 /// What a provider gave for a tick.
@@ -44,6 +45,8 @@ pub trait FrameProvider: Send {
     fn active_format(&self) -> u8 {
         tb_m2v_syntax::afd::FULL
     }
+    /// The program moves to another format: pictures of `w`×`h` from now on, at `cadence`.
+    fn reformat(&mut self, _w: u32, _h: u32, _cadence: crate::source::Cadence) {}
     /// Film mode: what is shown at display unit time `t` (a field of an interlaced output, a
     /// frame period of a progressive one), as a whole picture of `len` bytes and its sameness
     /// key. `None`: the provider has no film mode, the program is coded frame by frame.
@@ -104,6 +107,23 @@ pub struct HubSession {
     pub delivered: Counter,
     /// Captions to write into the pictures, if any.
     pub captioner: Option<tb_captions::Captioner>,
+    /// The program at each rung of its ladder (`plan` is the one it is on).
+    pub ladder: Vec<ProgramPlan>,
+    /// Its rung now (metric).
+    pub rung_gauge: Gauge,
+    /// Format switches (metric).
+    pub switches: Counter,
+    /// Encoder sessions of earlier formats still delivering their last access units.
+    pub old_ids: Vec<SessionId>,
+}
+
+/// Step-down settings and what the hub needs to carry a switch out.
+#[derive(Debug, Clone, Copy)]
+pub struct OverloadSetup {
+    /// When to step.
+    pub plan: crate::config::OverloadPlan,
+    /// PCR interval, ms (for the transport rate of the new format).
+    pub pcr_ms: u64,
 }
 
 /// The captioner of a program with a subtitle file: its cues on CC1 and CEA-708 service 1,
@@ -258,6 +278,7 @@ fn finish<D: TickDevice>(
                     pts: Stc(s.stc0 + (au.pts.max(0) as u64) * 300),
                     dts: Stc(s.stc0 + (au.dts.max(0) as u64) * 300),
                     keyframe: au.keyframe,
+                    reconfig: None,
                 };
                 match s.tx.try_send(CarrierMsg::Video(s.plan.index, v)) {
                     Ok(()) => s.delivered.inc(),
@@ -389,6 +410,7 @@ pub fn run<D: TickDevice>(
     mut sessions: Vec<HubSession>,
     timing: HubTiming,
     statmux: Option<StatmuxSetup>,
+    overload: Option<OverloadSetup>,
     clock: &dyn Clock,
 ) -> Result<(), String> {
     let plans: Vec<&ProgramPlan> = sessions.iter().map(|s| &s.plan).collect();
@@ -406,15 +428,43 @@ pub fn run<D: TickDevice>(
         let (n, d) = f.fps();
         HZ * u64::from(d) / u64::from(n)
     };
+    // (over every format a program may step to: the tick must divide them all)
     let tick = sessions
         .iter()
-        .map(|s| period(s.plan.format))
+        .flat_map(|s| s.ladder.iter().map(|p| p.format).chain([s.plan.format]))
+        .map(period)
         .min()
         .unwrap_or(HZ / 30);
-    let every: Vec<u64> = sessions
+    let mut every: Vec<u64> = sessions
         .iter()
         .map(|s| period(s.plan.format) / tick)
         .collect();
+    // Step-down: GOP phases kept across switches, batch capacities per format (every program
+    // that may use it), the governor, and the switches in progress.
+    let phases: Vec<u32> = cfgs.iter().map(|c| c.gop_phase).collect();
+    let capacity_of = {
+        let mut v: Vec<(Format, u32)> = Vec::new();
+        for s in &sessions {
+            for p in &s.ladder {
+                match v.iter_mut().find(|(f, _)| *f == p.format) {
+                    Some((_, n)) => *n += 1,
+                    None => v.push((p.format, 1)),
+                }
+            }
+        }
+        move |f: Format| v.iter().find(|(g, _)| *g == f).map_or(1, |(_, n)| *n)
+    };
+    let mut gov = overload
+        .as_ref()
+        .filter(|o| o.plan.enabled && sessions.iter().any(|s| s.ladder.len() > 1))
+        .map(|o| Governor::new(o.plan, sessions.len(), timing.p0));
+    let mut next_sample = timing.p0 + HZ;
+    // old sessions still delivering their last access units
+    let mut closing: Vec<SessionId> = Vec::new();
+    // per program: the tick index at which its new session starts, while switching
+    let mut resume: Vec<Option<u64>> = vec![None; sessions.len()];
+    // per program: the mux parameters to send with the new session's first access unit
+    let mut reconfig: Vec<Option<VideoReconfig>> = vec![None; sessions.len()];
     // The statmux: controllers made, their starting rates set before the first picture.
     let mut sm = match &statmux {
         Some(setup) => Some(statmux_setup(setup, &sessions)?),
@@ -461,8 +511,15 @@ pub fn run<D: TickDevice>(
         if !clock.sleep_until(wake) || timing.end.is_some_and(|e| t >= e) {
             return finish(&mut eng, &mut sessions, &ids);
         }
-        let mut any = false;
+        let mut any = !closing.is_empty();
         for (i, s) in sessions.iter_mut().enumerate() {
+            if let Some(r) = resume[i] {
+                if k < r {
+                    continue;
+                }
+                resume[i] = None;
+                first[i] = true;
+            }
             if !k.is_multiple_of(every[i]) {
                 continue;
             }
@@ -593,6 +650,7 @@ pub fn run<D: TickDevice>(
                         pts: Stc(s.stc0 + (au.pts.max(0) as u64) * 300),
                         dts: Stc(s.stc0 + (au.dts.max(0) as u64) * 300),
                         keyframe: au.keyframe,
+                        reconfig: reconfig[i].take(),
                     };
                     match s.tx.try_send(CarrierMsg::Video(s.plan.index, v)) {
                         Ok(()) => s.delivered.inc(),
@@ -600,6 +658,41 @@ pub fn run<D: TickDevice>(
                     }
                 }
             }
+            // The old sessions of programs that switched: their last access units, the last
+            // with sequence_end_code, then they go.
+            let mut still = Vec::new();
+            for sid in std::mem::take(&mut closing) {
+                let owner = sessions.iter().position(|s| s.old_ids.contains(&sid));
+                while let Some(au) = eng.enc_mut().take_output(sid) {
+                    let Some(s) = owner.and_then(|o| sessions.get(o)) else {
+                        continue;
+                    };
+                    let mut data = au.data;
+                    if au.last {
+                        data.extend_from_slice(&SEQUENCE_END);
+                    }
+                    let v = VideoAu {
+                        data,
+                        pts: Stc(s.stc0 + (au.pts.max(0) as u64) * 300),
+                        dts: Stc(s.stc0 + (au.dts.max(0) as u64) * 300),
+                        keyframe: au.keyframe,
+                        reconfig: None,
+                    };
+                    match s.tx.try_send(CarrierMsg::Video(s.plan.index, v)) {
+                        Ok(()) => s.delivered.inc(),
+                        Err(_) => s.dropped.inc(),
+                    }
+                }
+                if eng.enc().is_closed(sid).unwrap_or(true) {
+                    let _ = eng.enc_mut().release(sid);
+                    if let Some(s) = owner.and_then(|o| sessions.get_mut(o)) {
+                        s.old_ids.retain(|&x| x != sid);
+                    }
+                } else {
+                    still.push(sid);
+                }
+            }
+            closing = still;
         }
         // The statmux: lowerings complete as the mux reaches them; allocation once per 0.5 s.
         if let Some(m) = sm.as_mut() {
@@ -615,6 +708,136 @@ pub fn run<D: TickDevice>(
                 };
                 if !cmds.is_empty() {
                     run_commands(cmds, c, m, &sessions, &ids, eng.enc_mut());
+                }
+            }
+        }
+        // Step-down: once a second, the counters to the governor, and its decision carried out.
+        if let (Some(g), Some(setup)) = (gov.as_mut(), overload.as_ref())
+            && wake >= next_sample
+        {
+            next_sample = wake + HZ;
+            for (i, sid) in ids.iter().enumerate() {
+                if resume[i].is_none()
+                    && let Ok(sn) = eng.enc().snapshot(*sid)
+                {
+                    g.sample(wake, i, sn.stats.shed, sn.stats.pictures + sn.stats.repeats);
+                }
+            }
+            let cands: Vec<Candidate> = sessions
+                .iter()
+                .enumerate()
+                .map(|(i, s)| {
+                    let (w, h) = s.plan.format.size();
+                    let (n, d) = s.plan.format.fps();
+                    Candidate {
+                        priority: s.plan.priority,
+                        rung: s.plan.rung.get(),
+                        rungs: s.ladder.len(),
+                        mbs: u64::from(w.div_ceil(16) * h.div_ceil(16)) * u64::from(n)
+                            / u64::from(d),
+                        switching: resume[i].is_some(),
+                    }
+                })
+                .collect();
+            if let Some(step) = g.decide(wake, &cands) {
+                let (i, to) = match step {
+                    Step::Down(i) => (i, sessions[i].plan.rung.get() + 1),
+                    Step::Up(i) => (i, sessions[i].plan.rung.get().saturating_sub(1)),
+                };
+                // the new session first: if it cannot be opened, nothing changes
+                let new_plan = sessions[i].ladder[to].clone();
+                let cfg = session_config(&new_plan, phases[i], capacity_of(new_plan.format));
+                match eng.enc_mut().open(&cfg) {
+                    Err(e) => tracing::error!(
+                        program = sessions[i].plan.service,
+                        "step to {:?} refused: {e}",
+                        new_plan.format
+                    ),
+                    Ok(new_sid) => {
+                        let s = &mut sessions[i];
+                        let old = std::mem::replace(&mut ids[i], new_sid);
+                        if let Err(e) = eng.enc_mut().close(old) {
+                            tracing::warn!("closing the old session: {e}");
+                        }
+                        s.old_ids.push(old);
+                        closing.push(old);
+                        // the rate the new stream starts at, and its mux parameters
+                        let es = match sm
+                            .as_mut()
+                            .and_then(|m| m.ctl.get_mut(s.carrier))
+                            .and_then(Option::as_mut)
+                        {
+                            Some(ctl) => ctl
+                                .restart(
+                                    s.plan.index,
+                                    tb_statmux::ProgramParams {
+                                        min_bps: new_plan.min_bps,
+                                        max_bps: new_plan.max_bps,
+                                        weight: new_plan.weight,
+                                    },
+                                )
+                                .unwrap_or(new_plan.min_bps),
+                            None => new_plan.max_bps,
+                        };
+                        if es != new_plan.max_bps
+                            && let Err(e) = eng.enc_mut().set_rate(new_sid, es, false)
+                        {
+                            tracing::warn!("step: set_rate: {e}");
+                        }
+                        let d_new = new_plan.vbv_bits * HZ / new_plan.max_bps;
+                        reconfig[i] = Some(VideoReconfig {
+                            rx_bps: new_plan.format.rx_bps(),
+                            buffer_delay: d_new,
+                            rate_bps: new_plan.ts_bps_for(es, setup.pcr_ms),
+                        });
+                        // The gap: the new stream's first picture enters the decoder's buffer
+                        // no earlier than its DTS − D (the mux's rule), which must not come
+                        // before the old stream's last DTS (at most the time just submitted):
+                        // D, two frame periods between the first PTS and DTS, and one more.
+                        let per = period(new_plan.format);
+                        let ev = (per / tick).max(1);
+                        let after = (d_new + 3 * per).div_ceil(tick);
+                        resume[i] = Some((k + after + 1).div_ceil(ev) * ev);
+                        every[i] = ev;
+                        afd[i] = None;
+                        film[i] = new_plan.film.then(|| {
+                            tb_timeline::film::Assembler::new(tb_timeline::film::FilmCfg {
+                                interlaced: new_plan.format.interlaced(),
+                                top_first: new_plan.format.interlaced(),
+                                three: true,
+                            })
+                        });
+                        let (w, h) = new_plan.format.size();
+                        let (fn_, fd) = new_plan.format.fps();
+                        s.provider.reformat(
+                            w,
+                            h,
+                            crate::source::Cadence {
+                                p0: timing.p0,
+                                period: HZ * u64::from(fd) / u64::from(fn_),
+                                gop: new_plan.format.gop(),
+                                phase: phases[i],
+                                delay: timing.delay,
+                                units: if new_plan.film && new_plan.format.interlaced() {
+                                    2
+                                } else {
+                                    1
+                                },
+                            },
+                        );
+                        tracing::warn!(
+                            program = s.plan.service,
+                            from = ?s.plan.format,
+                            to = ?new_plan.format,
+                            "overload: {} to rung {to}",
+                            if matches!(step, Step::Down(_)) { "stepping down" } else { "stepping back up" }
+                        );
+                        s.plan = new_plan;
+                        s.plan.rung.set(to);
+                        s.rung_gauge.set(to as u64);
+                        s.switches.inc();
+                        g.reset(i);
+                    }
                 }
             }
         }

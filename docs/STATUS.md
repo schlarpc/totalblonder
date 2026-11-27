@@ -58,6 +58,7 @@ frame clock and fallback selector are used by the server (`source.rs`).
 | `tb-output` | UDP and RTP framing, UDP (multicast with interface and TTL) and file sinks, the pacer that owns time and covers a late mux with nulls | real time on nixark: 99.8 % of datagrams within 50 µs |
 | `tb-ts-verify` | Independent checker (147 rules): TR 101 290, cable table rules, PSIP cross-checks, T-STD; library and CLI | agrees with TSDuck; finds nothing in our streams, offline or real time |
 | `tb-statmux` | A carrier's video pool by complexity, lower before raise, never overcommitted | simulation tests |
+| Step-down (`overload.rs`, `video.rs`) | Under sustained overload the lowest-priority program steps down its ladder (default to 480i): new session opened first, the old one ended with `sequence_end_code`, a gap of the new buffer delay, the mux and statmux reconfigured with the new stream, the decoder worker re-specced; back up after 5 min without loss (SPEC §12.1) | 96 × 1080i on nixark: steps every window, the switched stream conformant at the switch |
 
 ### 1.4 Audio
 

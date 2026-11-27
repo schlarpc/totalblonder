@@ -72,6 +72,7 @@ fn glyph(c: char) -> [u8; 7] {
 
 /// A slate for one program.
 pub struct Slate {
+    text: String,
     w: usize,
     h: usize,
     base: Vec<u8>,
@@ -127,11 +128,17 @@ impl Slate {
             }
         }
         Slate {
+            text: text.to_owned(),
             w,
             h,
             base,
             marker: None,
         }
+    }
+
+    /// The same slate at another size.
+    pub fn resized(&self, w: u32, h: u32) -> Slate {
+        Slate::new(w, h, &self.text)
     }
 
     /// Forgets what was last written, so the next [`Slate::render`] writes the whole picture
@@ -180,6 +187,10 @@ impl crate::video::FrameProvider for SlateProvider {
             },
             data: std::sync::Arc::new(buf),
         })
+    }
+
+    fn reformat(&mut self, w: u32, h: u32, _cadence: crate::source::Cadence) {
+        self.0 = self.0.resized(w, h);
     }
 
     fn picture(&mut self, t: u64, out: &mut [u8]) -> crate::video::Picture {

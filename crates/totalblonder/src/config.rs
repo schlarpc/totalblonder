@@ -53,6 +53,8 @@ struct File {
     persistence: PersistenceFile,
     #[serde(default)]
     statmux: StatmuxFile,
+    #[serde(default)]
+    overload: OverloadFile,
     device: Option<DeviceFile>,
     #[serde(default, rename = "carrier")]
     carriers: Vec<CarrierFile>,
@@ -282,6 +284,9 @@ struct ProgramFile {
     /// An input shown while the live input is away (SPEC §9.5 level 2).
     standby: Option<String>,
     live: Option<String>,
+    /// The formats this program may step down to under sustained overload, after its own
+    /// (SPEC §12.1): default 480i for a program above 480i, `[]` for none.
+    ladder: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -295,6 +300,26 @@ struct VideoProgFile {
     weight: Option<f64>,
     #[serde(default)]
     priority: i32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+struct OverloadFile {
+    enabled: bool,
+    window_s: f64,
+    threshold: f64,
+    recover_s: f64,
+}
+
+impl Default for OverloadFile {
+    fn default() -> Self {
+        OverloadFile {
+            enabled: true,
+            window_s: 10.0,
+            threshold: 0.02,
+            recover_s: 300.0,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -514,9 +539,65 @@ pub struct ProgramPlan {
     pub film: bool,
     /// The standby input, if any.
     pub standby: Option<String>,
+    /// Its formats, best first: `ladder[0]` is `format` as configured, the others what it
+    /// may step down to under sustained overload (SPEC §12.1).
+    pub ladder: Vec<Format>,
+    /// Which of `ladder` it is on now, shared by every copy of the plan (the video hub sets
+    /// it, the program's decoder threads follow it).
+    pub rung: Rung,
+}
+
+/// The index of a program's current format in its ladder, shared between threads.
+#[derive(Debug, Clone, Default)]
+pub struct Rung(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+
+impl Rung {
+    /// The rung now.
+    pub fn get(&self) -> usize {
+        self.0.load(std::sync::atomic::Ordering::Acquire)
+    }
+    /// Moves to rung `r`.
+    pub fn set(&self, r: usize) {
+        self.0.store(r, std::sync::atomic::Ordering::Release);
+    }
+}
+
+impl PartialEq for Rung {
+    /// Shared state, not configuration: plans compare equal whatever rung they are on.
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+/// How the video hub reacts to sustained overload (SPEC §12.1, `[overload]`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OverloadPlan {
+    /// Step-down on.
+    pub enabled: bool,
+    /// The window over which pictures given up are counted, process ticks.
+    pub window: u64,
+    /// The share of pictures given up in the window that steps a program down.
+    pub threshold: f64,
+    /// Time without a picture given up before a program steps back up, process ticks.
+    pub recover: u64,
 }
 
 impl ProgramPlan {
+    /// The same program in format `f` (a rung of its ladder): its ceiling within the format's
+    /// limit, its floor within its ceiling, its buffer derived as at configuration.
+    pub fn at(&self, f: Format) -> ProgramPlan {
+        let max_bps = self.max_bps.min(f.max_bps());
+        let min_bps = self.min_bps.min(max_bps);
+        let vbv_bits = ((max_bps / 2).min(f.max_vbv()) / 16_384) * 16_384;
+        ProgramPlan {
+            format: f,
+            max_bps,
+            min_bps,
+            vbv_bits,
+            ..self.clone()
+        }
+    }
+
     /// The video delivery rate of the mux at the ceiling, bit/s.
     pub fn video_ts_bps(&self, pcr_ms: u64) -> u64 {
         self.ts_bps_for(self.max_bps, pcr_ms)
@@ -660,6 +741,8 @@ pub struct Plant {
     pub inputs: Vec<InputPlan>,
     /// Rating systems of our own, one RRT each, regions distinct.
     pub ratings: Vec<tb_psip::rating::RatingSystem>,
+    /// Step-down under sustained overload.
+    pub overload: OverloadPlan,
 }
 
 /// The modulator's supervisor settings (SPEC §10, §13.2 `[device]`).
@@ -1053,6 +1136,25 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
                     p.number
                 )));
             }
+            let mut ladder = vec![format];
+            match &p.ladder {
+                None if format != Format::F480i => ladder.push(Format::F480i),
+                None => {}
+                Some(list) => {
+                    for s in list {
+                        let f = Format::parse(s)?;
+                        let (w, _) = f.size();
+                        let (lw, _) = ladder[ladder.len() - 1].size();
+                        if w >= lw || ladder.contains(&f) {
+                            return Err(rule(format!(
+                                "program {}: ladder {list:?}: each format smaller than the one before",
+                                p.number
+                            )));
+                        }
+                        ladder.push(f);
+                    }
+                }
+            }
             let weight = p.video.weight.unwrap_or(1.0);
             if weight.is_nan() || weight <= 0.0 {
                 return Err(rule(format!(
@@ -1074,6 +1176,8 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
                 live: p.live.clone(),
                 subtitles: p.subtitles.clone(),
                 standby: p.standby.clone(),
+                ladder,
+                rung: Rung::default(),
                 film: match p.film.as_deref() {
                     None | Some("off") => false,
                     Some("auto") => true,
@@ -1132,6 +1236,22 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
         });
     }
 
+    let ov = &f.overload;
+    if !(ov.window_s >= 1.0
+        && ov.recover_s >= ov.window_s
+        && ov.threshold > 0.0
+        && ov.threshold < 1.0)
+    {
+        return Err(rule(
+            "overload: window_s at least 1, recover_s at least window_s, threshold in (0, 1)",
+        ));
+    }
+    let overload = OverloadPlan {
+        enabled: ov.enabled,
+        window: (ov.window_s * crate::time::HZ as f64) as u64,
+        threshold: ov.threshold,
+        recover: (ov.recover_s * crate::time::HZ as f64) as u64,
+    };
     let mut ratings: Vec<tb_psip::rating::RatingSystem> = Vec::new();
     for r in &f.rating_systems {
         let dims = r
@@ -1197,6 +1317,7 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
         carriers,
         inputs,
         ratings,
+        overload,
     })
 }
 
@@ -1214,6 +1335,49 @@ mod tests {
         assert_eq!(p.carriers[0].lineup.tsid(), 0x0101);
         assert_eq!(p.ratings.len(), 1);
         assert_eq!(p.ratings[0].lookup("Eirin", "R15+"), Some((0, 3)));
+    }
+
+    #[test]
+    fn ladders() {
+        let one = |format: &str, ladder: &str| {
+            format!(
+                "[[carrier]]\nid = 1\ndestination = \"udp://239.1.1.1:5000\"\n[[carrier.program]]\nnumber = 1\nservice = \"s\"\nvideo = {{ format = \"{format}\", max_kbps = 15000 }}\n{ladder}\n[[service]]\nid = \"s\"\nname = \"S\"\nchannel = \"20.1\"\nsource_id = 1\n"
+            )
+        };
+        let p = load(&one("1080i", "")).unwrap();
+        let pp = &p.carriers[0].programs[0];
+        assert_eq!(pp.ladder, vec![Format::F1080i, Format::F480i]);
+        let sd = pp.at(Format::F480i);
+        assert_eq!((sd.max_bps, sd.vbv_bits), (15_000_000, 112 * 16_384));
+        assert_eq!(sd.min_bps, pp.min_bps);
+        assert_eq!(
+            load(&one("480i", "")).unwrap().carriers[0].programs[0].ladder,
+            vec![Format::F480i]
+        );
+        assert_eq!(
+            load(&one("1080i", "ladder = []")).unwrap().carriers[0].programs[0].ladder,
+            vec![Format::F1080i]
+        );
+        assert_eq!(
+            load(&one("1080i", "ladder = [\"720p\", \"480i\"]"))
+                .unwrap()
+                .carriers[0]
+                .programs[0]
+                .ladder,
+            vec![Format::F1080i, Format::F720p, Format::F480i]
+        );
+        let e = load(&one("720p", "ladder = [\"1080i\"]"))
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("smaller"), "{e}");
+        let e = load(&one("720p", "[overload]\nwindow_s = 0\n"))
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("overload"), "{e}");
+        // the rung is shared by every copy of a plan
+        let c = pp.clone();
+        pp.rung.set(1);
+        assert_eq!(c.rung.get(), 1);
     }
 
     #[test]

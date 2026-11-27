@@ -1145,7 +1145,7 @@ per component, rendered by hand as Prometheus text at `/api/metrics`. The names 
 | Video encoder stalls | Freeze | Mux sends nulls and PCR-only packets for that program; encoder restarted after `encoder_timeout` (2 s), resuming with a keyframe | `encoder_restarts_total`, mux queue-empty counter |
 | Encoder thread panics or libav returns a fatal error | Freeze of a few seconds | Same restart path. A crash of the whole process inside libav is systemd's to restart; see next row | Same |
 | Process crash or restart | All carriers lose input for the restart time; TVs show their no-signal behavior or a frozen picture [unknown, M0] | systemd restarts the service; slot counters and STC start fresh (a time-base jump the TV sees as a new stream); table versions and `source_id`s continue from SQLite | systemd, uptime metric |
-| CPU overload, encoders late | Occasional freeze of up to one GOP on the affected programs | Late AUs dropped to the next keyframe; if sustained, the program supervisor steps that program down a configured ladder (lower resolution or frame rate) **[proposed]** | `late_au_total`, encode time histogram |
+| CPU overload, encoders late | Occasional freeze of up to one GOP on the affected programs; under sustained overload one program at a time re-syncs (about a second of freeze or black on that channel) and continues at 480i | The deadline policy gives up pictures, lower priority first; if at least 2 % of pictures are given up over 10 s, the lowest-priority program steps one rung down its ladder, and steps back up after 5 min without loss (§12.1) **[built]** | `late_au_total`, `video_format_rung`, `video_format_switches_total` |
 | CPU overload, mux thread late | Brief glitch on that carrier | Pacer sends null datagrams for the missed slots; PCRs stay exact; mux skips ahead | `mux_underrun_slots_total` |
 | Output socket error | Carrier content missing for the duration | Datagram skipped, socket reopened after repeated errors, timing unchanged | `send_errors_total` |
 | Network path to the box lost | Carrier carries no programs; the box reports "assigned but not streaming" (device §11.4) | Nothing changes on our side; supervisor and probe alarm | Supervisor status poll, probe |
@@ -1155,6 +1155,49 @@ per component, rendered by hand as Prometheus text at `/api/metrics`. The names 
 | Probe lost | Nothing | Output continues; alarm for loss of verification | Probe driver |
 | Host clock unsynchronized | TV clock and guide placement drift over time | STT still sent; alarm | Clock metrics |
 | Control plane or SQLite failure | Nothing | Mux, encoders and pacer do not depend on either after start; guide data stops updating | Health endpoint |
+
+### 12.1 Step-down under sustained overload **[built]**
+
+A program has a ladder of formats, best first: its own, then (by default, for a program above
+480i) 480i; `ladder = [...]` in its configuration lists others or `[]` for none. Lowering the
+bit rate saves no device time (the work per picture is set by its macroblocks), so only a
+smaller format helps.
+
+`overload.rs` decides from each program's encoder counters, sampled once a second: when at
+least `threshold` (2 %) of all pictures were given up over `window` (10 s), the lowest-priority
+program with a rung below it (ties: the larger format, then the later program) steps down one
+rung, and nothing else is decided for one window. When no picture was given up for `recover`
+(300 s) and nothing moved for as long, the highest-priority stepped-down program steps up one
+rung; a step down within two windows of a step up doubles `recover` (at most an hour).
+
+The hub carries a switch out (`video.rs`):
+
+1. It opens the session of the new format first; if that is refused (no room in the arenas,
+   which are sized at start for every rung), nothing changes.
+2. It closes the old session: its queued frames are coded and its last access unit ends with
+   `sequence_end_code`.
+3. It leaves a gap of `D_new` plus three frame periods before the new session's first picture,
+   so the first access unit of the new stream enters the decoder's buffer (no earlier than its
+   DTS − `D_new`, the mux's rule) only after the old stream's last DTS: nothing of the old
+   stream, coded at another level, is in the buffer when the new one arrives.
+4. The new stream's first access unit carries the mux parameters of its format (Rx, `D`, the
+   delivery rate; `tb_mux::VideoReconfig`), applied when it reaches the head of the queue,
+   after every access unit of the old stream. With the statmux, `Controller::restart` gives the
+   program its new limits at a rate never above what it had committed.
+5. The program's providers redraw the slate and rebuild their frame clocks at the new size and
+   rate; its decoder threads give the worker the new spec and announce the streams again, and
+   the worker converts at the new size from the next key frame. Captions carry over (every
+   format has the same field rate).
+
+Viewers see the program freeze or go black for the gap and the TV's re-sync (about a second,
+depending on the TV), then the new format. Not updated: the `wide_aspect_ratio` flag of the
+caption service descriptor in the PSIP stays as configured.
+
+Measured on nixark (2026-11-27): 96 programs of 1080i on the RTX 2000 Ada, beyond its
+capacity: the lowest-priority program stepped to 480i after 7 s, then one program every 5 s
+(the test's window). The switched program's stream: a 1080i sequence ended by
+`sequence_end_code`, then a 704×480 4:3 sequence; `tb-m2v-verify --profile a53` and
+`tb-ts-verify` find nothing at the switch.
 
 ## 13. Operator interface and stored state
 

@@ -20,5 +20,5 @@ pub use carousel::{Periods, SttConfig, WallClock};
 pub use clock::{QAM256_PAYLOAD, SlotClock, TsRate};
 pub use mux::{
     AudioAu, AudioConfig, ConfigError, Mux, MuxConfig, MuxStats, ProgramConfig, ProgramStats,
-    PushError, VideoAu, VideoConfig, ts_rate_for,
+    PushError, VideoAu, VideoConfig, VideoReconfig, ts_rate_for,
 };

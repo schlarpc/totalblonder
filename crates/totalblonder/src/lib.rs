@@ -27,6 +27,7 @@ pub mod device;
 pub mod ingest;
 pub mod live;
 pub mod metrics;
+pub mod overload;
 pub mod runtime;
 pub mod schedule;
 pub mod slate;

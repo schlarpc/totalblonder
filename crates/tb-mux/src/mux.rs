@@ -146,6 +146,23 @@ pub struct VideoAu {
     pub dts: Stc,
     /// A random access point (closed-GOP I picture with sequence header; IDR).
     pub keyframe: bool,
+    /// The first access unit of a stream in another format (a program stepped to another
+    /// resolution): the video stream's parameters from this access unit on. Applied when it
+    /// reaches the head of the queue, so every access unit before it has been sent or dropped
+    /// under the old ones. The caller leaves a gap of at least the new buffer delay before
+    /// its DTS, so nothing of the old stream is in the decoder's buffer when it enters.
+    pub reconfig: Option<VideoReconfig>,
+}
+
+/// New parameters of a program's video stream (see [`VideoAu::reconfig`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VideoReconfig {
+    /// The transport buffer's drain rate Rx, bit/s ([`VideoConfig::rx_bps`]).
+    pub rx_bps: u64,
+    /// The encoder's buffer delay D, ticks ([`VideoConfig::buffer_delay`]).
+    pub buffer_delay: u64,
+    /// Delivery rate at transport level, bit/s ([`VideoConfig::rate_bps`]).
+    pub rate_bps: u64,
 }
 
 /// One coded audio frame.
@@ -195,6 +212,8 @@ pub struct ProgramStats {
     pub max_pcr_gap: u64,
     /// Smallest margin between the end of an access unit's delivery and its DTS, ticks.
     pub min_dts_margin: Option<u64>,
+    /// Video streams started in another format ([`VideoAu::reconfig`]).
+    pub reconfigs: u64,
 }
 
 /// Counters of the carrier.
@@ -604,6 +623,15 @@ impl Mux {
             let dts = match &v.cur {
                 Some((_, dts, _)) => *dts,
                 None => {
+                    // A stream in another format starts: its parameters from here on.
+                    if let Some(r) = v.queue.front_mut().and_then(|h| h.reconfig.take()) {
+                        v.cfg.rx_bps = r.rx_bps;
+                        v.cfg.buffer_delay = r.buffer_delay;
+                        v.cfg.rate_bps = r.rate_bps;
+                        v.tb.set_rate(now, r.rx_bps);
+                        v.tokens.set_rate(now, r.rate_bps);
+                        p.stats.reconfigs += 1;
+                    }
                     // Discard what can no longer be decoded in time, up to a key frame.
                     while let Some(h) = v.queue.front() {
                         if v.dropping && !h.keyframe {

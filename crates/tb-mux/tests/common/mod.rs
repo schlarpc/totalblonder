@@ -146,6 +146,7 @@ impl FakeVideo {
             pts: Stc(pts),
             dts: Stc(dts),
             keyframe: k == 0,
+            reconfig: None,
         }
     }
 }

@@ -172,6 +172,12 @@ fn start_live(
             audio: (!p.audio.is_empty()).then_some(atx),
             video_spec: vspec,
             audio_spec: aspec,
+            specs: p
+                .ladder
+                .iter()
+                .map(|&f| crate::live::specs(&p.at(f)).0)
+                .collect(),
+            rung: p.rung.clone(),
             delay,
         };
         let lstats = crate::live::LiveStats::default();
@@ -337,23 +343,29 @@ fn hub_sessions(
                 dropped: Counter::default(),
                 delivered: Counter::default(),
                 captioner: video::captioner(p),
+                ladder: p.ladder.iter().map(|&f| p.at(f)).collect(),
+                rung_gauge: crate::metrics::Gauge::default(),
+                switches: Counter::default(),
+                old_ids: Vec::new(),
             });
         }
     }
     v
 }
 
+#[allow(clippy::too_many_arguments, reason = "the hub thread's whole setup")]
 fn hub<D: TickDevice>(
     dev: D,
     sessions: Vec<HubSession>,
     timing: HubTiming,
     statmux: Option<video::StatmuxSetup>,
+    overload: Option<video::OverloadSetup>,
     clock: &dyn Clock,
     ready: std::sync::mpsc::Sender<Result<(), String>>,
 ) {
     let _ = ready.send(Ok(()));
     let eng = Engine::new(dev, video::encoder_options(), 5.0);
-    if let Err(e) = video::run(eng, sessions, timing, statmux, clock) {
+    if let Err(e) = video::run(eng, sessions, timing, statmux, overload, clock) {
         tracing::error!("video hub stopped: {e}");
     }
 }
@@ -368,7 +380,19 @@ fn start_video(
     clock: Box<dyn Clock>,
 ) -> anyhow::Result<std::thread::JoinHandle<()>> {
     let plans: Vec<_> = sessions.iter().map(|s| &s.plan).collect();
-    let cfgs = video::session_configs(&plans);
+    let mut cfgs = video::session_configs(&plans);
+    // Room for the formats programs may step to (SPEC §12.1): one more session for each lower
+    // rung, in batches of the size the hub makes; during a switch the old and the new session
+    // of a program are open together.
+    for (i, s) in sessions.iter().enumerate() {
+        for p in s.ladder.iter().skip(1) {
+            let n = sessions
+                .iter()
+                .filter(|o| o.ladder.iter().any(|q| q.format == p.format))
+                .count() as u32;
+            cfgs.push(video::session_config(p, cfgs[i].gop_phase, n));
+        }
+    }
     let arenas = video::arena_sizes(&cfgs).map_err(|e| anyhow::anyhow!("sessions: {e}"))?;
     tracing::info!(
         device = arenas.device,
@@ -382,6 +406,10 @@ fn start_video(
         pools_ts: plant.carriers.iter().map(|c| c.video_pool_ts).collect(),
         pcr_ms: plant.output.pcr_interval_ms,
     });
+    let overload = Some(video::OverloadSetup {
+        plan: plant.overload,
+        pcr_ms: plant.output.pcr_interval_ms,
+    });
     let (tx, rx) = std::sync::mpsc::channel();
     let h = std::thread::Builder::new()
         .name("video-hub".into())
@@ -392,6 +420,7 @@ fn start_video(
                     sessions,
                     timing,
                     statmux,
+                    overload,
                     clock.as_ref(),
                     tx,
                 ),
@@ -405,6 +434,7 @@ fn start_video(
                     sessions,
                     timing,
                     statmux,
+                    overload,
                     clock.as_ref(),
                     tx,
                 ),
@@ -418,6 +448,7 @@ fn start_video(
                     sessions,
                     timing,
                     statmux,
+                    overload,
                     clock.as_ref(),
                     tx,
                 ),
@@ -587,8 +618,18 @@ pub fn run(plant: Plant, mode: Mode) -> anyhow::Result<()> {
                 );
                 reg.add(
                     "encoder_queue_full_total",
-                    l,
+                    l.clone(),
                     Value::Counter(s.dropped.clone()),
+                );
+                reg.add(
+                    "video_format_rung",
+                    l.clone(),
+                    Value::Gauge(s.rung_gauge.clone()),
+                );
+                reg.add(
+                    "video_format_switches_total",
+                    l,
+                    Value::Counter(s.switches.clone()),
                 );
             }
             let tracks = audio_tracks(&plant, &built, p0, &mut live)?;

@@ -67,6 +67,10 @@ pub struct LiveTarget {
     pub video_spec: VideoSpec,
     /// Audio in the track's layout.
     pub audio_spec: Option<AudioSpec>,
+    /// Pictures at each rung of the program's ladder (`video_spec` is rung 0).
+    pub specs: Vec<VideoSpec>,
+    /// The program's rung now: the thread follows it.
+    pub rung: crate::config::Rung,
     /// Δ.
     pub delay: u64,
 }
@@ -178,8 +182,12 @@ pub fn run_decoder(
             return;
         }
     };
-    dec.set_video_output(Some(target.video_spec));
+    let mut rung = target.rung.get();
+    let mut spec = target.specs.get(rung).copied().unwrap_or(target.video_spec);
+    dec.set_video_output(Some(spec));
     dec.set_audio_output(target.audio_spec);
+    // the session's streams, announced again with the new spec when the program changes format
+    let mut streams: Option<Vec<tb_media::StreamInfo>> = None;
     let mut mapper = Mapper::new(MapperConfig::default());
     let mut bases: HashMap<StreamIndex, (Rational, MediaKind)> = HashMap::new();
     let mut grids: HashMap<StreamIndex, GridSnap> = HashMap::new();
@@ -192,6 +200,7 @@ pub fn run_decoder(
                 Ok(ev) => {
                     match &ev {
                         InputEvent::Streams(s) => {
+                            streams = Some(s.clone());
                             bases = s
                                 .iter()
                                 .map(|i| (i.index, (i.time_base, i.codec.kind())))
@@ -217,6 +226,19 @@ pub fn run_decoder(
                 }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => return,
+            }
+        }
+        // The program stepped to another format: the worker converts to the new size from the
+        // next key frame of the streams announced again.
+        let r = target.rung.get();
+        if r != rung
+            && let Some(&s) = target.specs.get(r)
+        {
+            rung = r;
+            spec = s;
+            dec.set_video_output(Some(spec));
+            if let Some(list) = &streams {
+                let _ = dec.try_send(InputEvent::Streams(list.clone()));
             }
         }
         // What the worker made.
@@ -245,7 +267,11 @@ pub fn run_decoder(
                             data.extend_from_slice(p);
                         }
                     }
-                    let afd = active_format(&target.video_spec, f.desc.active);
+                    // a frame converted under the old spec is not the program's size: dropped
+                    if f.desc.width != spec.width || f.desc.height != spec.height {
+                        continue;
+                    }
+                    let afd = active_format(&spec, f.desc.active);
                     if target
                         .video
                         .try_send(LiveEvent::Frame {

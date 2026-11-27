@@ -173,6 +173,50 @@ impl Controller {
         Ok((c, cmds))
     }
 
+    /// Program `i` starts over in another format with limits `params` (a program stepped to
+    /// another resolution): its limits are replaced, a rate change in progress is forgotten
+    /// (it was for the stream that ended) and so is its complexity. Returns the rate the new
+    /// stream starts at, for the encoder and the mux alike: what the program had, within the
+    /// new limits and never more than it had, so the pool stays within its budget. The caller
+    /// gives the mux that rate with the new stream's first access unit, not at once: the old
+    /// stream's last access units are still delivered at the old rate.
+    pub fn restart(&mut self, i: usize, params: ProgramParams) -> Result<u64, ConfigError> {
+        if params.min_bps == 0
+            || params.min_bps > params.max_bps
+            || params.weight.is_nan()
+            || params.weight <= 0.0
+        {
+            return Err(ConfigError::Limits(i));
+        }
+        let floors: u64 = self
+            .progs
+            .iter()
+            .enumerate()
+            .map(|(k, p)| if k == i { params.min_bps } else { p.p.min_bps })
+            .sum();
+        if floors > self.cfg.pool_bps {
+            return Err(ConfigError::Floors(floors, self.cfg.pool_bps));
+        }
+        let p = self.progs.get(i).ok_or(ConfigError::Limits(i))?;
+        // what the mux delivers for it is what the pool has committed to it
+        let (had, mux) = (p.mux, p.mux);
+        // what it had, capped by the new ceiling; the new floor only if the pool allows
+        let mut r = had.min(params.max_bps);
+        if r < params.min_bps {
+            let others: u64 = self.committed() - mux;
+            r = params.min_bps.min(self.cfg.pool_bps.saturating_sub(others));
+        }
+        let p = &mut self.progs[i];
+        p.p = params;
+        p.pending = None;
+        p.complexity = None;
+        p.acc = 0.0;
+        p.shown = 0;
+        p.encoder = r;
+        p.mux = r;
+        Ok(r)
+    }
+
     /// The sum of the mux rates now: never above the pool.
     pub fn committed(&self) -> u64 {
         self.progs.iter().map(|p| p.mux).sum()
@@ -393,6 +437,32 @@ mod tests {
             max_bps: max,
             weight: 1.0,
         }
+    }
+
+    /// A program restarted in another format: its rate is capped by the new ceiling, never
+    /// raised, the pool never exceeded; refused limits leave it as it was.
+    #[test]
+    fn restart_in_another_format() {
+        let (mut c, _) = Controller::new(
+            cfg(30_000_000),
+            &[p(4_000_000, 19_000_000), p(2_000_000, 15_000_000)],
+        )
+        .unwrap();
+        let (_, before) = c.rates(0).unwrap();
+        assert!(before > 4_000_000);
+        // down: an HD program to 480i with a 4 Mbit/s ceiling
+        let r = c.restart(0, p(1_000_000, 4_000_000)).unwrap();
+        assert_eq!(r, 4_000_000.min(before));
+        assert_eq!(c.rates(0), Some((r, r)));
+        assert!(c.committed() <= 30_000_000);
+        assert_eq!(c.complexity(0), None);
+        // up again: the ceiling rises, the rate does not until the allocation says so
+        let r2 = c.restart(0, p(4_000_000, 19_000_000)).unwrap();
+        assert_eq!(r2, 4_000_000);
+        assert!(c.committed() <= 30_000_000);
+        // floors over the pool are refused
+        assert!(c.restart(0, p(29_000_000, 29_000_000)).is_err());
+        assert_eq!(c.rates(0), Some((r2, r2)));
     }
 
     /// Plays the caller: executes commands, codes pictures whose size follows the content's

@@ -33,6 +33,12 @@ gpu = 0
 [control]
 bind = "127.0.0.1:8090"
 
+[overload]                    # step a program down its ladder under sustained overload (SPEC §12.1)
+enabled = true
+window_s = 10                 # pictures given up are counted over this window
+threshold = 0.02              # the share given up that steps the lowest-priority program down
+recover_s = 300               # without loss this long, step one back up (doubles if it does not fit)
+
 [statmux]                     # divide each carrier's video pool by complexity (SPEC §8.4)
 enabled = false               # off: every program gets its max_kbps
 alpha = 0.85
@@ -81,6 +87,7 @@ destination = "udp://239.10.0.1:5000"   # udp://, rtp://, or file:/path.ts
   live = "studio"           # an [[input]] id; without one the program shows its slate
   standby = "loop"            # an input shown while the live one is away (live → standby → slate)
   film = "off"                # auto: 24p sources coded as film with 3:2 display flags (check on your TVs first)
+  # ladder = ["480i29.97"]    # formats to step down to under sustained overload (default: 480i above 480i; [] none)
 
   [[carrier.program]]
   number = 2

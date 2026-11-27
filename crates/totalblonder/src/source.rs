@@ -285,6 +285,21 @@ impl FrameProvider for LiveProvider {
         self.afd
     }
 
+    fn reformat(&mut self, w: u32, h: u32, cadence: Cadence) {
+        // Frames of the old size are of no use; the decoder thread follows the program's rung
+        // and sends frames of the new size after its worker takes the new spec.
+        let unit = cadence.period / u64::from(cadence.units.max(1));
+        for f in self.feeds.iter_mut().flatten() {
+            f.frames.clear();
+            f.clock = FrameClock::new(Ticks27(unit as i64));
+        }
+        self.slate = self.slate.resized(w, h);
+        self.slate_shot = None;
+        self.cadence = cadence;
+        self.last = None;
+        self.afd = tb_m2v_syntax::afd::FULL;
+    }
+
     fn picture(&mut self, t: u64, out: &mut [u8]) -> Picture {
         if let (src, Some(id)) = self.choose(t) {
             if self.last == Some((src, Some(id))) {
