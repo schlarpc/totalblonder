@@ -217,10 +217,13 @@ of payload, too close to one gigabit port's limit, which is another reason to us
 (software-survey §8). Multicast is sent with an explicit outgoing interface and a TTL of 1–4,
 and must never reach the box's 10/100 control port (manual §2; software-survey §8).
 
-The live unit's network state complicates this and is unresolved: GIGE1 is configured in the
-same subnet as the control port, which the manual forbids, and GIGE2 shows a corrupted mask
-and gateway (device §1; corruption-48 §8). The owner has ruled out changing network settings.
-See §18.
+**[decided 2026-11-26]** Each GigE port is on a VLAN of its own: VLAN 20 `10.42.20.0/24` for
+GIGE1 and VLAN 21 `10.42.21.0/24` for GIGE2. `nixark` sends from one SR-IOV VF in each, so
+carriers 1–8 go out one interface and 9–16 the other. Each VLAN's only receiver is the box, so
+a group reaches it even if the switch floods it. That makes IGMP snooping, an IGMP querier and
+ARP irrelevant to the data path. IGMPv2 stays, with no source filters. The box's live addresses
+(GIGE1 inside the control port's subnet, GIGE2's corrupted mask and gateway) are replaced by one
+`admin.cgi` save (§18 item 2; firmware §4.1).
 
 ### 4.3 Pacing
 
@@ -994,11 +997,11 @@ mis-parses (corruption-48 §2). What exactly it wrote at the last boot is not fu
 
 Mitigation **[decided]**: Configuration Mode is set to Manual before the first configuration
 write (design-inputs "Decisions so far"; corruption-48 §5 item 1). That setting lives on
-`admin.cgi`, which the client refuses, so the owner makes this one change by hand. Two points
-are unresolved and listed in §18: the `admin.cgi` form also carries the network fields,
-including GIGE2's corrupted mask and gateway (corruption-48 §8), so it must be established
-what a save of that form writes before it is submitted; and the supervisor needs a way to
-confirm Manual mode without requesting `admin.cgi`. Independently, the supervisor treats the
+`admin.cgi`, which the client refuses, so the owner makes this one change by hand. What a
+save of that form writes is now known (firmware §4.1): only the fields in the POST are
+applied, so the save carries Manual mode together with the GigE re-addressing (§18 item 2).
+Still unresolved (§18): the supervisor needs a way to confirm Manual mode without requesting
+`admin.cgi`. Independently, the supervisor treats the
 event-log line "Difference detected in Config File" as an alarm and re-checks everything after
 any reboot.
 
@@ -1633,16 +1636,20 @@ structure.
 
 For the owner:
 
-1. **Data network.** GIGE1 (10.42.0.183/22) is in the same subnet as the control port
-   (10.42.0.184/22), which the manual forbids, and GIGE2 shows a corrupted mask and gateway
-   (device §1; manual §2; corruption-48 §8). Network settings may not be changed. How will
-   the host reach the two GigE ports: direct cables from dedicated host interfaces, or a
-   switch? Does `nixark`, as a VM, have two interfaces that can be dedicated to this?
-2. **Manual mode.** Setting it means submitting `admin.cgi`, the form that also holds the
-   network fields with GIGE2's corrupted values. What that form writes on save must be
-   established from the saved page and the CGI's handler before anyone submits it. Is the
-   owner willing to do it by hand, and is deleting the flash config file from telnet an
-   acceptable alternative?
+1. **Data network. [decided 2026-11-26]** Network settings may now be changed (the earlier
+   rule applied only during the investigation). GIGE1 is on the rack switch's sfp-sfpplus14
+   and GIGE2 on sfp-sfpplus8, each module with its speed forced (neither links under
+   auto-negotiation). Each GigE port gets a VLAN of its own, with no router interface:
+   VLAN 20 `10.42.20.0/24` for GIGE1 and VLAN 21 `10.42.21.0/24` for GIGE2. `nixark` gets
+   one SR-IOV VF in each, and the owner's VF policy pins each VF's VLAN. Each data VLAN has
+   one receiver, so multicast reaches the box even if no switch acts on its IGMP joins. GIGE1
+   answers ARP, so unicast is the fallback.
+2. **Manual mode. [analyzed]** What an `admin.cgi` save writes is now known (firmware §4.1).
+   Only the fields present in the POST are applied, and a changed GigE address reboots the box
+   right after the write. The plan is one POST, made by hand with the owner present, carrying
+   only `configMode=1` and the six GigE fields. The box then reboots into Manual mode with both
+   GigE ports re-addressed and GIGE2's mask and gateway overwritten. Take a fresh EEPROM dump
+   before the POST and compare after. Deleting the flash config file stays an optional extra.
 3. **Confirming Manual mode at run time.** A bare GET of `admin.cgi` shows the mode and was
    done safely once (device §11.3), but the refusal list bans the page outright. Allow that
    one read, or rely on a recorded manual check?

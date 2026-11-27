@@ -293,6 +293,51 @@ The image is 0x15E0 = 5600 bytes, and mux_sync's main frame is 5608 bytes. It fi
 * Counting 48/64/0x30/0x40 immediates is useless: '0' = 48 and '@' = 64 in uClibc code drown the
   signal. Use Ghidra xrefs from the offsets above instead.
 
+### 4.1 What an `admin.cgi` save writes (2026-11-26)
+
+From `admin.cgi` main (0x100000ec, Ghidra `work/ghidra/out/admin.cgi/decomp/all.c`). Offsets
+checked against the live EEPROM dump (corruption-48 §8), which holds exactly the values the
+device survey shows for every field below. [V decomp + dump]
+
+* **Read-modify-write of the whole EEPROM.** `FUN_1000a5c4` reads all 8 KB from 0x13010000 under
+  `eeprom_sem_id` (and runs the guard check on 0x1128: all-zero or all-0xFF defaults the EEPROM
+  and reboots). Each form field is then applied **only if it is present and non-empty**:
+  `FUN_1000cf1c` is a cgic `cgiFormString` wrapper, and only `cgiFormSuccess` (0) applies the
+  field. `FUN_1000a498` writes all 8 KB back through the mailbox and reads it back to verify
+  (it logs "EEPROM write verify" on a mismatch). The write happens if any field was applied.
+  **There is no `btnSave` check.** Any POST with a field in it writes. Fields that are not sent
+  keep their current bytes, corrupted or not.
+* Applied fields and their EEPROM offsets:
+
+  | Field | Offset | Notes |
+  |---|---|---|
+  | `configMode` | 0x40 | `atoi`; 0 = Automatic, 1 = Manual. `update_config` reads the same byte |
+  | `igmpType` | 0x3D | |
+  | `watchdogEnable` | 0x79 | |
+  | `ipAddress` / `subnetMask` / `defaultGateway` | 0x1128 / 0x112C / 0x1130 | management, the guard bytes |
+  | `local1ipAddress` / `local1subnetMask` / `local1defaultGateway` | 0x1140 / 0x1144 / 0x1148 | |
+  | `ipAddressGigE_2a` / `subnetMaskGigE_2a` / `defaultGatewayGigE_2a` | 0x1158 / 0x1134 / 0x1138 | GIGE1 |
+  | `ipAddressGigE_2b` / `subnetMaskGigE_2b` / `defaultGatewayGigE_2b` | 0x115C / **0xF30 / 0xF34** | GIGE2; mask and gateway sit inside the foreign table (corruption-48 §8) |
+
+  Also: user names and passwords (a new password is applied only when Current matches),
+  SNMP names, log destination and port, SNMP destination, time server, `payloadData`, and the
+  three syslog bits.
+* **Address parsing:** `strtok(value, ".")` four times, then `atoi` of each part. There is no
+  validation, and fewer than four parts passes `NULL` to `atoi`, which reads address 0 on this
+  CPU without an MMU. Always send four dotted octets.
+* **Reboot:** any changed management or Local Control 1 field counts in one flag, and any changed
+  GigE field in a second one. If either is set after the write, the handler runs `epcs -c`
+  (FPGA reconfiguration, i.e. a full reboot) and returns with no page. Fields applied in the same
+  POST, `configMode` included, are already in the EEPROM before that reboot. So a POST that
+  sets Manual mode and changes a GigE address reboots straight into Manual mode, and defect B
+  does not run at that boot.
+* **Action keys in the same handler** are checked before the fields: `btnReboot`,
+  `commitConfig`, `btnFlush` (wipes all stream records) and `btnDeleteConfig` (in Automatic mode
+  it also zeroes the stream tables). A save must never carry any of them.
+* **GigE gateways are not Linux routes.** `set_route` installs only the management (eth1)
+  gateway. `set_eth2_ip` and `set_eth3_ip` run `ifconfig` from the EEPROM at boot. So a GigE gateway
+  is at most used by the FPGA [I], and it cannot pull management replies off the control port.
+
 ## 5. Network surface
 
 * **HTTP:** Boa on :80 **as root**. The CGIs are listed above. Auth is a numeric `session_id` in

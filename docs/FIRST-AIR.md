@@ -5,31 +5,41 @@ SPEC M0's ffmpeg-plus-`tsp` spike: the server now produces the stream itself
 (`docs/SERVER.md`). Every step that changes the modulator is marked **(writes)** and needs the
 owner.
 
-## 0. Where things stand (2026-11-26, 03:30)
+## 0. Where things stand (2026-11-26, evening)
 
-- The control port 10.42.0.184 answers from bagel and nixark; the supervisor has run against it
-  in report mode (every page parsed, nothing written).
-- GIGE1 (10.42.0.183, MAC 00:14:39:00:35:C6 per `docs/notes/device.md` §1) does not answer ARP
-  from either host: `ip neigh` shows it INCOMPLETE. Either the port is not cabled to this LAN,
-  or the FPGA's data port does not answer ARP at all (the Linux side of eth2 saw 0 packets in
-  the survey). Ping is therefore not a test of the data path; the box's own status page is.
+- The control port 10.42.0.184 is on the router's ether7 and answers from bagel and nixark. The
+  supervisor has run against it in report mode (every page parsed, nothing written).
+- GIGE1 is cabled to the rack switch's sfp-sfpplus14 and GIGE2 to sfp-sfpplus8. Both links
+  needed the switch-side speed forced (schlarpc-network-terraform `config/interfaces.nix`).
+  With the speed forced the switch reports link even with no copper link, so use the box's
+  LEDs, or where its MAC is learned, as the test. GIGE1 (10.42.0.183, `00:14:39:00:35:C6`)
+  answers ARP and ping. GIGE2 still has its old address (192.168.253.4, corrupted mask) and
+  does not answer.
 - The box is in MPTS mode, 16 carriers on and locked, no inputs configured, Configuration Mode
-  Automatic (defect B active at the next boot), uptime 8 days.
+  Automatic (defect B active at the next boot).
 
-## 1. Decisions needed first
+## 1. Before the first stream
 
-1. **The data path.** Cable GIGE1 to the switch nixark is on (the same L2 as 10.42.0.0/22), or
-   directly to a NIC of nixark's. GIGE1 is configured inside the control port's subnet, which
-   the manual forbids but which also means no re-addressing is needed on our side. Network
-   settings of the box are not to be changed (owner's rule).
-2. **Multicast or unicast.** Multicast (`239.10.0.1:5000` for carrier 1) needs no ARP: the box
-   joins the group with IGMPv2 on GIGE1 and the switch forwards it (the switch must not drop
-   unknown multicast, or must snoop IGMP correctly). Unicast to 10.42.0.183 needs ARP to
-   resolve; if the FPGA does not answer ARP, add a static entry on nixark:
-   `ip neigh replace 10.42.0.183 lladdr 00:14:39:00:35:c6 dev ens16 nud permanent`.
-   Multicast is the default of the design (SPEC §4.2).
-3. **Configuration Mode Manual** before the first configuration write (defect B, SPEC §10.3),
-   set by hand on `admin.cgi` by the owner. The supervisor refuses that page.
+1. **Data VLANs (network repo, Proxmox, flake).** VLAN 20 `10.42.20.0/24` on sfp-sfpplus14 and
+   VLAN 21 `10.42.21.0/24` on sfp-sfpplus8, untagged, tagged on the Proxmox trunk, with no
+   router interface. Give `nixark` one VF in each at `.1` (SPEC §4.2).
+2. **One `admin.cgi` save (writes; owner present).** Take an EEPROM dump first
+   (`tools/eedump`). Then, logged in as Admin, POST exactly these fields and nothing else
+   (firmware §4.1):
+
+   ```
+   configMode=1
+   ipAddressGigE_2a=10.42.20.2  subnetMaskGigE_2a=255.255.255.0  defaultGatewayGigE_2a=10.42.20.1
+   ipAddressGigE_2b=10.42.21.2  subnetMaskGigE_2b=255.255.255.0  defaultGatewayGigE_2b=10.42.21.1
+   ```
+
+   The box writes the EEPROM and reboots (`epcs -c`) into Manual mode. Afterwards: dump again,
+   check that only 0x40, 0x1134–0x113B, 0x1158–0x115F and 0xF30–0xF37 changed, check that the
+   event log has no "Difference detected in Config File", and ARP for `.2` from `nixark` on each
+   VLAN.
+3. **Multicast** (`239.10.0.1:5000` for carrier 1), sent out the VLAN 20 VF with TTL 1. The box
+   is the only receiver in its VLAN, so the group reaches it whether or not the switch acts on
+   the box's join.
 
 ## 2. The server
 
@@ -40,8 +50,8 @@ On nixark, a configuration with one carrier and the supervisor in report mode:
 framing = "udp"
 
 [[output.interface]]
-name = "lan"
-address = "10.42.0.15"          # nixark's address: the multicast interface
+name = "gige1"
+address = "10.42.20.1"          # nixark's VF on VLAN 20: the multicast interface
 carriers = [1]
 multicast_ttl = 1
 
