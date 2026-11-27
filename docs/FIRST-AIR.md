@@ -29,6 +29,11 @@ owner.
   The Status bitrate (1.5 Mbit/s average, 4.1 max) counts programs without nulls: two slates
   leave the carrier about 93 % null. Not yet checked: a receiver on cable channel 2.
 - The box is in MPTS mode, with 16 carriers on and slot 1 configured.
+- Syslog, 2026-11-27 23:20 UTC: one `admin.cgi` POST carrying only `logDestination=10.42.0.10`,
+  `logPort=514` and `errors`, `info`, `feedback` = 1. The page read back with exactly those
+  changes, uptime unbroken, and no EEPROM error in the event log. These fields do not set either
+  reboot flag (firmware §4.1). `/etc/rc` starts `syslogd -R` once from the EEPROM
+  (`start_syslogd`), so the box keeps sending to 10.42.0.53 until its next boot.
 
 ## 1. Before the first stream
 

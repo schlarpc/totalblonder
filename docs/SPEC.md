@@ -1732,9 +1732,9 @@ For the owner:
    first?
 10. **Supervisor login.** The supervisor's Admin session logs a human out of the web UI and
     the reverse. Is the Guest account (read-only, untested here) acceptable for polling?
-11. **Syslog.** The box sends syslog to 10.42.0.53 with all categories disabled (device §4,
-    §11.3). Is that host available to us, given that enabling categories is an `admin.cgi`
-    change?
+11. **Syslog. [done 2026-11-27: destination 10.42.0.10:514 (VictoriaLogs), all three
+    categories on; takes effect at the next boot; FIRST-AIR §0]** The box sent syslog to
+    10.42.0.53 with all categories disabled (device §4, §11.3).
 12. **1080i.** Is interlaced MPEG-2 output wanted at all? It costs about 3.5 times a 720p
     channel (software-survey §12 item 5).
 
