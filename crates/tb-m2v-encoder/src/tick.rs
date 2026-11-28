@@ -637,7 +637,11 @@ fn round_up(x: u64, to: u64) -> u64 {
 
 impl Encoder {
     /// An encoder for a device with these arenas.
-    pub fn new(opt: EncoderOptions, arenas: ArenaSizes) -> Self {
+    pub fn new(mut opt: EncoderOptions, arenas: ArenaSizes) -> Self {
+        // A size the transform kernel does not exist in: the first one it does.
+        if !tb_device::kernel::XF_BLOCKS.contains(&opt.xf_blocks) {
+            opt.xf_blocks = tb_device::kernel::XF_BLOCKS[0];
+        }
         let shed = match opt.force_shed {
             Some((_, seed)) => ShedState::seeded(seed),
             None => ShedState::seeded(0),
@@ -968,7 +972,7 @@ impl Encoder {
             (dev_off, lay.dev_bytes),
             (host_off, host_len),
             alt,
-            self.opt.xf_blocks.max(1),
+            self.opt.xf_blocks,
         ));
         Ok(self.batches.len() - 1)
     }

@@ -760,11 +760,11 @@ HD inline float n_act(int act, int avg, float s) { return fmaf(s, (float)act, (f
 // The transform kernels use 8 threads per 8x8 block and 32 blocks per CUDA block; the two
 // passes of the separable transform exchange data through shared memory. Threads enumerate
 // the blocks of the listed sessions only: t = b * (na * nmb) + k * nmb + macroblock.
-// XF_BLOCKS (8x8 blocks per thread block) is XB of tb_kernel_abi.h, or what the image's shim says
-// (XB_HIP in the AMD image): the host launches the kernel with the image's value.
-#ifndef XF_BLOCKS
-#define XF_BLOCKS XB
-#endif
+// How many 8x8 blocks a thread block holds is the launch's choice among the kernels k_xf (XB of
+// tb_kernel_abi.h), k_xf16, k_xf32 and k_xf64: the same code with shared memory for that many
+// blocks. Which is fastest depends on the card (two warps on the RTX 2000 Ada, 64 blocks on the
+// RX 7900 XTX), and shared memory sized for the largest costs the smallest its occupancy (5 to
+// 7 % on the RTX 2000 Ada), so each size is a kernel of its own and the host times them.
 
 struct BlkGeo { int b, mbi, s, pw, ph, x0, y0; size_t blk; bool valid; };
 
@@ -833,11 +833,12 @@ __device__ inline int mb_qcode(const Geo &g, const Tables *T, const SessPar &sp,
 // the prediction when the picture will be reconstructed, and per block a histogram of the quantiser_scale at which each coefficient
 // becomes zero (normalized by the macroblock's activity factor when adaptive quantization is on),
 // which is what the rate control needs to choose quantizers before any entropy coding.
-__global__ void k_xf(Geo g, const Tables *T, Bufs B, const SessPar *par, const int *list, int na,
-                     const MbInfo *info, const uint16_t *act, int16_t *coef, uint8_t *predbuf, uint64_t *hist, uint64_t *cmask) {
-  __shared__ float sm[XF_BLOCKS][8][8];
+// (The body of the kernels; sm: the block's shared memory, for nb 8x8 blocks.)
+__device__ __forceinline__ void xf_body(float (*sm)[8][8], int nb, Geo g, const Tables *T, Bufs B, const SessPar *par,
+                                        const int *list, int na, const MbInfo *info, const uint16_t *act, int16_t *coef,
+                                        uint8_t *predbuf, uint64_t *hist, uint64_t *cmask) {
   int lb = threadIdx.x >> 3, j = threadIdx.x & 7;
-  BlkGeo bg = blk_geo(g, blockIdx.x * XF_BLOCKS + lb, list, na, true);
+  BlkGeo bg = blk_geo(g, blockIdx.x * nb + lb, list, na, true);
   int mode = MODE_INTRA;
   SessPar sp;
   if (bg.valid) {
@@ -962,6 +963,19 @@ __global__ void k_xf(Geo g, const Tables *T, Bufs B, const SessPar *par, const i
     }
   }
 }
+
+#define XF_KERNEL(NAME, NB)                                                                                        \
+  __global__ void NAME(Geo g, const Tables *T, Bufs B, const SessPar *par, const int *list, int na,              \
+                       const MbInfo *info, const uint16_t *act, int16_t *coef, uint8_t *predbuf, uint64_t *hist, \
+                       uint64_t *cmask) {                                                                         \
+    __shared__ float sm[NB][8][8];                                                                                \
+    xf_body(sm, NB, g, T, B, par, list, na, info, act, coef, predbuf, hist, cmask);                              \
+  }
+XF_KERNEL(k_xf, XB)
+XF_KERNEL(k_xf16, 16)
+XF_KERNEL(k_xf32, 32)
+XF_KERNEL(k_xf64, 64)
+#undef XF_KERNEL
 
 // Row statistics for the rate control. One CUDA block per (listed session, macroblock row), one
 // thread per macroblock (block size: the row length rounded up to whole warps, at most 256):

@@ -465,7 +465,7 @@ fn layout(c: &Clip, xb: usize) -> (Layout, Vec<Geo>) {
             N * mbh * size_of::<RowStatRec>(),
         );
         l.launches.push(Launch {
-            kernel: Kernel::Xf(Xf {
+            kernel: Xf {
                 g,
                 tables: dt,
                 b: bufs,
@@ -478,7 +478,9 @@ fn layout(c: &Clip, xb: usize) -> (Layout, Vec<Geo>) {
                 predbuf: pred,
                 hist,
                 cmask,
-            }),
+            }
+            .sized(xb as u32)
+            .unwrap(),
             grid: nblk.div_ceil(xb) as u32,
             block: (xb * 8) as u32,
         });

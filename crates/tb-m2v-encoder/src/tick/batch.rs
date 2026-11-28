@@ -701,7 +701,7 @@ impl Batch {
 
     fn xf(&self, list: List, na: usize, plan: &mut Plan) {
         let l = &self.lay;
-        let k = Kernel::Xf(Xf {
+        let k = Xf {
             g: l.geo,
             tables: l.d_tables,
             b: l.bufs,
@@ -714,7 +714,9 @@ impl Batch {
             predbuf: l.d_pred,
             hist: l.d_hist,
             cmask: l.d_cmask,
-        });
+        };
+        // (`Encoder::new` leaves no size without a kernel in the options)
+        let k = k.sized(self.xf_blocks).unwrap_or(Kernel::Xf(k));
         let nblocks = na as u64 * u64::from(self.nmb()) * 6;
         plan.main(Op::Launch(Launch {
             kernel: k,

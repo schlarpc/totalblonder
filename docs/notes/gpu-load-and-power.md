@@ -171,10 +171,39 @@ median ticks, and runs of 15 s of video. Identical builds differ by up to 1.4 % 
 | The other kernels in blocks of 1024 instead of 256 | −0.8 % | – | −1.3 % | +0.4 % | −0.4 % |
 
 (Rows two and three against the start, with the layout.) What the RTX 2000 Ada gains from
-small blocks in `k_xf` this card loses several times over, so the block size is the kernel
-image's (`XB`, `XB_HIP`). The other block sizes do not matter here.
+small blocks in `k_xf` this card loses several times over, so the block size is chosen per
+card (§6.4). The other block sizes do not matter here.
 
-### 6.4 Paced ticks are slower than free-running ones
+### 6.4 The size is timed at start
+
+Two cards, two answers, and neither is a property of its vendor: the NVIDIA figure is the RTX
+2000 Ada's (sm_89), the AMD one the RX 7900 XTX's (gfx1100), and the AMD image is built for
+eight targets. So the transform kernel exists in four sizes (`k_xf` with 8 blocks, `k_xf16`,
+`k_xf32`, `k_xf64`: the same body, shared memory for its own size each) and the host chooses.
+One kernel with shared memory for the largest size was tried first: launched with 8 blocks it
+costs the RTX 2000 Ada 5 to 7 % (fewer blocks fit an SM).
+
+`tb_engine::calibrate` times the sizes at start: the real encoder on the line-up's sessions
+(up to four 1080-line pictures per tick), a moving synthetic picture, 24 ticks per size, the
+sizes in turn for two to four rounds of which the first only warms the card; the median tick
+decides, and a size replaces the device's usual one only when it is 3 % faster. The server
+does it before its time base is set (`video.transform_blocks = "auto"`, the default; `"usual"`
+or a number skip it); `tb-m2venc --xf-blocks auto` prints it:
+
+| Card, line-up | 8 | 16 | 32 | 64 | Chosen |
+|---|---|---|---|---|---|
+| RTX 2000 Ada, 16 × 1080i (two runs) | 3.01, 2.97 ms | 3.02, 2.98 | 3.10, 2.99 | 3.22, 3.17 | 8 |
+| RTX 2000 Ada, 96 × 480i | 3.09 | 3.14 | 3.12 | 3.29 | 8 |
+| RTX 2000 Ada, 1 × 720p | 0.231 | 0.227 | 0.227 | 0.231 | 8 (usual; no size 3 % faster) |
+| RX 7900 XTX, 16 × 1080i (two runs) | 4.55, 4.56 ms | 3.65, 3.72 | 3.18, 3.20 | 3.12, 3.07 | 64 |
+| RX 7900 XTX, 96 × 480i | 4.52 | 3.74 | 3.28 | 3.20 | 64 |
+| RX 7900 XTX, 2 × 480i | 0.902 | 0.919 | 0.898 | 0.896 | 64 (usual) |
+
+(Timed with up to eight 1080-line pictures and three counted rounds, which took 0.5 to 4.6 s;
+the limits are now half of that.) Only this one kernel is timed: of the block sizes tried,
+it is the only one that mattered on either card (§3, §6.3).
+
+### 6.5 Paced ticks are slower than free-running ones
 
 16 × 1080i: 4.9 ms per tick free-running, 7.8 ms paced. Between ticks the card drops its clock
 (to 35 MHz within tens of milliseconds) and every tick starts on the way up. With

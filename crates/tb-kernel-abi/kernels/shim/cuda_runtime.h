@@ -22,6 +22,7 @@
 #define __device__
 #define __host__
 #define __shared__ static thread_local
+#define __forceinline__ inline __attribute__((always_inline))
 
 struct tbk_dim3 { unsigned x, y, z; };
 extern thread_local tbk_dim3 threadIdx, blockIdx, blockDim, gridDim;

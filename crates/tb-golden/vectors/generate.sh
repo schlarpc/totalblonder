@@ -7,7 +7,7 @@
 #   ./golden/generate.sh --device cuda --check DIR    # the same cases on the card (nixark):
 #       every stream and every record must be the reference adapter's, except the records
 #       that hold measured times (tick_end, shed_hist, shed_budget: the card's clock is real),
-#       the shape of the k_xf launches (the kernel image's own),
+#       the size of thread block of the k_xf launches (the device's choice),
 #       the command line in the first record, and the case `deadline`, whose decisions follow
 #       the device's clock (nix run .#gate-golden)
 #
@@ -121,11 +121,11 @@ case_ film60 qcif --size 176x144 --fps 60000/1001 --gop 30 --bframes 2 --bitrate
 if [ -n "$check" ]; then
   status=0
   # on the card: the records without the measured ones and without the command line, and
-  # the k_xf launches without their grid and block, which are the kernel image's own
-  # (tb_kernel_abi: XB for the NVIDIA image and the reference build, XB_HIP for the AMD one)
+  # the k_xf launches without their size of thread block (k_xf, k_xf16, k_xf32, k_xf64 and the
+  # grid and block that go with each), which is the device's choice (tb_engine: TickDevice::xf_blocks)
   records() {
     grep -v '"k":"golden"\|"k":"tick_end"\|"k":"shed_hist"\|"k":"shed_budget"' "$1" |
-      sed -E 's/("kernel":"k_xf"),"grid":[0-9]+,"block":[0-9]+/\1/'
+      sed -E 's/"kernel":"k_xf(16|32|64)?","grid":[0-9]+,"block":[0-9]+/"kernel":"k_xf"/'
   }
   same() {
     if [ "$device" = ref ]; then cmp -s "$1" "$2"; return; fi

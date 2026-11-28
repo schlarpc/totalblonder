@@ -12,8 +12,9 @@ pub trait TickDevice: Device {
     /// Queue a plan whose wait is accounted under `class` (`Encoder::wait_class`): a plan of
     /// one class takes about as long from tick to tick, which the hybrid wait relies on.
     fn submit_class(&mut self, plan: &Plan, class: u8) -> Result<Ticket, DeviceError>;
-    /// 8x8 blocks per thread block of the transform kernel in this device's image
-    /// (`EncoderOptions::xf_blocks`).
+    /// 8x8 blocks per thread block of the transform kernel (`EncoderOptions::xf_blocks`) that
+    /// suit the one card of this kind that was measured; [`crate::calibrate`] times the sizes
+    /// on the card at hand.
     fn xf_blocks(&self) -> u32 {
         tb_m2v_encoder::EncoderOptions::default().xf_blocks
     }

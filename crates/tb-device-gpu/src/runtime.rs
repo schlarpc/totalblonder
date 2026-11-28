@@ -52,8 +52,9 @@ pub trait Runtime: sys::Api + 'static {
     const NAME: &'static str;
     /// The device image this crate was built with for this runtime.
     const IMAGE: KernelImage;
-    /// 8x8 blocks per thread block of the transform kernel in that image (`tb_kernel_abi::XB`
-    /// for the NVIDIA image, `XB_HIP` for the AMD one).
+    /// 8x8 blocks per thread block of the transform kernel that were fastest on the one card
+    /// of this runtime that was measured (`tb_kernel_abi::XB`: RTX 2000 Ada; `XB_HIP`: RX 7900
+    /// XTX). A starting point, not a property of the vendor.
     const XF_BLOCKS: u32;
     /// The status that reads "not finished yet" from a stream or event query.
     const NOT_READY: Status;

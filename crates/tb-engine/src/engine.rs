@@ -100,9 +100,20 @@ pub struct Engine<D> {
 
 impl<D: TickDevice> Engine<D> {
     /// An encoder on this device.
-    pub fn new(dev: D, mut opt: EncoderOptions, device_timeout: f64) -> Self {
-        // The transform kernel is launched in the blocks its image was built for.
-        opt.xf_blocks = dev.xf_blocks();
+    pub fn new(dev: D, opt: EncoderOptions, device_timeout: f64) -> Self {
+        let blocks = dev.xf_blocks();
+        Self::with_xf_blocks(dev, opt, device_timeout, blocks)
+    }
+
+    /// An encoder on this device whose transform kernel runs in thread blocks of `xf_blocks`
+    /// 8x8 blocks (`EncoderOptions::xf_blocks`; [`crate::calibrate`] finds the fastest).
+    pub fn with_xf_blocks(
+        dev: D,
+        mut opt: EncoderOptions,
+        device_timeout: f64,
+        xf_blocks: u32,
+    ) -> Self {
+        opt.xf_blocks = xf_blocks;
         let enc = Encoder::new(opt, dev.arenas());
         Self {
             dev,
@@ -118,6 +129,10 @@ impl<D: TickDevice> Engine<D> {
         }
     }
 
+    /// Gives the device back. Nothing may be in flight ([`Engine::settle`]).
+    pub fn into_dev(self) -> D {
+        self.dev
+    }
     /// The encoder, for reading.
     pub fn enc(&self) -> &Encoder {
         &self.enc

@@ -28,7 +28,7 @@ tb-m2venc [group options] [--group [group options]]... [global options]
          [--output prefix] [--write N] [--recon f.yuv] [--stats f.jsonl] [--json f.json] [--log]
          [--ticklog f.txt] [--golden f.jsonl]
          [--paced] [--warmup ticks] [--profile] [--overlap] [--max-in-frames K] [--tickmark]
-         [--blocking-wait]
+         [--blocking-wait] [--xf-blocks auto|8|16|32|64]
  other:  tb-m2venc plumb ref|cuda            the plumbing proof (k_pyr through an adapter)
          tb-m2venc --golden-tables f.jsonl   the table record the kernels read
          tb-m2venc --make-clip W H FRAMES SEED [interlaced|noisy|white|patch] > clip.yuv
@@ -223,6 +223,9 @@ pub struct Opts {
     pub tickmark: bool,
     /// Blocking waits instead of the hybrid wait.
     pub blocking: bool,
+    /// `--xf-blocks`: the size of thread block of the transform kernel (`None`: the device's
+    /// usual one; `Some(0)`: timed at start, `auto`).
+    pub xf_blocks: Option<u32>,
     /// Ticks left out of the timing statistics.
     pub warmup: u64,
     /// Frames read of each clip.
@@ -288,6 +291,7 @@ impl Default for Opts {
             overlap: false,
             tickmark: false,
             blocking: false,
+            xf_blocks: None,
             warmup: 0,
             max_in: 600,
             deadline: false,
@@ -494,6 +498,12 @@ pub fn parse(args: &[String]) -> Result<Opts, OptError> {
             "--overlap" => o.overlap = true,
             "--tickmark" => o.tickmark = true,
             "--blocking-wait" => o.blocking = true,
+            "--xf-blocks" => {
+                o.xf_blocks = Some(match val()? {
+                    "auto" => 0,
+                    v => num(a, v)?,
+                });
+            }
             "--max-in-frames" => o.max_in = num(a, val()?)?,
             "--warmup" => o.warmup = num::<i64>(a, val()?)?.max(0) as u64,
             "--log" => o.log = true,

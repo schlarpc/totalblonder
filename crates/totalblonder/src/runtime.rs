@@ -526,6 +526,7 @@ fn service_infos(plant: &Plant) -> Vec<crate::telemetry::ServiceInfo> {
 #[allow(clippy::too_many_arguments, reason = "the hub thread's whole setup")]
 fn hub<D: TickDevice>(
     dev: D,
+    xf_blocks: Option<u32>,
     sessions: Vec<HubSession>,
     timing: HubTiming,
     statmux: Option<video::StatmuxSetup>,
@@ -535,7 +536,8 @@ fn hub<D: TickDevice>(
 ) {
     let _ = ready.send(Ok(()));
     let _ctx = tracing::info_span!("video").entered();
-    let eng = Engine::new(dev, video::encoder_options(), 5.0);
+    let blocks = xf_blocks.unwrap_or_else(|| dev.xf_blocks());
+    let eng = Engine::with_xf_blocks(dev, video::encoder_options(), 5.0, blocks);
     if let Err(e) = video::run(eng, sessions, timing, statmux, overload, clock) {
         tracing::error!("video hub stopped: {e}");
     }
@@ -544,8 +546,62 @@ fn hub<D: TickDevice>(
 /// Starts the video hub on its own thread. The device is made on that thread (a CUDA context
 /// is current on the thread that made it, and the adapter is not `Send`); failure to make it
 /// is reported here.
+/// The size of thread block the transform kernel runs in (`video.transform_blocks`; `None`:
+/// the device's usual one). `auto` times the sizes on the card with the line-up's sessions
+/// (`tb_engine::calibrate`), on a device made for it on a thread of its own and gone again
+/// before the plant's time base is set: the timing takes up to a few seconds, which the hub
+/// cannot spend once its ticks are due. Whatever goes wrong there, the usual size runs.
+fn transform_blocks(plant: &Plant) -> Option<u32> {
+    use crate::config::TransformBlocks;
+    match plant.transform_blocks {
+        TransformBlocks::Usual => return None,
+        TransformBlocks::Fixed(n) => return Some(n),
+        TransformBlocks::Auto => {}
+    }
+    let plans: Vec<&crate::config::ProgramPlan> = plant
+        .carriers
+        .iter()
+        .flat_map(|c| c.programs.iter())
+        .collect();
+    let cfgs = video::session_configs(&plans);
+    let arenas = video::arena_sizes(&cfgs).ok()?;
+    let kind = plant.video;
+    let timed = std::thread::Builder::new()
+        .name("video-calibrate".into())
+        .spawn(move || {
+            let opt = video::encoder_options();
+            match kind {
+                VideoDevice::Ref => None,
+                VideoDevice::Cuda(gpu) => CudaDevice::new(gpu as i32, arenas, &Cuda::IMAGE)
+                    .ok()
+                    .map(|d| tb_engine::calibrate::xf_blocks(d, &opt, &cfgs, 5.0).1),
+                VideoDevice::Hip(gpu) => HipDevice::new(gpu as i32, arenas, &Hip::IMAGE)
+                    .ok()
+                    .map(|d| tb_engine::calibrate::xf_blocks(d, &opt, &cfgs, 5.0).1),
+            }
+        })
+        .ok()?
+        .join()
+        .ok()??;
+    let sizes: Vec<String> = timed
+        .median_ms
+        .iter()
+        .map(|(b, ms)| format!("{b}: {ms:.3} ms"))
+        .collect();
+    tracing::info!(
+        chosen = timed.chosen,
+        usual = timed.usual,
+        seconds = timed.took.as_secs_f64(),
+        median_tick = sizes.join(", "),
+        not_timed = timed.skipped.as_deref().unwrap_or(""),
+        "transform kernel thread blocks"
+    );
+    Some(timed.chosen)
+}
+
 fn start_video(
     plant: &Plant,
+    xf_blocks: Option<u32>,
     flex: &[std::sync::Arc<crate::audio::CarrierFlex>],
     sessions: Vec<HubSession>,
     timing: HubTiming,
@@ -590,6 +646,7 @@ fn start_video(
             VideoDevice::Ref => match tb_device_ref::RefDevice::new(arenas) {
                 Ok(d) => hub(
                     Guarded::new(d),
+                    xf_blocks,
                     sessions,
                     timing,
                     statmux,
@@ -604,6 +661,7 @@ fn start_video(
             VideoDevice::Cuda(gpu) => match CudaDevice::new(gpu as i32, arenas, &Cuda::IMAGE) {
                 Ok(d) => hub(
                     Guarded::new(d),
+                    xf_blocks,
                     sessions,
                     timing,
                     statmux,
@@ -618,6 +676,7 @@ fn start_video(
             VideoDevice::Hip(gpu) => match HipDevice::new(gpu as i32, arenas, &Hip::IMAGE) {
                 Ok(d) => hub(
                     Guarded::new(d),
+                    xf_blocks,
                     sessions,
                     timing,
                     statmux,
@@ -674,6 +733,11 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
             });
             let video = start_video(
                 &plant,
+                // (an offline run is not timed: its device is not a card on the clock)
+                match plant.transform_blocks {
+                    crate::config::TransformBlocks::Fixed(n) => Some(n),
+                    _ => None,
+                },
                 &built.flex,
                 sessions,
                 HubTiming {
@@ -778,6 +842,7 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
         }
         Mode::Realtime { duration } => {
             let stop = Arc::new(AtomicBool::new(false));
+            let xf_blocks = transform_blocks(&plant);
             let epoch = Instant::now() + Duration::from_millis(200);
             let unix0 = RealClock::new(epoch, stop.clone()).unix_nanos_at(0);
             let built = build_carriers(&plant, unix0)?;
@@ -845,6 +910,7 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
                 .collect();
             let video = start_video(
                 &plant,
+                xf_blocks,
                 &built.flex,
                 sessions,
                 HubTiming {

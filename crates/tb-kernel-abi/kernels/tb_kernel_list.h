@@ -13,6 +13,9 @@
   X(k_me, 0) \
   X(k_mvsmooth, 0) \
   X(k_xf, 1) \
+  X(k_xf16, 1) \
+  X(k_xf32, 1) \
+  X(k_xf64, 1) \
   X(k_rowstat, 1) \
   X(k_quant, 0) \
   X(k_recon, 0) \

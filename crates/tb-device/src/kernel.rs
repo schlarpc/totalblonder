@@ -650,8 +650,24 @@ kernels! {
     MvSmooth = "k_mvsmooth" {
         g: geo, b: bufs, par: ptr, list: ptr, na: int, input: ptr, out: ptr,
     }
-    /// `k_xf`: prediction, residual, forward DCT, zero-threshold histogram.
+    /// `k_xf`: prediction, residual, forward DCT, zero-threshold histogram, in thread blocks
+    /// of `tb_kernel_abi::XB` 8x8 blocks (eight threads each).
     Xf = "k_xf" {
+        g: geo, tables: ptr, b: bufs, par: ptr, list: ptr, na: int, info: ptr, act: ptr,
+        coef: ptr, predbuf: ptr, hist: ptr, cmask: ptr,
+    }
+    /// `k_xf16`: `k_xf` in thread blocks of 16 8x8 blocks.
+    Xf16 = "k_xf16" {
+        g: geo, tables: ptr, b: bufs, par: ptr, list: ptr, na: int, info: ptr, act: ptr,
+        coef: ptr, predbuf: ptr, hist: ptr, cmask: ptr,
+    }
+    /// `k_xf32`: `k_xf` in thread blocks of 32 8x8 blocks.
+    Xf32 = "k_xf32" {
+        g: geo, tables: ptr, b: bufs, par: ptr, list: ptr, na: int, info: ptr, act: ptr,
+        coef: ptr, predbuf: ptr, hist: ptr, cmask: ptr,
+    }
+    /// `k_xf64`: `k_xf` in thread blocks of 64 8x8 blocks.
+    Xf64 = "k_xf64" {
         g: geo, tables: ptr, b: bufs, par: ptr, list: ptr, na: int, info: ptr, act: ptr,
         coef: ptr, predbuf: ptr, hist: ptr, cmask: ptr,
     }
@@ -736,6 +752,57 @@ impl Launch {
     }
 }
 
+/// The sizes of thread block the transform kernel exists in, in 8x8 blocks (eight threads
+/// each): `tb_kernel_abi::XB` (`k_xf`) first, then `k_xf16`, `k_xf32`, `k_xf64`.
+pub const XF_BLOCKS: [u32; 4] = [tb_kernel_abi::XB as u32, 16, 32, 64];
+
+impl Xf {
+    /// The transform kernel for thread blocks of `blocks` 8x8 blocks with these arguments, or
+    /// `None` when there is none of that size ([`XF_BLOCKS`]). Launch it with `blocks * 8`
+    /// threads per block: each of the kernels has shared memory for its own size only.
+    pub fn sized(self, blocks: u32) -> Option<Kernel> {
+        let Xf {
+            g,
+            tables,
+            b,
+            par,
+            list,
+            na,
+            info,
+            act,
+            coef,
+            predbuf,
+            hist,
+            cmask,
+        } = self;
+        macro_rules! as_ {
+            ($rec:ident) => {
+                Kernel::$rec($rec {
+                    g,
+                    tables,
+                    b,
+                    par,
+                    list,
+                    na,
+                    info,
+                    act,
+                    coef,
+                    predbuf,
+                    hist,
+                    cmask,
+                })
+            };
+        }
+        match blocks {
+            x if x == XF_BLOCKS[0] => Some(Kernel::Xf(self)),
+            16 => Some(as_!(Xf16)),
+            32 => Some(as_!(Xf32)),
+            64 => Some(as_!(Xf64)),
+            _ => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -764,7 +831,7 @@ mod tests {
         assert_eq!(k.args().as_slice().len(), 15);
         assert_eq!(k.name(), "k_recon");
         assert_eq!(Kernel::NAMES[k.index()], "k_recon");
-        assert_eq!(Kernel::NAMES.len(), 24);
+        assert_eq!(Kernel::NAMES.len(), 27);
     }
 
     #[test]

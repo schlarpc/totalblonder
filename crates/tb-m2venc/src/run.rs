@@ -670,7 +670,43 @@ pub fn run<D: TickDevice>(o: &Opts, dev: D, console: &mut dyn Write) -> Result<O
     dev.set_blocking(o.blocking || o.profile);
     dev.set_timing(o.profile);
     let device = dev.describe();
-    let mut eng = Engine::new(dev, encoder_options(o), o.device_timeout);
+    // `--xf-blocks`: the transform kernel's thread blocks as given, or (`auto`) as a timing of
+    // the sizes on this card with the sessions of the run finds them fastest.
+    let (dev, xf_blocks) = match o.xf_blocks {
+        None => {
+            let b = dev.xf_blocks();
+            (dev, b)
+        }
+        Some(0) => {
+            let cfgs: Vec<SessionConfig> = o
+                .groups
+                .iter()
+                .filter(|g| !g.pool)
+                .flat_map(|g| (0..g.n).map(|s| g.session_cfg(s)))
+                .collect();
+            let (dev, c) =
+                tb_engine::calibrate::xf_blocks(dev, &encoder_options(o), &cfgs, o.device_timeout);
+            let sizes: Vec<String> = c
+                .median_ms
+                .iter()
+                .map(|(b, ms)| format!("{b}: {ms:.3} ms"))
+                .collect();
+            let _ = writeln!(
+                console,
+                "transform kernel: blocks of {} (usual {}), timed in {:.2} s: {}{}",
+                c.chosen,
+                c.usual,
+                c.took.as_secs_f64(),
+                sizes.join(", "),
+                c.skipped
+                    .map(|s| format!("not timed: {s}"))
+                    .unwrap_or_default()
+            );
+            (dev, c.chosen)
+        }
+        Some(b) => (dev, b),
+    };
+    let mut eng = Engine::with_xf_blocks(dev, encoder_options(o), o.device_timeout, xf_blocks);
     // `--golden`: the encoder's records of crates/tb-golden/vectors/README.md, written as they come
     eng.enc_mut().record_golden(o.golden.is_some());
 

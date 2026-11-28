@@ -178,6 +178,7 @@ impl Default for PsipFile {
 struct VideoFile {
     device: String,
     gpu: u32,
+    transform_blocks: String,
 }
 
 impl Default for VideoFile {
@@ -185,6 +186,7 @@ impl Default for VideoFile {
         VideoFile {
             device: "cuda".into(),
             gpu: 0,
+            transform_blocks: "auto".into(),
         }
     }
 }
@@ -530,6 +532,18 @@ impl Format {
     }
 }
 
+/// The size of thread block the transform kernel runs in (`video.transform_blocks`): the
+/// fastest size is the card's, and only two cards were measured (`tb_engine::calibrate`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransformBlocks {
+    /// Timed on the card at start, with the line-up, before anything goes on air.
+    Auto,
+    /// What the one measured card of the device's kind ran fastest with; no timing.
+    Usual,
+    /// This many 8x8 blocks (8, 16, 32 or 64); no timing.
+    Fixed(u32),
+}
+
 /// How the video encoder runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VideoDevice {
@@ -833,6 +847,8 @@ pub struct Plant {
     pub guide: GuideConfig,
     /// Video device.
     pub video: VideoDevice,
+    /// The transform kernel's thread blocks.
+    pub transform_blocks: TransformBlocks,
     /// Control API address.
     pub control: Option<std::net::SocketAddr>,
     /// The table version file.
@@ -1112,6 +1128,18 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
         "hip" => VideoDevice::Hip(f.video.gpu),
         "ref" => VideoDevice::Ref,
         x => return Err(rule(format!("video device {x:?}: cuda, hip or ref"))),
+    };
+    let transform_blocks = match f.video.transform_blocks.as_str() {
+        "auto" => TransformBlocks::Auto,
+        "usual" => TransformBlocks::Usual,
+        x => match x.parse() {
+            Ok(n) if tb_device::kernel::XF_BLOCKS.contains(&n) => TransformBlocks::Fixed(n),
+            _ => {
+                return Err(rule(format!(
+                    "video transform_blocks {x:?}: \"auto\", \"usual\", or one of \"8\", \"16\", \"32\", \"64\""
+                )));
+            }
+        },
     };
 
     let mut services = HashMap::new();
@@ -1564,6 +1592,7 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
         dst,
         guide,
         video,
+        transform_blocks,
         control: f.control.bind,
         versions: f.persistence.versions.clone(),
         schedule: f.psip.schedule.clone(),
