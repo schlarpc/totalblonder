@@ -681,6 +681,7 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
                     delay,
                     epoch: None,
                     end: Some(end),
+                    stats: video::HubStats::default(),
                 },
                 Box::new(vworker),
             )?;
@@ -809,6 +810,8 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
                     Value::Counter(s.switches.clone()),
                 );
             }
+            let hub_stats = video::HubStats::default();
+            hub_stats.register(&mut reg);
             let tracks = audio_tracks(&plant, &built, p0, &mut live)?;
             for t in &tracks {
                 let l = vec![
@@ -849,6 +852,7 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
                     delay,
                     epoch: Some(epoch),
                     end: None,
+                    stats: hub_stats,
                 },
                 Box::new(RealClock::new(epoch, stop.clone())),
             )?;

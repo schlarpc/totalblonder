@@ -307,8 +307,49 @@ pub fn arena_sizes(cfgs: &[SessionConfig]) -> Result<ArenaSizes, tb_m2v_encoder:
     })
 }
 
+/// How long the hub's ticks take: the encoder's whole work for one frame period (queueing,
+/// the device, rate control between its phases), measured around the engine's tick. This is
+/// the load the deadline policy answers, seen before any picture is given up.
+#[derive(Debug, Clone, Default)]
+pub struct HubStats {
+    /// Ticks that ran the encoder.
+    pub ticks: Counter,
+    /// Their duration, summed, in microseconds.
+    pub busy_us: Counter,
+    /// Ticks that ended after their deadline (85 % of a tick period after the wake).
+    pub late: Counter,
+    /// The longest tick of the last second, microseconds.
+    pub max_us: Gauge,
+    /// The tick period, microseconds (the shortest frame period of the line-up).
+    pub period_us: Gauge,
+}
+
+impl HubStats {
+    /// Registers them.
+    pub fn register(&self, reg: &mut crate::control::Registry) {
+        use crate::control::Value::{Counter as C, Gauge as G};
+        reg.add("video_ticks_total", vec![], C(self.ticks.clone()));
+        reg.add(
+            "video_tick_microseconds_total",
+            vec![],
+            C(self.busy_us.clone()),
+        );
+        reg.add("video_ticks_late_total", vec![], C(self.late.clone()));
+        reg.add(
+            "video_tick_max_microseconds",
+            vec![],
+            G(self.max_us.clone()),
+        );
+        reg.add(
+            "video_tick_period_microseconds",
+            vec![],
+            G(self.period_us.clone()),
+        );
+    }
+}
+
 /// The hub's timing.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct HubTiming {
     /// Process time of frame 0 of every program.
     pub p0: u64,
@@ -320,6 +361,8 @@ pub struct HubTiming {
     /// for it or later, every session is closed so its last GOP is coded, and the streams end
     /// with `sequence_end_code`.
     pub end: Option<u64>,
+    /// Where the hub accounts its ticks.
+    pub stats: HubStats,
 }
 
 /// H.262 §6.2.2: `sequence_end_code`.
@@ -706,6 +749,8 @@ pub fn run<D: TickDevice>(
             })
         })
         .collect();
+    timing.stats.period_us.set(tick / 27);
+    let mut tick_max_us = 0u64;
     let mut k: u64 = 0;
     loop {
         let t = timing.p0 + k * tick;
@@ -822,9 +867,18 @@ pub fn run<D: TickDevice>(
                     ((u128::from(wake) + u128::from(tick) * 85 / 100) * 1000 / 27) as u64,
                 )
             });
+            let began = Instant::now();
             if let Err(e) = eng.tick(deadline) {
                 tracing::error!("video tick: {e}");
             }
+            let ended = Instant::now();
+            let us = ended.duration_since(began).as_micros() as u64;
+            timing.stats.ticks.inc();
+            timing.stats.busy_us.add(us);
+            if deadline.is_some_and(|d| ended > d) {
+                timing.stats.late.inc();
+            }
+            tick_max_us = tick_max_us.max(us);
             for (i, s) in sessions.iter_mut().enumerate() {
                 while let Some(au) = eng.enc_mut().take_output(ids[i]) {
                     if let Some(ctl) = sm
@@ -920,6 +974,7 @@ pub fn run<D: TickDevice>(
         // The encoder's counters, once a second.
         if wake >= next_stats {
             next_stats = wake + HZ;
+            timing.stats.max_us.set(std::mem::take(&mut tick_max_us));
             for (i, s) in sessions.iter().enumerate() {
                 if let Ok(sn) = eng.enc().snapshot(ids[i]) {
                     s.encoder.update(&sn.stats, sn.rate, &mut enc_last[i]);
