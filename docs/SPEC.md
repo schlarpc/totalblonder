@@ -917,8 +917,10 @@ time, reads the playlist again every minute (keeping the position by air time) a
 end waits for more. Packets are restamped onto the air-time clock (anchored at the first
 segment and after each discontinuity), so episodes follow each other without a timeline
 session break; packets already past are dropped and video then waits for a key frame. The
-variant playlist's `EXT-X-DATERANGE`s with an `X-TITLE` (and `X-DESCRIPTION`, `X-RATING`)
-become the guide of every service airing the input, at most one event per start minute (event
+variant playlist's `EXT-X-DATERANGE`s of `CLASS="totalblonder.program"` with an `X-TITLE` (and
+`X-DESCRIPTION`, `X-RATING`) become the guide (`X-` attributes are HLS's client-defined
+namespace and the class says whose they are; ranges of other classes, such as a third-party
+stream's ad breaks, are not read for the guide) of every service airing the input, at most one event per start minute (event
 ids come from the minute: the longer of two stays). Bumpers and promos stay out: a range marked
 `X-GUIDE="NO"` or shorter than a minute is skipped, and the event before a gap of up to five
 minutes runs on to the next, so the skipped spans leave no hole. Checked on nixark:

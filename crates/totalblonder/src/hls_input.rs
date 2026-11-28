@@ -22,9 +22,10 @@
 //! segment's air time plus its offset into the segment, so the channel runs on the playlist's
 //! schedule across restarts; packets already in the past when they arrive are dropped (a start
 //! in mid-segment). Discontinuities (between episodes) do not end the session: the timeline
-//! mapper starts a new one at the jump. The variant playlist's `EXT-X-DATERANGE` spans with an
-//! `X-TITLE` (and `X-DESCRIPTION`, `X-RATING`) become the guide of every service this input
-//! feeds ([`crate::schedule::Feeds`]).
+//! mapper starts a new one at the jump. The variant playlist's `EXT-X-DATERANGE` spans of
+//! class [`GUIDE_CLASS`] with an `X-TITLE` (and `X-DESCRIPTION`, `X-RATING`, `X-GUIDE`) become
+//! the guide of every service this input feeds ([`crate::schedule::Feeds`]); other date ranges
+//! (ad breaks, chapters, another vendor's metadata) are not read for the guide.
 
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
@@ -470,6 +471,10 @@ impl Ord for Held {
     }
 }
 
+/// The `CLASS` of the date ranges that are guide events (RFC 8216bis §4.4.5.1: the class
+/// says how a range's `X-` attributes are to be read).
+pub const GUIDE_CLASS: &str = "totalblonder.program";
+
 /// Date ranges shorter than this, seconds, are not guide events (bumpers, promos).
 const GUIDE_MIN: f64 = 60.0;
 
@@ -487,14 +492,17 @@ pub struct GuideTarget {
 }
 
 impl GuideTarget {
-    /// The date ranges with an `X-TITLE` that end after six hours ago and start within 16
-    /// days, as guide events of every service. Left out: ranges marked `X-GUIDE="NO"` and
+    /// The date ranges of class [`GUIDE_CLASS`] with an `X-TITLE` that end after six hours ago
+    /// and start within 16 days, as guide events of every service. Left out: ranges marked `X-GUIDE="NO"` and
     /// anything shorter than [`GUIDE_MIN`] (bumpers, promos). An event is stretched to the
     /// next one across a gap of up to [`GUIDE_BRIDGE`], so a skipped bumper leaves no hole.
     fn publish(&self, ranges: &[tb_hls::playlist::DateRange]) {
         let now = unix_now();
         let mut entries = Vec::new();
         for r in ranges {
+            if r.class.as_deref() != Some(GUIDE_CLASS) {
+                continue;
+            }
             let (Some(title), Some(d)) = (r.attr("X-TITLE"), r.duration) else {
                 continue;
             };
@@ -737,7 +745,7 @@ mod tests {
         let now = (((unix_now() + 18.0) / 60.0).floor() * 60.0) - 18.0;
         let r = |id: &str, start: f64, d: f64, x: &[(&str, &str)]| DateRange {
             id: id.into(),
-            class: None,
+            class: Some(GUIDE_CLASS.into()),
             start,
             duration: Some(d),
             attributes: x.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect(),
@@ -775,6 +783,15 @@ mod tests {
             r("i", now + 4070.0, 1320.0, &[("X-TITLE", "Tenchi Muyo")]),
             // after a ten-minute hole: not bridged
             r("j", now + 6000.0, 1320.0, &[("X-TITLE", "Dragon Ball Z")]),
+            // another class (someone else's metadata) or none: not read for the guide
+            DateRange {
+                class: Some("com.example.ad".into()),
+                ..r("k", now + 7500.0, 1320.0, &[("X-TITLE", "an ad break")])
+            },
+            DateRange {
+                class: None,
+                ..r("l", now + 9000.0, 1320.0, &[("X-TITLE", "unclassed")])
+            },
         ]);
         let f = g.feeds.lock().unwrap();
         let titles: Vec<String> = f["toonami"]

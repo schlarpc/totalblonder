@@ -165,7 +165,8 @@ key = "wall"
 # id = "web"
 # kind = "hls"                # HLS or Low-Latency HLS pull; audio renditions keep their LANGUAGE.
 #                             # A VOD playlist with EXT-X-PROGRAM-DATE-TIME plays on its schedule,
-#                             # and its EXT-X-DATERANGEs with X-TITLE / X-DESCRIPTION / X-RATING
+#                             # and its EXT-X-DATERANGEs of CLASS="totalblonder.program" with
+#                             # X-TITLE / X-DESCRIPTION / X-RATING
 #                             # are the guide of the services airing it (X-GUIDE="NO", or under a
 #                             # minute, keeps a bumper out; the show before it covers the gap).
 # url = "https://example.com/live/master.m3u8"
