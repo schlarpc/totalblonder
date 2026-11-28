@@ -10,6 +10,10 @@
 //! playlist's own URL. Byte ranges (`BYTERANGE` on parts and hints, `EXT-X-BYTERANGE` on
 //! segments) are kept; an open-ended hint (`BYTERANGE-START` without a length) too.
 //!
+//! `EXT-X-PROGRAM-DATE-TIME` gives a segment its wall-clock time; segments after it without
+//! one of their own continue from it by their durations (§4.4.4.6). `EXT-X-DATERANGE` spans
+//! are kept with their client attributes (`X-…`); tags with the same `ID` merge (§4.4.5.1).
+//!
 //! Unknown tags are ignored, as the RFC requires of clients.
 
 use url::Url;
@@ -142,6 +146,34 @@ pub struct Segment {
     pub map: Option<Url>,
     /// Its parts, in order (LL-HLS; empty when not listed).
     pub parts: Vec<Part>,
+    /// Its wall-clock start, seconds since the Unix epoch (`EXT-X-PROGRAM-DATE-TIME`, or
+    /// carried on from the last one).
+    pub pdt: Option<f64>,
+}
+
+/// `EXT-X-DATERANGE`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DateRange {
+    /// `ID`.
+    pub id: String,
+    /// `CLASS`.
+    pub class: Option<String>,
+    /// `START-DATE`, seconds since the Unix epoch.
+    pub start: f64,
+    /// Its length: `DURATION`, else `END-DATE` − `START-DATE`, else `PLANNED-DURATION`.
+    pub duration: Option<f64>,
+    /// The client attributes (`X-…`), names as written.
+    pub attributes: Vec<(String, String)>,
+}
+
+impl DateRange {
+    /// Client attribute `name` (`X-TITLE`, …).
+    pub fn attr(&self, name: &str) -> Option<&str> {
+        self.attributes
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.as_str())
+    }
 }
 
 /// `EXT-X-PRELOAD-HINT:TYPE=PART`: the next part, which a request may block on.
@@ -180,6 +212,8 @@ pub struct MediaPlaylist {
     pub part_target: Option<f64>,
     /// `EXT-X-ENDLIST`.
     pub ended: bool,
+    /// `EXT-X-DATERANGE` spans, by `ID`, in order of first appearance.
+    pub dateranges: Vec<DateRange>,
 }
 
 impl MediaPlaylist {
@@ -203,6 +237,18 @@ impl MediaPlaylist {
         }
         let i = usize::try_from(msn.checked_sub(self.media_sequence)?).ok()?;
         self.segments.get(i).map(|s| (s.parts.as_slice(), true))
+    }
+
+    /// Whether the segments carry wall-clock times.
+    pub fn dated(&self) -> bool {
+        self.segments.first().is_some_and(|s| s.pdt.is_some())
+    }
+
+    /// The segment airing at `t` (seconds since the Unix epoch), if any.
+    pub fn segment_at(&self, t: f64) -> Option<&Segment> {
+        self.segments
+            .iter()
+            .find(|s| s.pdt.is_some_and(|p| p <= t && t < p + s.duration))
     }
 
     /// Segment `msn`, if listed.
@@ -269,6 +315,50 @@ fn byte_range(tag: &'static str, v: &str) -> Result<ByteRange, PlaylistError> {
         len: int(tag, n)?,
         offset: o,
     })
+}
+
+/// An RFC 3339 / ISO 8601 date-time (`2026-11-28T02:13:36.106Z`, or with `±hh:mm`) as seconds
+/// since the Unix epoch.
+pub fn parse_date(s: &str) -> Option<f64> {
+    let s = s.trim();
+    let num = |a: usize, n: usize| -> Option<i64> { s.get(a..a + n)?.parse().ok() };
+    let (y, mo, d) = (num(0, 4)?, num(5, 2)?, num(8, 2)?);
+    let (h, mi, se) = (num(11, 2)?, num(14, 2)?, num(17, 2)?);
+    let b = s.as_bytes();
+    if b.get(4) != Some(&b'-') || !matches!(b.get(10), Some(b'T' | b't' | b' ')) {
+        return None;
+    }
+    let mut i = 19;
+    let mut frac = 0.0;
+    if b.get(i) == Some(&b'.') {
+        let start = i;
+        i += 1;
+        while b.get(i).is_some_and(u8::is_ascii_digit) {
+            i += 1;
+        }
+        frac = s.get(start..i)?.parse::<f64>().ok()?;
+    }
+    let off = match b.get(i) {
+        Some(b'Z' | b'z') => 0,
+        Some(c @ (b'+' | b'-')) => {
+            let sign = if *c == b'-' { -1 } else { 1 };
+            let oh = num(i + 1, 2)?;
+            let om = if b.get(i + 3) == Some(&b':') {
+                num(i + 4, 2)?
+            } else {
+                num(i + 3, 2)?
+            };
+            sign * (oh * 3600 + om * 60)
+        }
+        _ => return None,
+    };
+    let yy = if mo <= 2 { y - 1 } else { y };
+    let era = yy.div_euclid(400);
+    let yoe = yy - era * 400;
+    let doy = (153 * (if mo > 2 { mo - 3 } else { mo + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    Some((days * 86_400 + h * 3600 + mi * 60 + se - off) as f64 + frac)
 }
 
 fn resolve(base: &Url, uri: &str) -> Result<Url, PlaylistError> {
@@ -341,6 +431,8 @@ fn parse_media(lines: &[&str], base: &Url) -> Result<MediaPlaylist, PlaylistErro
     let mut duration: Option<f64> = None;
     let mut range: Option<ByteRange> = None;
     let mut discontinuity = false;
+    // the wall-clock time of the next segment
+    let mut pdt: Option<f64> = None;
     for l in lines {
         if let Some(v) = l.strip_prefix("#EXT-X-TARGETDURATION:") {
             p.target_duration = num("EXT-X-TARGETDURATION", v)?;
@@ -356,6 +448,44 @@ fn parse_media(lines: &[&str], base: &Url) -> Result<MediaPlaylist, PlaylistErro
             range = Some(byte_range("EXT-X-BYTERANGE", v)?);
         } else if *l == "#EXT-X-DISCONTINUITY" {
             discontinuity = true;
+        } else if let Some(v) = l.strip_prefix("#EXT-X-PROGRAM-DATE-TIME:") {
+            pdt = Some(parse_date(v).ok_or_else(|| PlaylistError::Tag {
+                tag: "EXT-X-PROGRAM-DATE-TIME",
+                why: format!("{v:?} is not a date-time"),
+            })?);
+        } else if let Some(v) = l.strip_prefix("#EXT-X-DATERANGE:") {
+            let a = attributes(v);
+            let date = |k: &str| attr(&a, k).and_then(parse_date);
+            let (Some(id), Some(start)) = (attr(&a, "ID"), date("START-DATE")) else {
+                continue;
+            };
+            let secs = |k: &str| attr(&a, k).and_then(|x| x.parse::<f64>().ok());
+            let duration = secs("DURATION")
+                .or_else(|| date("END-DATE").map(|e| e - start))
+                .or_else(|| secs("PLANNED-DURATION"));
+            let x: Vec<(String, String)> = a
+                .iter()
+                .filter(|(k, _)| k.starts_with("X-"))
+                .cloned()
+                .collect();
+            match p.dateranges.iter_mut().find(|d| d.id == id) {
+                Some(d) => {
+                    d.duration = duration.or(d.duration);
+                    for (k, v) in x {
+                        match d.attributes.iter_mut().find(|(n, _)| *n == k) {
+                            Some(slot) => slot.1 = v,
+                            None => d.attributes.push((k, v)),
+                        }
+                    }
+                }
+                None => p.dateranges.push(DateRange {
+                    id: id.to_owned(),
+                    class: attr(&a, "CLASS").map(str::to_owned),
+                    start,
+                    duration,
+                    attributes: x,
+                }),
+            }
         } else if let Some(v) = l.strip_prefix("#EXT-X-PART:") {
             let a = attributes(v);
             let Some(uri) = attr(&a, "URI") else {
@@ -396,15 +526,20 @@ fn parse_media(lines: &[&str], base: &Url) -> Result<MediaPlaylist, PlaylistErro
             p.ended = true;
         } else if !l.starts_with('#') {
             let msn = p.media_sequence + p.segments.len() as u64;
+            let d = duration.unwrap_or(0.0);
+            let at = pdt;
+            pdt = pdt.map(|t| t + d);
             p.segments.push(Segment {
                 msn,
                 uri: resolve(base, l)?,
-                duration: duration.take().unwrap_or(0.0),
+                duration: d,
                 range: range.take(),
                 discontinuity: std::mem::take(&mut discontinuity),
                 map: p.map.clone(),
                 parts: std::mem::take(&mut parts),
+                pdt: at,
             });
+            duration = None;
         }
     }
     p.open_parts = parts;
@@ -507,6 +642,56 @@ https://cdn.example.net/v1080.m3u8
             m.renditions[0].uri.as_ref().unwrap().as_str(),
             "https://example.com/live/a/en.m3u8"
         );
+    }
+
+    /// A generated VOD channel: dated segments (one tag, the rest carried on, a new one after
+    /// a discontinuity) and date ranges naming the programs.
+    #[test]
+    fn dated_vod_with_dateranges() {
+        let text = "#EXTM3U
+#EXT-X-TARGETDURATION:6
+#EXT-X-PLAYLIST-TYPE:VOD
+#EXT-X-PROGRAM-DATE-TIME:2026-11-28T03:00:00Z
+#EXT-X-DATERANGE:ID=\"ep1\",CLASS=\"com.example.program\",START-DATE=\"2026-11-28T03:00:00Z\",DURATION=12,X-TITLE=\"Cowboy Bebop\",X-DESCRIPTION=\"Asteroid Blues\",X-RATING=\"TV-14\"
+#EXTINF:6,
+a0.ts
+#EXTINF:6,
+a1.ts
+#EXT-X-DISCONTINUITY
+#EXT-X-PROGRAM-DATE-TIME:2026-11-28T03:00:12.500+00:00
+#EXT-X-DATERANGE:ID=\"ep2\",START-DATE=\"2026-11-28T03:00:12.5Z\",END-DATE=\"2026-11-28T03:00:18.5Z\",X-TITLE=\"Outlaw Star\"
+#EXTINF:6,
+b0.ts
+#EXT-X-DATERANGE:ID=\"ep2\",START-DATE=\"2026-11-28T03:00:12.5Z\",X-DESCRIPTION=\"Outlaw World\"
+#EXT-X-ENDLIST
+";
+        let Playlist::Media(p) = parse(text, &base()).unwrap() else {
+            panic!()
+        };
+        let t0 = parse_date("2026-11-28T03:00:00Z").unwrap();
+        assert_eq!(t0, 1_795_834_800.0);
+        assert!(p.dated() && p.ended);
+        let pdts: Vec<f64> = p.segments.iter().map(|s| s.pdt.unwrap() - t0).collect();
+        assert_eq!(pdts, [0.0, 6.0, 12.5]);
+        assert_eq!(p.segment_at(t0 + 7.0).unwrap().msn, 1);
+        assert_eq!(
+            p.segment_at(t0 + 12.4),
+            None,
+            "the half second between them is a gap"
+        );
+        assert_eq!(p.dateranges.len(), 2);
+        let ep1 = &p.dateranges[0];
+        assert_eq!((ep1.start - t0, ep1.duration), (0.0, Some(12.0)));
+        assert_eq!(ep1.attr("X-TITLE"), Some("Cowboy Bebop"));
+        assert_eq!(ep1.attr("X-RATING"), Some("TV-14"));
+        let ep2 = &p.dateranges[1];
+        assert_eq!(ep2.duration, Some(6.0));
+        assert_eq!(
+            ep2.attr("X-DESCRIPTION"),
+            Some("Outlaw World"),
+            "merged by ID"
+        );
+        assert_eq!(ep2.attr("X-TITLE"), Some("Outlaw Star"));
     }
 
     #[test]

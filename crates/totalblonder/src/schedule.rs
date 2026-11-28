@@ -93,11 +93,60 @@ pub struct Entry {
     pub rating: Option<Advisory>,
 }
 
-/// Reads and keeps the schedule file.
+/// Guide events that inputs publish for the services they feed (an HLS input's
+/// `EXT-X-DATERANGE`s): by service id. A service with events here takes them instead of the
+/// schedule file's.
+pub type Feeds = std::sync::Arc<std::sync::Mutex<HashMap<String, Vec<Entry>>>>;
+
+/// Reads and keeps the schedule file, and consults the inputs' [`Feeds`].
 pub struct ScheduleFile {
-    path: PathBuf,
+    path: Option<PathBuf>,
     last: HashMap<String, Vec<Entry>>,
     ratings: Vec<RatingSystem>,
+    feeds: Feeds,
+}
+
+/// One event from an input (the schedule file's US ratings only): `start` and `seconds` on
+/// the Unix clock, a title, perhaps a description and a rating such as `TV-14-LV`.
+pub fn entry(
+    start_unix: i64,
+    seconds: u32,
+    title: &str,
+    description: Option<&str>,
+    rating: Option<&str>,
+    leap: LeapSeconds,
+) -> Result<Entry, String> {
+    let gps = GpsSeconds::from_unix(start_unix, leap).ok_or("start out of range")?;
+    if seconds == 0 || seconds >= 1 << 20 {
+        return Err("length must be 1 s to 12 days".into());
+    }
+    let us = match rating {
+        Some(r) => Some(
+            parse_rating(r).ok_or_else(|| format!("rating {r:?} is not a permitted US rating"))?,
+        ),
+        None => None,
+    };
+    let advisory = Advisory {
+        us,
+        regions: Vec::new(),
+    };
+    advisory.check().map_err(|e| e.to_string())?;
+    let rating = (!advisory.is_empty()).then_some(advisory);
+    let mut descriptors = Vec::new();
+    if let Some(r) = &rating {
+        descriptors.push(Descriptor::ContentAdvisory(r.clone()));
+    }
+    Ok(Entry {
+        event: Event {
+            id: EventId::wrapping(gps.0 / 60),
+            start: gps,
+            length: seconds,
+            title: Mss::eng(title),
+            description: description.map(Mss::eng),
+            descriptors,
+        },
+        rating,
+    })
 }
 
 fn parse_time(s: &str) -> Option<i64> {
@@ -143,16 +192,47 @@ impl ScheduleFile {
     /// The file at `path`, whose events may rate in `ratings`.
     pub fn with_ratings(path: PathBuf, ratings: Vec<RatingSystem>) -> Self {
         ScheduleFile {
-            path,
+            path: Some(path),
             last: HashMap::new(),
             ratings,
+            feeds: Feeds::default(),
         }
+    }
+
+    /// No file: the inputs' events only.
+    pub fn feeds_only(feeds: Feeds) -> Self {
+        ScheduleFile {
+            path: None,
+            last: HashMap::new(),
+            ratings: Vec::new(),
+            feeds,
+        }
+    }
+
+    /// Consults `feeds` too.
+    pub fn with_feeds(mut self, feeds: Feeds) -> Self {
+        self.feeds = feeds;
+        self
+    }
+
+    /// The events of `service`: the inputs' if they have any, else the file's.
+    fn events(&self, service: &str) -> Vec<Entry> {
+        let fed = self
+            .feeds
+            .lock()
+            .ok()
+            .and_then(|f| f.get(service).filter(|v| !v.is_empty()).cloned());
+        fed.or_else(|| self.last.get(service).cloned())
+            .unwrap_or_default()
     }
 
     /// Reads the file again; on any error keeps the previous content, reports why and returns
     /// false.
     pub fn reload(&mut self, leap: LeapSeconds) -> bool {
-        match std::fs::read_to_string(&self.path)
+        let Some(path) = &self.path else {
+            return true;
+        };
+        match std::fs::read_to_string(path)
             .map_err(|e| e.to_string())
             .and_then(|t| parse_with(&t, leap, &self.ratings))
         {
@@ -161,15 +241,18 @@ impl ScheduleFile {
                 true
             }
             Err(e) => {
-                tracing::warn!(path = %self.path.display(), "schedule not reloaded: {e}");
+                tracing::warn!(path = %path.display(), "schedule not reloaded: {e}");
                 false
             }
         }
     }
 
-    /// How many services the file has events for.
+    /// How many services the file and the inputs have events for.
     pub fn services(&self) -> usize {
-        self.last.len()
+        let fed = self.feeds.lock().map_or(0, |f| {
+            f.keys().filter(|k| !self.last.contains_key(*k)).count()
+        });
+        self.last.len() + fed
     }
 
     /// The schedules of `services` (service id, source id, name).
@@ -179,18 +262,14 @@ impl ScheduleFile {
             .map(|(id, src, name)| Schedule {
                 source: *src,
                 name: name.clone(),
-                events: self
-                    .last
-                    .get(id)
-                    .map(|v| v.iter().map(|e| e.event.clone()).collect())
-                    .unwrap_or_default(),
+                events: self.events(id).into_iter().map(|e| e.event).collect(),
             })
             .collect()
     }
 
     /// The rating of the event of `service` airing at `now`, if any.
     pub fn current_rating(&self, service: &str, now: GpsSeconds) -> Option<Advisory> {
-        self.last.get(service)?.iter().find_map(|e| {
+        self.events(service).iter().find_map(|e| {
             let s = e.event.start.0;
             (s <= now.0 && now.0 < s.saturating_add(e.event.length))
                 .then(|| e.rating.clone())

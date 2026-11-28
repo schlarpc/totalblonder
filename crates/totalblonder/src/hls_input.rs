@@ -16,6 +16,15 @@
 //! duration, so the timeline mapper sees a live source. A playlist that fails, ends or meets a
 //! discontinuity ends the session (`End`); the input starts again from the top after two
 //! seconds.
+//!
+//! **Scheduled VOD** (a VOD playlist whose segments carry `EXT-X-PROGRAM-DATE-TIME`, as a
+//! generated channel's does): the planner plays what airs now, and each packet is due at its
+//! segment's air time plus its offset into the segment, so the channel runs on the playlist's
+//! schedule across restarts; packets already in the past when they arrive are dropped (a start
+//! in mid-segment). Discontinuities (between episodes) do not end the session: the timeline
+//! mapper starts a new one at the jump. The variant playlist's `EXT-X-DATERANGE` spans with an
+//! `X-TITLE` (and `X-DESCRIPTION`, `X-RATING`) become the guide of every service this input
+//! feeds ([`crate::schedule::Feeds`]).
 
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
@@ -45,8 +54,11 @@ type MediaList = (Url, Option<[u8; 3]>);
 enum FromFetch {
     /// Playlist `.0`'s streams (again, when they change).
     Streams(usize, Vec<StreamInfo>),
-    /// A packet and its time in seconds.
-    Packet(Packet, f64),
+    /// A packet, its time in seconds, and (scheduled) its air time, seconds since the Unix
+    /// epoch.
+    Packet(Packet, f64, Option<f64>),
+    /// The variant playlist's date ranges.
+    Guide(Vec<tb_hls::playlist::DateRange>),
     /// The playlist cannot go on (the reason).
     Stop(String),
 }
@@ -152,6 +164,13 @@ fn playlists(
     }
 }
 
+/// The wall clock, seconds since the Unix epoch.
+fn unix_now() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0.0, |d| d.as_secs_f64())
+}
+
 /// Sleeps `d` unless `stop` is set first.
 fn nap(d: Duration, stop: &AtomicBool) -> bool {
     let end = Instant::now() + d;
@@ -180,6 +199,12 @@ fn fetch_playlist(
     let mut ts: Option<tb_tsin::Demuxer> = None;
     let mut last_dts: HashMap<StreamIndex, i64> = HashMap::new();
     let mut fetched_media = false;
+    // Scheduled: seconds added to media time to make it air time, set at the first segment
+    // and again after a discontinuity or a jump (not per segment: EXTINF durations are not
+    // exactly the media's, and re-anchoring each would nudge every segment); and the last
+    // segment fetched.
+    let mut anchor: Option<f64> = None;
+    let mut prev_msn: Option<u64> = None;
     let label = |mut s: StreamInfo| {
         s.index = StreamIndex(base + s.index.0);
         if s.codec.kind() == tb_media::MediaKind::Audio && s.language.is_none() {
@@ -191,12 +216,18 @@ fn fetch_playlist(
         let _ = tx.send(FromFetch::Stop(why));
     };
     while !stop.load(Ordering::Relaxed) {
+        planner.set_now(unix_now());
         let f = planner.next_fetch();
         let target = planner
             .current()
             .map_or(6.0, |p| p.target_duration.max(1.0));
         let timeout = Duration::from_secs_f64(target * 3.0 + 5.0);
         match &f {
+            Fetch::Wait(d) => {
+                if !nap(*d, &stop) {
+                    return;
+                }
+            }
             Fetch::Playlist { url: u, wait } => {
                 if !nap(*wait, &stop) {
                     return;
@@ -219,6 +250,9 @@ fn fetch_playlist(
                         let before = planner
                             .current()
                             .map(|q| (q.next_msn(), q.open_parts.len()));
+                        if r == 0 && !p.dateranges.is_empty() {
+                            let _ = tx.send(FromFetch::Guide(p.dateranges.clone()));
+                        }
                         planner.playlist(p);
                         let after = planner
                             .current()
@@ -293,6 +327,7 @@ fn fetch_playlist(
                 let starts_segment = m.part.is_none_or(|p| p == 0);
                 if fetched_media
                     && starts_segment
+                    && !planner.scheduled()
                     && planner
                         .current()
                         .and_then(|p| p.segment(m.msn))
@@ -311,7 +346,8 @@ fn fetch_playlist(
                 };
                 st.bytes.add(bytes.len() as u64);
                 fetched_media = true;
-                let mut out: Vec<(Packet, f64)> = Vec::new();
+                // (packet, time in seconds, ticks per second of its stream)
+                let mut out: Vec<(Packet, f64, u32)> = Vec::new();
                 if mp4.tracks().next().is_some() {
                     let samples = match mp4.fragment(&bytes) {
                         Ok(s) => s,
@@ -338,6 +374,7 @@ fn fetch_playlist(
                                 data: s.data,
                             },
                             s.dts as f64 / f64::from(ts),
+                            ts,
                         ));
                     }
                 } else {
@@ -354,20 +391,51 @@ fn fetch_playlist(
                             InputEvent::Packet(mut p) => {
                                 p.stream = StreamIndex(base + p.stream.0);
                                 let t = p.dts.or(p.pts).unwrap_or(0) as f64 / 90_000.0;
-                                out.push((p, t));
+                                out.push((p, t, 90_000));
                             }
                             InputEvent::End(_) => {}
                         }
                     }
                 }
-                for (p, t) in out {
+                // Scheduled: media time to air time.
+                let seg = planner
+                    .scheduled()
+                    .then(|| planner.current()?.segment(m.msn))
+                    .flatten();
+                let t_first = out.iter().map(|(_, t, _)| *t).fold(f64::INFINITY, f64::min);
+                let shift = match seg.and_then(|s| Some((s.pdt?, s.discontinuity))) {
+                    Some((pdt, disc)) if t_first.is_finite() => {
+                        let jumped = prev_msn.is_none_or(|p| p + 1 != m.msn);
+                        if anchor.is_none() || disc || jumped {
+                            anchor = Some(pdt - t_first);
+                        }
+                        anchor
+                    }
+                    _ => None,
+                };
+                if m.part.is_none() {
+                    prev_msn = Some(m.msn);
+                }
+                let air = shift;
+                for (mut p, mut t, scale) in out {
+                    // Scheduled: restamped onto the air-time clock, so that time stamps run on
+                    // across a discontinuity (a new episode starting again from zero) and the
+                    // timeline mapper sees one continuous session.
+                    if let Some(shift) = air {
+                        let units = (shift * f64::from(scale)).round() as i64;
+                        p.dts = p.dts.map(|x| x + units);
+                        p.pts = p.pts.map(|x| x + units);
+                        t += shift;
+                    }
                     let dts = p.dts.or(p.pts).unwrap_or(i64::MIN);
                     // a whole segment after some of its parts: what came already is skipped
                     if m.overlaps && last_dts.get(&p.stream).is_some_and(|&l| dts <= l) {
                         continue;
                     }
                     last_dts.insert(p.stream, dts);
-                    if tx.send(FromFetch::Packet(p, t)).is_err() {
+                    // (restamped, the time is the air time itself)
+                    let due = air.map(|_| t);
+                    if tx.send(FromFetch::Packet(p, t, due)).is_err() {
                         return;
                     }
                 }
@@ -402,10 +470,73 @@ impl Ord for Held {
     }
 }
 
+/// Where an HLS input's date ranges go: the guide of the services it feeds.
+pub struct GuideTarget {
+    /// The shared guide events.
+    pub feeds: crate::schedule::Feeds,
+    /// The services airing this input.
+    pub services: Vec<String>,
+    /// For the guide's GPS times.
+    pub leap: tb_psip::gps::LeapSeconds,
+}
+
+impl GuideTarget {
+    /// The date ranges with an `X-TITLE` that end after six hours ago and start within 16
+    /// days, as guide events of every service.
+    fn publish(&self, ranges: &[tb_hls::playlist::DateRange]) {
+        let now = unix_now();
+        let mut entries = Vec::new();
+        for r in ranges {
+            let (Some(title), Some(d)) = (r.attr("X-TITLE"), r.duration) else {
+                continue;
+            };
+            if r.start + d < now - 6.0 * 3600.0 || r.start > now + 16.0 * 86_400.0 {
+                continue;
+            }
+            match crate::schedule::entry(
+                r.start.floor() as i64,
+                d.round().max(1.0) as u32,
+                title,
+                r.attr("X-DESCRIPTION"),
+                r.attr("X-RATING"),
+                self.leap,
+            ) {
+                Ok(e) => entries.push(e),
+                Err(e) => tracing::warn!(id = r.id, "HLS input: date range not in the guide: {e}"),
+            }
+        }
+        entries.sort_by_key(|e| e.event.start.0);
+        // Overlaps are not allowed in a guide: a later event starts after the earlier ends.
+        entries.dedup_by(|b, a| {
+            u64::from(b.event.start.0) < u64::from(a.event.start.0) + u64::from(a.event.length)
+        });
+        // Event ids come from the start minute (`schedule`), so two events may not start in
+        // the same minute (a bumper next to an episode): the longer one stays.
+        let mut kept: Vec<crate::schedule::Entry> = Vec::with_capacity(entries.len());
+        for e in entries {
+            match kept.last_mut() {
+                Some(last) if last.event.start.0 / 60 == e.event.start.0 / 60 => {
+                    if e.event.length > last.event.length {
+                        *last = e;
+                    }
+                }
+                _ => kept.push(e),
+            }
+        }
+        let entries = kept;
+        if let Ok(mut f) = self.feeds.lock() {
+            for s in &self.services {
+                f.insert(s.clone(), entries.clone());
+            }
+        }
+    }
+}
+
 /// One session: fetch threads for every playlist, merged and paced, until one stops or the
 /// clock does. Returns whether to go on.
 fn session(
     c: &reqwest::blocking::Client,
+    guide: Option<&GuideTarget>,
     lists: Vec<MediaList>,
     sink: &mut dyn EventSink,
     st: &InputStats,
@@ -434,6 +565,7 @@ fn session(
     let mut origin: Option<(Instant, f64)> = None;
     let mut heap: BinaryHeap<Reverse<Held>> = BinaryHeap::new();
     let mut seq = 0u64;
+    let mut need_key: std::collections::HashSet<StreamIndex> = Default::default();
     let announce = |streams: &[Option<Vec<StreamInfo>>], sink: &mut dyn EventSink| {
         let all: Vec<StreamInfo> = streams.iter().flatten().flatten().cloned().collect();
         if !all.is_empty() {
@@ -453,16 +585,49 @@ fn session(
                     }
                 }
             }
-            Ok(FromFetch::Packet(p, t)) => {
-                let (w, t_0) =
-                    *origin.get_or_insert((Instant::now() + Duration::from_millis(500), t));
-                let due = w + Duration::from_secs_f64((t - t_0).max(0.0));
+            Ok(FromFetch::Packet(p, t, air)) => {
+                let video =
+                    streams.iter().flatten().flatten().any(|s| {
+                        s.index == p.stream && s.codec.kind() == tb_media::MediaKind::Video
+                    });
+                let due = match air {
+                    // scheduled: its air time; one already past is not shown late, and a
+                    // video stream joined that way starts again at its next key frame
+                    Some(a) => {
+                        let ahead = a - unix_now();
+                        if ahead < -0.5 {
+                            st.late.inc();
+                            if video {
+                                need_key.insert(p.stream);
+                            }
+                            continue;
+                        }
+                        if need_key.contains(&p.stream) {
+                            if !p.keyframe {
+                                st.late.inc();
+                                continue;
+                            }
+                            need_key.remove(&p.stream);
+                        }
+                        Instant::now() + Duration::from_secs_f64(ahead.max(0.0))
+                    }
+                    None => {
+                        let (w, t_0) =
+                            *origin.get_or_insert((Instant::now() + Duration::from_millis(500), t));
+                        w + Duration::from_secs_f64((t - t_0).max(0.0))
+                    }
+                };
                 seq += 1;
                 heap.push(Reverse(Held {
                     due,
                     seq,
                     packet: p,
                 }));
+            }
+            Ok(FromFetch::Guide(ranges)) => {
+                if let Some(g) = guide {
+                    g.publish(&ranges);
+                }
             }
             Ok(FromFetch::Stop(why)) => break Some(why),
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
@@ -503,6 +668,7 @@ fn session(
 pub fn run_hls(
     url: Url,
     max_bandwidth: Option<u64>,
+    guide: Option<GuideTarget>,
     mut sink: Box<dyn EventSink>,
     st: InputStats,
     clock: &dyn Clock,
@@ -518,7 +684,7 @@ pub fn run_hls(
         match playlists(&c, &url, max_bandwidth) {
             Ok(lists) => {
                 st.connections.inc();
-                if !session(&c, lists, sink.as_mut(), &st, clock) {
+                if !session(&c, guide.as_ref(), lists, sink.as_mut(), &st, clock) {
                     return;
                 }
             }
@@ -537,6 +703,61 @@ pub fn run_hls(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Date ranges with a title become the guide of every service the input feeds; one
+    /// without a title, one overlapping the previous, and one long past are left out.
+    #[test]
+    fn date_ranges_become_the_guide() {
+        use tb_hls::playlist::DateRange;
+        // on a GPS minute (GPS runs 18 s ahead of Unix time here), so the bumper and the
+        // episode after it share a minute
+        let now = (((unix_now() + 18.0) / 60.0).floor() * 60.0) - 18.0;
+        let r = |id: &str, start: f64, d: f64, x: &[(&str, &str)]| DateRange {
+            id: id.into(),
+            class: None,
+            start,
+            duration: Some(d),
+            attributes: x.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect(),
+        };
+        let g = GuideTarget {
+            feeds: crate::schedule::Feeds::default(),
+            services: vec!["toonami".into(), "toonami-hd".into()],
+            leap: tb_psip::gps::LeapSeconds(18),
+        };
+        g.publish(&[
+            r(
+                "a",
+                now,
+                1320.0,
+                &[
+                    ("X-TITLE", "Cowboy Bebop"),
+                    ("X-DESCRIPTION", "Asteroid Blues"),
+                    ("X-RATING", "TV-14"),
+                ],
+            ),
+            r("b", now + 1320.0, 1320.0, &[("X-DESCRIPTION", "no title")]),
+            r("c", now + 600.0, 600.0, &[("X-TITLE", "overlaps a")]),
+            r("d", now + 1320.0, 1320.0, &[("X-TITLE", "Outlaw Star")]),
+            r("e", now - 86_400.0, 1320.0, &[("X-TITLE", "yesterday")]),
+            // a 20-second bumper in the same minute as the episode after it
+            r("f", now + 2640.0, 20.0, &[("X-TITLE", "bumper")]),
+            r("g", now + 2660.0, 1320.0, &[("X-TITLE", "Gundam Wing")]),
+        ]);
+        let f = g.feeds.lock().unwrap();
+        let titles: Vec<String> = f["toonami"]
+            .iter()
+            .map(|e| format!("{:?}", e.event.title))
+            .collect();
+        assert_eq!(titles.len(), 3, "{titles:?}");
+        assert!(titles[0].contains("Cowboy Bebop") && titles[1].contains("Outlaw Star"));
+        assert!(titles[2].contains("Gundam Wing"), "the longer one stays");
+        assert!(f["toonami"][0].rating.is_some());
+        assert_eq!(f["toonami"][0].event.length, 1320);
+        assert_eq!(f["toonami-hd"].len(), 3);
+        let mut minutes: Vec<u32> = f["toonami"].iter().map(|e| e.event.start.0 / 60).collect();
+        minutes.dedup();
+        assert_eq!(minutes.len(), 3, "one event per start minute");
+    }
 
     #[test]
     fn languages() {

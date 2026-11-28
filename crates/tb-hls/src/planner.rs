@@ -11,6 +11,13 @@
 //!   longer listed at all restarts at the live edge.
 //! - **Segments** (no parts): the next segment, or a reload after half a target duration.
 //! - **Init.** An `EXT-X-MAP` not yet fetched comes first.
+//! - **Scheduled** (a VOD playlist whose segments carry `EXT-X-PROGRAM-DATE-TIME`, as a
+//!   generated channel's does): the segment airing now (or the next one to air), then segment
+//!   after segment, each fetched at most [`LOOKAHEAD`] before its air time; one already more
+//!   than a segment in the past makes the position start again from now. The playlist is read
+//!   again every [`VOD_RELOAD`] (it is generated and may change); the position is kept by air
+//!   time across reloads. Past the last segment the playlist is read again after
+//!   [`VOD_RELOAD`] instead of ending. Needs [`Planner::set_now`].
 //!
 //! The caller fetches what [`Planner::next_fetch`] says and reports back with [`Planner::fetched`]
 //! (or [`Planner::failed`]); playlists it receives go to [`Planner::playlist`].
@@ -21,9 +28,17 @@ use url::Url;
 
 use crate::playlist::MediaPlaylist;
 
+/// How long before its air time a scheduled segment is fetched.
+pub const LOOKAHEAD: f64 = 8.0;
+
+/// How often a scheduled (VOD) playlist is read again.
+pub const VOD_RELOAD: f64 = 60.0;
+
 /// A request to make.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Fetch {
+    /// Nothing to do yet (a scheduled segment not yet due to be fetched).
+    Wait(Duration),
     /// The playlist, after `wait`. `url` carries the blocking-reload query when the server can
     /// hold the request.
     Playlist {
@@ -75,6 +90,10 @@ pub struct Planner {
     range_end: std::collections::HashMap<Url, u64>,
     /// The last request was a reload that came back without what it waited for.
     stalled: bool,
+    /// The wall clock, seconds since the Unix epoch (scheduled playlists).
+    now: Option<f64>,
+    /// When the playlist was last read.
+    loaded_at: Option<f64>,
 }
 
 fn with_query(url: &Url, msn: u64, part: Option<usize>) -> Url {
@@ -99,13 +118,92 @@ impl Planner {
             map_have: None,
             range_end: Default::default(),
             stalled: false,
+            now: None,
+            loaded_at: None,
         }
+    }
+
+    /// The wall clock, seconds since the Unix epoch; scheduled playlists need it before each
+    /// [`Planner::next_fetch`].
+    pub fn set_now(&mut self, t: f64) {
+        self.now = Some(t);
+    }
+
+    /// Whether the playlist is scheduled: VOD with wall-clock times.
+    pub fn scheduled(&self) -> bool {
+        self.pl.as_ref().is_some_and(|p| p.ended && p.dated()) && self.now.is_some()
     }
 
     /// A new copy of the playlist arrived.
     pub fn playlist(&mut self, pl: MediaPlaylist) {
+        // Scheduled: keep the position by air time (a regenerated playlist may number its
+        // segments differently).
+        let air = self.at.and_then(|a| self.pl.as_ref()?.segment(a.msn)?.pdt);
+        if let (Some(t), true) = (air, pl.ended && pl.dated()) {
+            self.at = pl
+                .segments
+                .iter()
+                .find(|s| s.pdt.is_some_and(|p| (p - t).abs() < 0.05))
+                .map(|s| Position {
+                    msn: s.msn,
+                    part: 0,
+                });
+        }
         self.pl = Some(pl);
         self.stalled = false;
+        self.loaded_at = self.now;
+    }
+
+    /// The next step of a scheduled playlist.
+    fn next_scheduled(&mut self, now: f64) -> Fetch {
+        let reload = |wait: f64| Fetch::Playlist {
+            url: self.url.clone(),
+            wait: Duration::from_secs_f64(wait.max(0.0)),
+        };
+        if self.loaded_at.is_none_or(|t| now - t >= VOD_RELOAD) {
+            return reload(0.0);
+        }
+        let Some(pl) = self.pl.as_ref() else {
+            return reload(0.0);
+        };
+        // Behind by more than the segment, or no position: from what airs now.
+        let stale = self.at.is_some_and(|a| {
+            pl.segment(a.msn)
+                .and_then(|s| Some(s.pdt? + s.duration))
+                .is_some_and(|end| end < now - 1.0)
+        });
+        if self.at.is_none() || stale {
+            self.at = pl
+                .segment_at(now)
+                .or_else(|| pl.segments.iter().find(|s| s.pdt.is_some_and(|p| p > now)))
+                .map(|s| Position {
+                    msn: s.msn,
+                    part: 0,
+                });
+        }
+        let Some(at) = self.at else {
+            // everything has aired: the generator may add more
+            return reload(VOD_RELOAD);
+        };
+        let Some(s) = pl.segment(at.msn) else {
+            return reload(VOD_RELOAD);
+        };
+        if let Some(m) = &s.map
+            && self.map_have.as_ref() != Some(m)
+        {
+            return Fetch::Map(m.clone());
+        }
+        let early = s.pdt.map_or(0.0, |p| p - now - LOOKAHEAD);
+        if early > 0.0 {
+            return Fetch::Wait(Duration::from_secs_f64(early.min(1.0)));
+        }
+        Fetch::Media(Media {
+            url: s.uri.clone(),
+            range: s.range.map(|r| (r.offset.unwrap_or(0), Some(r.len))),
+            msn: at.msn,
+            part: None,
+            overlaps: false,
+        })
     }
 
     /// The last playlist.
@@ -184,6 +282,11 @@ impl Planner {
 
     /// What to request now.
     pub fn next_fetch(&mut self) -> Fetch {
+        if self.scheduled()
+            && let Some(now) = self.now
+        {
+            return self.next_scheduled(now);
+        }
         let Some(pl) = self.pl.as_ref() else {
             return Fetch::Playlist {
                 url: self.url.clone(),
@@ -312,7 +415,7 @@ impl Planner {
                     },
                 });
             }
-            Fetch::Playlist { .. } | Fetch::Ended => {}
+            Fetch::Playlist { .. } | Fetch::Ended | Fetch::Wait(_) => {}
         }
     }
 
@@ -386,6 +489,7 @@ mod tests {
             Fetch::Map(u) => format!("map:{}", u.path().rsplit('/').next().unwrap()),
             Fetch::Playlist { url, .. } => format!("playlist?{}", url.query().unwrap_or("")),
             Fetch::Ended => "ended".into(),
+            Fetch::Wait(d) => format!("wait {d:?}"),
         }
     }
 
@@ -495,6 +599,60 @@ mod tests {
         assert_eq!(wait, Duration::from_secs(3));
         p.playlist(media(&(s + "#EXT-X-ENDLIST\n")));
         assert_eq!(uri(&p.next_fetch()), "ended");
+    }
+
+    /// A generated VOD channel: segments at 03:00:00, :06 and :12.5 (a gap before it).
+    fn vod(seq: u64) -> MediaPlaylist {
+        media(&format!(
+            "#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXT-X-MEDIA-SEQUENCE:{seq}\n#EXT-X-PROGRAM-DATE-TIME:2026-11-28T03:00:00Z\n#EXTINF:6,\na0.ts\n#EXTINF:6,\na1.ts\n#EXT-X-DISCONTINUITY\n#EXT-X-PROGRAM-DATE-TIME:2026-11-28T03:00:12.5Z\n#EXTINF:6,\nb0.ts\n#EXT-X-ENDLIST\n"
+        ))
+    }
+
+    /// Scheduled: what airs now, the next within the lookahead, a wait before one too far
+    /// ahead, a reload past the end and every VOD_RELOAD, the position kept by air time.
+    #[test]
+    fn scheduled_vod() {
+        let t0 = crate::playlist::parse_date("2026-11-28T03:00:00Z").unwrap();
+        let mut p = Planner::new(base());
+        p.set_now(t0 + 7.0);
+        p.playlist(vod(0));
+        assert!(p.scheduled());
+        let f = p.next_fetch();
+        assert_eq!(uri(&f), "a1.ts", "airing now");
+        p.fetched(&f, 1);
+        let f = p.next_fetch();
+        assert_eq!(uri(&f), "b0.ts", "within the lookahead");
+        p.fetched(&f, 1);
+        let Fetch::Playlist { wait, .. } = p.next_fetch() else {
+            panic!("past the end: read again later")
+        };
+        assert_eq!(wait, Duration::from_secs_f64(VOD_RELOAD));
+        // Before the first segment airs: wait until it is within the lookahead.
+        let mut q = Planner::new(base());
+        q.set_now(t0 - 20.0);
+        q.playlist(vod(0));
+        assert_eq!(q.next_fetch(), Fetch::Wait(Duration::from_secs(1)));
+        q.set_now(t0 - 7.0);
+        assert_eq!(uri(&q.next_fetch()), "a0.ts");
+        // A minute later the playlist is read again; regenerated with other numbers, the
+        // position follows the air time.
+        let mut r = Planner::new(base());
+        r.set_now(t0 + 1.0);
+        r.playlist(vod(0));
+        let f = r.next_fetch();
+        assert_eq!(uri(&f), "a0.ts");
+        r.fetched(&f, 1);
+        r.set_now(t0 + 1.0 + VOD_RELOAD);
+        assert!(matches!(r.next_fetch(), Fetch::Playlist { .. }));
+        r.playlist(vod(500));
+        r.set_now(t0 + 3.0);
+        let Fetch::Media(m) = r.next_fetch() else {
+            panic!()
+        };
+        assert_eq!((m.msn, m.url.path()), (501, "/live/a1.ts"));
+        // Far behind (the box was off): from what airs now.
+        r.set_now(t0 + 14.0);
+        assert_eq!(uri(&r.next_fetch()), "b0.ts");
     }
 
     /// Byte ranges without an offset continue after the previous range of the resource.

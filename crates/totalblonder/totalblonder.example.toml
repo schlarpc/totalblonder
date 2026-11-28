@@ -163,7 +163,10 @@ key = "wall"
 #
 # [[input]]
 # id = "web"
-# kind = "hls"                # HLS or Low-Latency HLS pull; audio renditions keep their LANGUAGE
+# kind = "hls"                # HLS or Low-Latency HLS pull; audio renditions keep their LANGUAGE.
+#                             # A VOD playlist with EXT-X-PROGRAM-DATE-TIME plays on its schedule,
+#                             # and its EXT-X-DATERANGEs with X-TITLE / X-DESCRIPTION / X-RATING
+#                             # are the guide of the services airing it.
 # url = "https://example.com/live/master.m3u8"
 # max_kbps = 8000             # optional: the highest variant bandwidth to take
 

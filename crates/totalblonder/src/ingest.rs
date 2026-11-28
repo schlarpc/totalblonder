@@ -35,6 +35,8 @@ pub struct InputStats {
     pub packets: Counter,
     /// Bytes received.
     pub bytes: Counter,
+    /// Packets dropped because they arrived after their air time (scheduled HLS).
+    pub late: Counter,
 }
 
 /// Wraps an input's sink to report each session (`Streams` … `End`) as one `input.session`

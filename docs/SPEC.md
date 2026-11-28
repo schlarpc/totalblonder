@@ -908,7 +908,21 @@ labels its audio, so a program's second audio track takes it. Packets are paced 
 stamps. A discontinuity, an ended playlist or a failure ends the session; the input starts
 again after two seconds. Checked on nixark against a simulated live LL-HLS origin (0.5 s parts,
 blocking reloads, preload hints, a separate Spanish rendition): picture and both languages
-continuous. libav's own
+continuous; and against ffmpeg's ordinary live HLS, TS and fMP4 segments.
+
+**Scheduled VOD [built 2026-11-28].** A VOD playlist whose segments carry
+`EXT-X-PROGRAM-DATE-TIME` (a generated channel, "everything that ever aired") runs on its
+schedule: the input plays the segment airing now, fetches each at most 8 s before its air
+time, reads the playlist again every minute (keeping the position by air time) and past its
+end waits for more. Packets are restamped onto the air-time clock (anchored at the first
+segment and after each discontinuity), so episodes follow each other without a timeline
+session break; packets already past are dropped and video then waits for a key frame. The
+variant playlist's `EXT-X-DATERANGE`s with an `X-TITLE` (and `X-DESCRIPTION`, `X-RATING`)
+become the guide of every service airing the input, at most one event per start minute (event
+ids come from the minute: the longer of a bumper and an episode stays). Checked on nixark:
+joined 15 s into one episode, the next (a separate encode after `EXT-X-DISCONTINUITY`) began on
+its air time with only the content's own 20 ms of encoder priming between them; the titles
+were in the guide and the checker found nothing. libav's own
 `hls` demuxer treats LL-HLS as ordinary HLS (software-survey §1). The producer stamps
 `PROGRAM-DATE-TIME` at push time, not capture time, so
 it is not a better clock than arrival time. An HLS request also counts as demand for 30 s.

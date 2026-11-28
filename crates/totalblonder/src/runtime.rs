@@ -158,6 +158,7 @@ fn worker_path() -> anyhow::Result<PathBuf> {
 /// and the queues to the program (SPEC §9; `live.rs`).
 fn start_live(
     plant: &Plant,
+    feeds: &crate::schedule::Feeds,
     p0: u64,
     delay: u64,
     epoch: Instant,
@@ -265,9 +266,28 @@ fn start_live(
             l.clone(),
             Value::Counter(ist.bytes.clone()),
         );
+        reg.add(
+            "input_late_packets_total",
+            l.clone(),
+            Value::Counter(ist.late.clone()),
+        );
         reg.add("input_errors_total", l, Value::Counter(ist.errors.clone()));
         let clock = RealClock::new(epoch, stop.clone());
         let input = input.clone();
+        // An HLS input's date ranges are the guide of the services airing it.
+        let guide = matches!(input, crate::config::InputPlan::Hls { .. }).then(|| {
+            crate::hls_input::GuideTarget {
+                feeds: feeds.clone(),
+                services: plant
+                    .carriers
+                    .iter()
+                    .flat_map(|c| &c.programs)
+                    .filter(|q| q.live.as_deref() == Some(id) || q.standby.as_deref() == Some(id))
+                    .map(|q| q.service.clone())
+                    .collect(),
+                leap: plant.leap,
+            }
+        });
         let (service, role_name) = (p.service.clone(), ["live", "standby"][role]);
         let (service2, input_id) = (service.clone(), id.to_owned());
         threads.push(
@@ -317,6 +337,7 @@ fn start_live(
                         } => crate::hls_input::run_hls(
                             url,
                             max_bandwidth,
+                            guide,
                             Box::new(SessionReporter::new(sink)),
                             ist,
                             &clock,
@@ -760,7 +781,9 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
             let unix0 = RealClock::new(epoch, stop.clone()).unix_nanos_at(0);
             let built = build_carriers(&plant, unix0)?;
             let mut reg = Registry::default();
-            let (mut live, live_threads) = start_live(&plant, p0, delay, epoch, &stop, &mut reg)?;
+            let feeds = crate::schedule::Feeds::default();
+            let (mut live, live_threads) =
+                start_live(&plant, &feeds, p0, delay, epoch, &stop, &mut reg)?;
             let sessions = hub_sessions(&plant, &built, &mut live, p0, delay);
             for s in &sessions {
                 let l = vec![("service", s.plan.service.clone())];
@@ -847,10 +870,19 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
             let (guide, leap) = (plant.guide, plant.leap);
             let vfile = plant.versions.clone().map(tables::VersionFile::new);
             let ratings = plant.ratings.clone();
-            let sfile = plant
-                .schedule
-                .clone()
-                .map(|p| crate::schedule::ScheduleFile::with_ratings(p, ratings.clone()));
+            // The schedule file, and the guide events HLS inputs publish.
+            let has_hls = plant
+                .inputs
+                .iter()
+                .any(|i| matches!(i, crate::config::InputPlan::Hls { .. }));
+            let sfile = match plant.schedule.clone() {
+                Some(p) => Some(
+                    crate::schedule::ScheduleFile::with_ratings(p, ratings.clone())
+                        .with_feeds(feeds.clone()),
+                ),
+                None if has_hls => Some(crate::schedule::ScheduleFile::feeds_only(feeds.clone())),
+                None => None,
+            };
             let tclock = RealClock::new(epoch, stop.clone());
             let tables = std::thread::Builder::new()
                 .name("tables".into())
