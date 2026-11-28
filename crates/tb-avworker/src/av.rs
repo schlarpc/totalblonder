@@ -2,7 +2,7 @@
 //! parsers, a hardware decoding device (CUDA or VAAPI). Every `unsafe` block of the worker that
 //! touches libav is here.
 
-use std::ffi::{CStr, c_int};
+use std::ffi::{CStr, c_int, c_void};
 use std::ptr;
 
 use ffmpeg_sys_the_third as ffi;
@@ -19,10 +19,52 @@ pub const ENOMEM: c_int = -libc::ENOMEM;
 pub const EOF: c_int = -(((b'E' as c_int) | ((b'O' as c_int) << 8) | ((b'F' as c_int) << 16))
     | ((b' ' as c_int) << 24));
 
-/// Only errors from libav's own log (stderr, which the parent captures and limits).
+/// Only errors from libav's own log (stderr, which the parent captures and limits), written
+/// by [`log_line`] instead of libav's default callback. The default one calls `isatty(2)` on
+/// its first message, an `ioctl` the sandbox's CPU profile does not allow: a decoder that
+/// logged anything (a stream joined in mid-GOP does) was killed for it.
 pub fn quiet() {
-    // SAFETY: sets a global integer.
-    unsafe { ffi::av_log_set_level(ffi::AV_LOG_ERROR) };
+    // SAFETY: sets a global integer and a global function pointer, before any decoder runs.
+    unsafe {
+        ffi::av_log_set_level(ffi::AV_LOG_ERROR);
+        ffi::av_log_set_callback(Some(log_line));
+    }
+}
+
+/// libav's log callback: formats the line as libav would and writes it to stderr in one
+/// `write(2)`, with no terminal probing.
+unsafe extern "C" fn log_line(
+    avcl: *mut c_void,
+    level: c_int,
+    fmt: *const std::ffi::c_char,
+    vl: *mut ffi::__va_list_tag,
+) {
+    // SAFETY: reads a global integer.
+    if level > unsafe { ffi::av_log_get_level() } {
+        return;
+    }
+    let mut line = [0 as std::ffi::c_char; 1024];
+    let mut prefix: c_int = 1;
+    // SAFETY: `avcl`, `fmt` and `vl` are what libav passed to this callback, handed on
+    // unchanged; `line` is a buffer of the size given; `prefix` a valid int.
+    let n = unsafe {
+        ffi::av_log_format_line2(
+            avcl,
+            level,
+            fmt,
+            vl,
+            line.as_mut_ptr(),
+            line.len() as c_int,
+            &raw mut prefix,
+        )
+    };
+    if n <= 0 {
+        return;
+    }
+    // av_log_format_line2 returns the length it wanted; the buffer holds at most size − 1
+    let len = (n as usize).min(line.len() - 1);
+    // SAFETY: `line` holds `len` initialized bytes; fd 2 is the worker's stderr.
+    unsafe { libc::write(2, line.as_ptr().cast(), len) };
 }
 
 /// `avcodec_version()`.
