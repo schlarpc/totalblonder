@@ -37,6 +37,9 @@ serde.workspace = true
 anyhow = "1"
 signal-hook = { version = "0.3", default-features = false }
 toml = { version = "0.9", default-features = false, features = ["parse", "serde", "std"] }
+srt-tokio = "0.4.4"
+futures-util = "0.3.34"
+tokio = { version = "1.54.1", features = ["rt", "net", "time", "macros"] }
 
 [dev-dependencies]
 tempfile.workspace = true

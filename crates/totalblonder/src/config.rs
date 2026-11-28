@@ -420,6 +420,12 @@ struct InputFile {
     app: Option<String>,
     key: Option<String>,
     path: Option<PathBuf>,
+    /// SRT: the passphrase (10 to 79 characters) a caller must use; none: unencrypted.
+    passphrase: Option<String>,
+    /// SRT: the receive latency, ms (default 200).
+    latency_ms: Option<u64>,
+    /// LL-HLS: the playlist URL.
+    url: Option<String>,
 }
 
 // ------------------------------------------------------------------ the validated model
@@ -759,6 +765,17 @@ pub enum InputPlan {
         /// Where to listen.
         bind: std::net::SocketAddr,
     },
+    /// MPEG-TS over SRT, as a listener serving one caller at a time.
+    Srt {
+        /// The input's id.
+        id: String,
+        /// Where to listen.
+        bind: std::net::SocketAddr,
+        /// The passphrase callers must use (AES-128), if any.
+        passphrase: Option<String>,
+        /// The receive latency.
+        latency: std::time::Duration,
+    },
     /// A file, looped (for tests and standby).
     File {
         /// The input's id.
@@ -774,6 +791,7 @@ impl InputPlan {
         match self {
             InputPlan::Rtmp { .. } => "rtmp",
             InputPlan::TsUdp { .. } => "ts_udp",
+            InputPlan::Srt { .. } => "srt",
             InputPlan::File { .. } => "file",
         }
     }
@@ -783,6 +801,7 @@ impl InputPlan {
         match self {
             InputPlan::Rtmp { id, .. }
             | InputPlan::TsUdp { id, .. }
+            | InputPlan::Srt { id, .. }
             | InputPlan::File { id, .. } => id,
         }
     }
@@ -1119,7 +1138,34 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
                     .clone()
                     .ok_or_else(|| rule(format!("file input {:?} needs path", i.id)))?,
             },
-            x => return Err(rule(format!("input kind {x:?}: rtmp, ts_udp or file"))),
+            "srt" => {
+                if let Some(p) = &i.passphrase
+                    && !(10..=79).contains(&p.chars().count())
+                {
+                    return Err(rule(format!(
+                        "srt input {:?}: passphrase must be 10 to 79 characters",
+                        i.id
+                    )));
+                }
+                let ms = i.latency_ms.unwrap_or(200);
+                if !(20..=5000).contains(&ms) {
+                    return Err(rule(format!(
+                        "srt input {:?}: latency_ms must be 20..=5000",
+                        i.id
+                    )));
+                }
+                InputPlan::Srt {
+                    id: i.id.clone(),
+                    bind: need_bind()?,
+                    passphrase: i.passphrase.clone(),
+                    latency: std::time::Duration::from_millis(ms),
+                }
+            }
+            x => {
+                return Err(rule(format!(
+                    "input kind {x:?}: rtmp, ts_udp, srt, hls or file"
+                )));
+            }
         });
     }
 

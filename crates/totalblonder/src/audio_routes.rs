@@ -5,7 +5,8 @@
 //! 1. `input_track = N` in the track's configuration: the input's N-th audio stream (1-based,
 //!    in the order the input announces them).
 //! 2. The first stream not yet taken whose language is the track's.
-//! 3. The main track (the first) still without one: the first stream not yet taken.
+//! 3. The main track (the first) still without one: the first stream not yet taken, else the
+//!    first stream (shared: the main audio is never silent while the input has audio).
 //! 4. Any other track still without one: the first stream not yet taken that has no language
 //!    (or `und`), so two unlabeled streams fill the main and second tracks in order.
 //! 5. A track still without one carries the main track's stream, as a station without a second
@@ -60,12 +61,14 @@ pub fn assign(streams: &[InputAudio], tracks: &[TrackWant]) -> Vec<Option<Stream
             taken[i] = true;
         }
     }
-    // 3. the main track takes what is left first
-    if let Some(None) = out.first()
-        && let Some(i) = (0..streams.len()).find(|&i| !taken[i])
-    {
-        out[0] = Some(streams[i].index);
-        taken[i] = true;
+    // 3. the main track takes what is left first, else shares the first stream
+    if let Some(None) = out.first() {
+        if let Some(i) = (0..streams.len()).find(|&i| !taken[i]) {
+            out[0] = Some(streams[i].index);
+            taken[i] = true;
+        } else if let Some(s) = streams.first() {
+            out[0] = Some(s.index);
+        }
     }
     // 4. unlabeled streams, in order
     let unlabeled = |l: Option<[u8; 3]>| l.is_none_or(|l| &l == b"und");
@@ -171,6 +174,17 @@ mod tests {
         assert_eq!(
             assign(&streams, &[t(b"eng"), far]),
             ix(&[Some(10), Some(12)])
+        );
+    }
+
+    /// One stream in the second track's language: the second track takes it, and the main
+    /// track shares it rather than going silent.
+    #[test]
+    fn the_main_track_is_never_left_without_audio() {
+        let streams = [s(1, Some(b"spa"))];
+        assert_eq!(
+            assign(&streams, &[t(b"eng"), t(b"spa")]),
+            ix(&[Some(1), Some(1)])
         );
     }
 

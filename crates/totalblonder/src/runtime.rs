@@ -299,6 +299,19 @@ fn start_live(
                             ist,
                             &clock,
                         ),
+                        crate::config::InputPlan::Srt {
+                            bind,
+                            passphrase,
+                            latency,
+                            ..
+                        } => crate::ingest::run_srt(
+                            bind,
+                            passphrase,
+                            latency,
+                            Box::new(SessionReporter::new(sink)),
+                            ist,
+                            &clock,
+                        ),
                         crate::config::InputPlan::File { path, .. } => crate::ingest::run_ts_file(
                             path,
                             Box::new(SessionReporter::new(sink)),

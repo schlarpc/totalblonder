@@ -298,6 +298,91 @@ pub fn run_ts_udp(
     }
 }
 
+/// Receives MPEG-TS over SRT (Haivision's Secure Reliable Transport; `srt-tokio`, pure Rust),
+/// listening on `bind` for one caller at a time until the clock stops. Each connection is a
+/// session of its own: when the caller goes, what it sent is finished with `End` and the next
+/// caller starts a new one. Lost packets are recovered by SRT within `latency`; payloads are
+/// TS packets (usually 7 per datagram), read like a UDP input's.
+pub fn run_srt(
+    bind: SocketAddr,
+    passphrase: Option<String>,
+    latency: Duration,
+    mut sink: Box<dyn EventSink>,
+    st: InputStats,
+    clock: &dyn Clock,
+) {
+    let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            tracing::error!(%bind, "SRT input: {e}");
+            return;
+        }
+    };
+    let t0 = Instant::now();
+    rt.block_on(async {
+        use futures_util::StreamExt;
+        // The passphrase was checked to be 10 to 79 characters (the builder panics otherwise).
+        let builder = || {
+            let b = srt_tokio::SrtSocket::builder().latency(latency);
+            match &passphrase {
+                Some(p) => b.encryption(16, p.clone()),
+                None => b,
+            }
+        };
+        while !clock.stopping() {
+            tracing::info!(%bind, "SRT input listening");
+            // Wait for a caller, waking now and then to see whether the clock stopped.
+            let listen = builder().listen_on(bind);
+            tokio::pin!(listen);
+            let mut socket = loop {
+                if clock.stopping() {
+                    return;
+                }
+                match tokio::time::timeout(Duration::from_millis(500), &mut listen).await {
+                    Ok(Ok(s)) => break s,
+                    Ok(Err(e)) => {
+                        tracing::warn!(%bind, "SRT listen: {e}");
+                        tokio::time::sleep(Duration::from_millis(500)).await;
+                        listen.set(builder().listen_on(bind));
+                    }
+                    Err(_) => {}
+                }
+            };
+            st.connections.inc();
+            tracing::info!(%bind, "SRT caller connected");
+            let mut input = TsInput::new(TsInputConfig::default());
+            while !clock.stopping() {
+                let evs =
+                    match tokio::time::timeout(Duration::from_millis(100), socket.next()).await {
+                        Ok(Some(Ok((_, data)))) => {
+                            st.bytes.add(data.len() as u64);
+                            input.on_datagram(t0.elapsed(), &data)
+                        }
+                        Ok(Some(Err(e))) => {
+                            tracing::warn!(%bind, "SRT receive: {e}");
+                            break;
+                        }
+                        Ok(None) => break,
+                        Err(_) => input.on_tick(t0.elapsed()),
+                    };
+                for e in evs {
+                    if matches!(e.event, InputEvent::Packet(_)) {
+                        st.packets.inc();
+                    }
+                    sink.event(e.event);
+                }
+            }
+            tracing::info!(%bind, "SRT caller gone");
+            for e in input.finish(t0.elapsed()) {
+                sink.event(e.event);
+            }
+        }
+    });
+}
+
 /// Plays an MPEG-TS file as an input, looped, paced by its own time stamps (a standby source,
 /// SPEC §9.5 level 2). Each pass is a session of its own: it ends with `End` and the next starts
 /// from the top, so the timeline mapper starts a new session at the loop point.
