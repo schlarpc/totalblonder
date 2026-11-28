@@ -1147,6 +1147,8 @@ impl Worker {
         let (mask, order): (u64, &[usize]) = match spec.layout {
             // libav's native order of the mask's bits: FL FR
             AudioLayout::Stereo => (0x3, &[0, 1]),
+            // FC
+            AudioLayout::Mono => (0x4, &[0]),
             // FL FR FC LFE SL SR in native order; A/52 wants L C R Ls Rs LFE
             AudioLayout::Surround51 => (0x60f, &[0, 2, 1, 4, 5, 3]),
         };

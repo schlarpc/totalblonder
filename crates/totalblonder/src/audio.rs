@@ -96,10 +96,10 @@ impl Track {
         feeds: [Option<Receiver<LiveAudio>>; 2],
         follow: Option<crate::metrics::Gauge>,
     ) -> Result<Track, TrackError> {
-        let (layout, mode, lfe) = if plan.channels == 6 {
-            (OutputLayout::FivePointOne, AudioCodingMode::THREE_TWO, true)
-        } else {
-            (OutputLayout::Stereo, AudioCodingMode::STEREO, false)
+        let (layout, mode, lfe) = match plan.channels {
+            6 => (OutputLayout::FivePointOne, AudioCodingMode::THREE_TWO, true),
+            1 => (OutputLayout::Mono, AudioCodingMode::Mono, false),
+            _ => (OutputLayout::Stereo, AudioCodingMode::STEREO, false),
         };
         let rate = BitRate::from_kbps(plan.kbps).ok_or(TrackError::Rate(plan.kbps))?;
         let cfg = ConfigBuilder::new(mode, lfe, rate).build()?;

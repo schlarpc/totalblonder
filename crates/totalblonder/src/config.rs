@@ -546,7 +546,7 @@ pub enum Destination {
 pub struct AudioPlan {
     /// Language.
     pub lang: Lang,
-    /// Channels: 2 (2/0) or 6 (3/2 + LFE).
+    /// Channels: 1 (1/0), 2 (2/0) or 6 (3/2 + LFE).
     pub channels: u8,
     /// Bit rate, kbit/s (an A/52 rate ≤ 448).
     pub kbps: u32,
@@ -1182,9 +1182,10 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
                         rule(format!("audio kbps {} is not an A/52 rate ≤ 448", a.kbps))
                     })?;
                 let (channels, acmod) = match a.layout.as_str() {
-                    "stereo" => (2u8, 2u8),
+                    "mono" => (1u8, 1u8),
+                    "stereo" => (2, 2),
                     "5.1" => (6, 7),
-                    x => return Err(rule(format!("audio layout {x:?}: stereo or 5.1"))),
+                    x => return Err(rule(format!("audio layout {x:?}: mono, stereo or 5.1"))),
                 };
                 audio.push(AudioPlan {
                     lang,
@@ -1482,6 +1483,16 @@ pub(crate) mod tests {
         assert_eq!(p.carriers[0].lineup.tsid(), 0x0101);
         assert_eq!(p.ratings.len(), 1);
         assert_eq!(p.ratings[0].lookup("Eirin", "R15+"), Some((0, 3)));
+    }
+
+    #[test]
+    fn mono_audio() {
+        let text = "[[carrier]]\nid = 1\ndestination = \"udp://239.1.1.1:5000\"\n[[carrier.program]]\nnumber = 1\nservice = \"s\"\nvideo = { format = \"480i\", max_kbps = 4000 }\naudio = [ { layout = \"mono\", kbps = 96 } ]\n[[service]]\nid = \"s\"\nname = \"S\"\nchannel = \"20.1\"\nsource_id = 1\n";
+        let p = load(text).unwrap();
+        let pp = &p.carriers[0].programs[0];
+        assert_eq!(pp.audio[0].channels, 1);
+        assert_eq!(pp.psip.audio[0].ac3.acmod, 1);
+        assert!(load(&text.replace("mono", "quad")).is_err());
     }
 
     #[test]

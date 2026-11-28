@@ -260,6 +260,7 @@ fn meter_agrees_with_ffmpeg() {
         let (oi, otp) = ours(planes, *layout);
         let path = dir.path().join(format!("{i}.wav"));
         match layout {
+            OutputLayout::Mono => write_wav(&path, planes, 0x4),
             OutputLayout::Stereo => write_wav(&path, planes, 0x3),
             // A/52 L C R Ls Rs LFE -> WAVE L R C LFE BL BR
             OutputLayout::FivePointOne => {

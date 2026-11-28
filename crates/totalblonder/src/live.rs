@@ -91,10 +91,10 @@ pub fn specs(p: &ProgramPlan) -> (VideoSpec, Option<AudioSpec>) {
         deinterlace: Deinterlace::Off,
     };
     let audio = p.audio.first().map(|a| AudioSpec {
-        layout: if a.channels == 6 {
-            AudioLayout::Surround51
-        } else {
-            AudioLayout::Stereo
+        layout: match a.channels {
+            6 => AudioLayout::Surround51,
+            1 => AudioLayout::Mono,
+            _ => AudioLayout::Stereo,
         },
     });
     (video, audio)

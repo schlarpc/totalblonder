@@ -223,6 +223,8 @@ impl VideoSpec {
 pub enum AudioLayout {
     /// L, R.
     Stereo,
+    /// C.
+    Mono,
     /// 5.1 in A/52 order: L, C, R, Ls, Rs, LFE.
     Surround51,
 }
@@ -231,6 +233,7 @@ impl AudioLayout {
     /// Channels.
     pub fn channels(self) -> u8 {
         match self {
+            Self::Mono => 1,
             Self::Stereo => 2,
             Self::Surround51 => 6,
         }
@@ -954,6 +957,7 @@ fn put_output(w: &mut Writer<'_>, o: &OutputSpec) -> Result<(), WireError> {
             w.u8(match a.layout {
                 AudioLayout::Stereo => 0,
                 AudioLayout::Surround51 => 1,
+                AudioLayout::Mono => 2,
             });
         }
     }
@@ -994,6 +998,7 @@ fn get_output(r: &mut Reader<'_>) -> Result<OutputSpec, WireError> {
             layout: match r.u8()? {
                 0 => AudioLayout::Stereo,
                 1 => AudioLayout::Surround51,
+                2 => AudioLayout::Mono,
                 v => return Err(bad("layout", v)),
             },
         }),

@@ -166,6 +166,8 @@ pub enum OutputChannel {
 /// The layouts we encode (SPEC §8.3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OutputLayout {
+    /// 1/0, `acmod` 1, no LFE.
+    Mono,
     /// 2/0, `acmod` 2, no LFE.
     Stereo,
     /// 3/2 with LFE, `acmod` 7, `lfeon` 1.
@@ -177,6 +179,7 @@ impl OutputLayout {
     pub fn channels(self) -> &'static [OutputChannel] {
         use OutputChannel::*;
         match self {
+            Self::Mono => &[C],
             Self::Stereo => &[L, R],
             Self::FivePointOne => &[L, C, R, Ls, Rs, Lfe],
         }
@@ -188,6 +191,7 @@ impl OutputLayout {
     /// A/52 `acmod` (Table 5.8).
     pub fn acmod(self) -> u8 {
         match self {
+            Self::Mono => 0b001,
             Self::Stereo => 0b010,
             Self::FivePointOne => 0b111,
         }
@@ -269,6 +273,19 @@ impl Mixer {
         let mut m = [[0.0f32; MAX_INPUT_CHANNELS]; 6];
         match output {
             OutputLayout::FivePointOne => m = bed,
+            // BS.775 Table 2's mono downmix: C + 0.71 (L + R) + 0.5 (Ls + Rs), LFE dropped.
+            OutputLayout::Mono => {
+                let k = match scaling {
+                    DownmixScaling::Unscaled => 1.0,
+                    DownmixScaling::A52WorstCase => 1.0 / (1.0 + 2.0 * M3DB + 1.0),
+                };
+                for i in 0..input.channels() {
+                    m[0][i] = k
+                        * (bed[1][i]
+                            + M3DB * (bed[0][i] + bed[2][i])
+                            + 0.5 * (bed[3][i] + bed[4][i]));
+                }
+            }
             OutputLayout::Stereo => {
                 let k = match scaling {
                     DownmixScaling::Unscaled => 1.0,
@@ -444,6 +461,25 @@ mod tests {
             mix(st, OutputLayout::FivePointOne, &[0.25, -0.5]),
             vec![0.25, 0.0, -0.5, 0.0, 0.0, 0.0]
         );
+    }
+
+    /// 1/0 output: acmod 1, a mono source copied, everything else folded down per BS.775.
+    #[test]
+    fn mono_output() {
+        assert_eq!(OutputLayout::Mono.channels(), &[C]);
+        assert_eq!(OutputLayout::Mono.acmod(), 1);
+        assert!(!OutputLayout::Mono.lfe());
+        let mono = InputLayout::default_for(1).unwrap();
+        assert_eq!(mix(mono, OutputLayout::Mono, &[0.5]), vec![0.5]);
+        let st = InputLayout::default_for(2).unwrap();
+        let y = mix(st, OutputLayout::Mono, &[1.0, -0.5]);
+        assert!((y[0] - M3DB * 0.5).abs() < 1e-6, "{y:?}");
+        // Decoder order L R C LFE Ls Rs.
+        let six = InputLayout::default_for(6).unwrap();
+        let y = mix(six, OutputLayout::Mono, &[1.0, 1.0, 1.0, 100.0, 1.0, 1.0]);
+        assert!((y[0] - (1.0 + 2.0 * M3DB + 1.0)).abs() < 1e-5, "{y:?}");
+        let m = Mixer::new(six, OutputLayout::Mono, DownmixScaling::A52WorstCase);
+        assert!((m.gain(0, 2) - 1.0 / (2.0 + 2.0 * M3DB)).abs() < 1e-6);
     }
 
     /// 7.1: side and back pairs share the surrounds at −3 dB each; 6.1's back center is split.
