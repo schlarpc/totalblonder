@@ -202,6 +202,55 @@ fn program_change_from_quiet_to_loud() {
     assert!(tp_all <= -2.0, "{tp_all:.2}");
 }
 
+/// A new session of the same input (a reconnect, a loop, a new channel count) keeps the gain
+/// in use: the first seconds after the reopen are near the target, not at the input's level.
+#[test]
+fn a_reopened_source_keeps_its_gain() {
+    let x = program_at(-10.0, 2, 40, 6);
+    let fmt = InputFormat {
+        rate: InputRate::new(48_000).unwrap(),
+        layout: InputLayout::default_for(2).unwrap(),
+    };
+    let mut t = TrackPipeline::new(TrackConfig::new(P0, OutputLayout::Stereo)).unwrap();
+    t.open(Source::Live, fmt).unwrap();
+    t.switch(Source::Live, P0);
+    let mut out = vec![Vec::new(); 2];
+    let mut f = AudioFrame::new(OutputLayout::Stereo);
+    let (mut sent, mut j) = (0usize, 0i64);
+    let reopen_at = 48_000 * 20;
+    let (mut reopened, mut reopen_out) = (false, 0);
+    while sent < x[0].len() {
+        if !reopened && sent >= reopen_at {
+            t.end_session(Source::Live);
+            t.open(Source::Live, fmt).unwrap();
+            reopened = true;
+            reopen_out = sent + 48_000; // the output runs J behind the input
+        }
+        let k = 1024.min(x[0].len() - sent);
+        let refs: Vec<&[f32]> = x.iter().map(|p| &p[sent..sent + k]).collect();
+        let at = Ticks27(P0.0 + J + (sent as f64 / 48_000.0 * 27e6) as i64);
+        t.push(Source::Live, at, &refs).unwrap();
+        sent += k;
+        while P0.0 + (j + 1) * 864_000 + J <= at.0 {
+            t.next_frame(&mut f);
+            for (o, p) in out.iter_mut().zip(f.planes().iter()) {
+                o.extend_from_slice(p);
+            }
+            j += 1;
+        }
+    }
+    // The 2 s that follow the reopen in the output.
+    let window: Vec<Vec<f32>> = out
+        .iter()
+        .map(|p| p[reopen_out..reopen_out + 48_000 * 2].to_vec())
+        .collect();
+    let l = integrated(&window, OutputLayout::Stereo);
+    assert!(
+        (l + 24.0).abs() <= 2.0,
+        "{l:.2} LKFS right after the reopen"
+    );
+}
+
 /// 44.1 kHz 5.1 input to a stereo track: downmixed, resampled, normalized.
 #[test]
 fn five_one_at_44_1_to_stereo() {

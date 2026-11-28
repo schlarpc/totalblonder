@@ -227,9 +227,22 @@ impl TrackPipeline {
         &self.cfg
     }
 
-    /// Open (or reopen with a new format) source `s`. Its normalizer starts afresh.
+    /// Open (or reopen with a new format) source `s`. A first open starts its normalizer at
+    /// 0 dB; a reopen (a new session of the input, or a new channel count) keeps the gain in
+    /// use and measures afresh from it ([`Normalizer::restart`]), so the input does not play at
+    /// its own level until the normalizer has caught up again.
+    ///
+    /// [`Normalizer::restart`]: crate::normalize::Normalizer::restart
     pub fn open(&mut self, s: Source, format: InputFormat) -> Result<(), PipelineError> {
         let i = slot(s)?;
+        let normalizer = match self.fronts[i].take() {
+            Some(old) => {
+                let mut n = old.normalizer;
+                n.restart();
+                n
+            }
+            None => self.normalizer.clone(),
+        };
         let out = self.cfg.layout();
         let mix_first = format.layout.channels() > out.count();
         let rs_ch = if mix_first {
@@ -242,7 +255,7 @@ impl TrackPipeline {
             resampler: Resampler::new(format.rate, rs_ch),
             mixer: Mixer::new(format.layout, out, self.cfg.downmix),
             mix_first,
-            normalizer: self.normalizer.clone(),
+            normalizer,
             limiter: self.limiter.clone(),
             a: vec![Vec::new(); rs_ch],
             b: vec![Vec::new(); out.count()],
