@@ -28,6 +28,7 @@
 //! | `POST login.cgi` | body `txtUserName`, `txtPassword`, `session_id`, `btnSubmit=Submit`, nothing else |
 //! | `GET status.cgi`, `statusedit.cgi`, `streaminfo.cgi`, `diagnostic.cgi`, `debug.cgi`, `errorlog.cgi` | query `session_id=<digits>` only |
 //! | `GET qamconfig.cgi` | query `session_id=<digits>&slotNumber=<1..4>` only |
+//! | `GET admin.cgi` | spelled exactly `admin.cgi` or `/cgi-bin/admin.cgi`, query `session_id=<digits>` only, no body: the one read of the admin page (a bare GET applies nothing, firmware §4.1; it was done safely during the survey, device §11.3) |
 //! | `POST statusedit.cgi` | write authority; all 16 rows' `streamGroupAddress<n>` and `streamName<n>` (valid URL and name, or both empty), optional `proIdiomEnable<n>=on`, `session_id`, `btnSave=Save` |
 //! | `POST qamconfig.cgi` | write authority for that module; `slotNumber`, `outputChannelA`, `outputChannelControlA..D`, `QAMModeA`, `QAMMap`, `qam_saved=1`, `session_id`, and `outputLevel` exactly when the module is 1 |
 //!
@@ -258,9 +259,12 @@ pub fn screen(draft: RequestDraft) -> Result<Request, Refusal> {
         .map(|(k, _)| percent_decode(k).to_ascii_lowercase())
         .collect();
 
-    // 1. Admin, by any method and in any spelling.
+    // 1. Admin, by any method and in any spelling, except the one bare read.
     if decoded_path.contains("admin") {
-        return refuse(RefusalRule::AdminPage, format!("path {:?}", draft.path));
+        return match admin_read(&draft) {
+            Some(r) => Ok(r),
+            None => refuse(RefusalRule::AdminPage, format!("path {:?}", draft.path)),
+        };
     }
     // 2. Action buttons in the query string.
     if let Some(n) = query_names
@@ -371,6 +375,34 @@ pub fn screen(draft: RequestDraft) -> Result<Request, Refusal> {
             })
         }
     }
+}
+
+/// The one allowed request to the admin page: a GET of exactly `admin.cgi` (or
+/// `/cgi-bin/admin.cgi`, as written, no encoding) with the single query parameter
+/// `session_id=<digits>`, no body and no write authority. The handler applies form fields and
+/// action keys from the query as well as the body (firmware §4.1), so nothing else may ride
+/// along.
+fn admin_read(draft: &RequestDraft) -> Option<Request> {
+    if draft.method != Method::Get
+        || !matches!(draft.path.as_str(), "admin.cgi" | "/cgi-bin/admin.cgi")
+        || !draft.body.is_empty()
+        || draft.authority().is_some()
+    {
+        return None;
+    }
+    let [(k, v)] = draft.query.as_slice() else {
+        return None;
+    };
+    if k != "session_id" || session_value(v).is_err() {
+        return None;
+    }
+    Some(Request {
+        kind: RequestKind::Read(ReadPage::Admin),
+        method: Method::Get,
+        cgi: "admin.cgi",
+        query: draft.query.clone(),
+        body: vec![],
+    })
 }
 
 /// The CGI name if `path` is `name.cgi` or `/cgi-bin/name.cgi` with `name` made of lower-case
@@ -715,12 +747,40 @@ mod tests {
         b
     }
 
+    /// The one admin request let through: a bare GET of the page with `session_id` only.
+    #[test]
+    fn the_bare_admin_read_is_the_only_admin_request_allowed() {
+        let s = [("session_id", SID)];
+        for p in ["admin.cgi", "/cgi-bin/admin.cgi"] {
+            let r = screen(get(p, &s)).unwrap();
+            assert_eq!(r.kind(), RequestKind::Read(ReadPage::Admin));
+            assert_eq!(r.target(), format!("/cgi-bin/admin.cgi?session_id={SID}"));
+            // anything more, anything less, or another method: refused
+            assert_eq!(rule(get(p, &[])), RefusalRule::AdminPage, "{p}");
+            assert_eq!(
+                rule(get(p, &[("session_id", "12x")])),
+                RefusalRule::AdminPage
+            );
+            assert_eq!(
+                rule(get(p, &[("session_id", SID), ("configMode", "0")])),
+                RefusalRule::AdminPage
+            );
+            assert_eq!(
+                rule(get(p, &[("configMode", "0"), ("session_id", SID)])),
+                RefusalRule::AdminPage
+            );
+            assert_eq!(rule(post(p, &s)), RefusalRule::AdminPage);
+            assert_eq!(
+                rule(RequestDraft::new(Method::Get, p, &s, &[("x", "1")])),
+                RefusalRule::AdminPage
+            );
+        }
+    }
+
     #[test]
     fn admin_is_refused_by_any_method_and_spelling() {
         let s = [("session_id", SID)];
         for p in [
-            "admin.cgi",
-            "/cgi-bin/admin.cgi",
             "admin_redir.cgi",
             "/cgi-bin/admin_redir.cgi",
             "ADMIN.CGI",
@@ -1224,7 +1284,9 @@ mod tests {
                 }
             }
         }
-        // 6 read pages + qamconfig + the login page, under two spellings of the path.
-        assert_eq!(accepted, 16);
+        // 6 read pages + qamconfig + the login page + the bare admin read, under two spellings
+        // of the path; every other admin combination (any extra parameter, any method, any
+        // other spelling) is refused.
+        assert_eq!(accepted, 18);
     }
 }

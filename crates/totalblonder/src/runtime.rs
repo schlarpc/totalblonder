@@ -933,7 +933,9 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
                 let g = crate::device::DeviceGauges::register(&mut reg, &d.desired);
                 let report = d.supervisor.mode == tb_eqam::supervisor::ReconcileMode::Report;
                 match read_credentials(&d.credentials_file, report) {
-                    Ok(creds) => {
+                    Ok((creds, admin)) => {
+                        let mut d = d;
+                        d.supervisor.admin_reads = admin;
                         let clock = RealClock::new(epoch, stop.clone());
                         threads.push(std::thread::Builder::new().name("device".into()).spawn(
                             move || {
@@ -1063,20 +1065,23 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
 /// password) and optionally, on lines 3 and 4, a read-only account (the box's Guest): in
 /// report mode, which never writes, that one is used, so the supervisor does not hold the
 /// single Administrator session and log people out of the web UI (SPEC §18 item 10).
+/// Returns the account and whether it is the Administrator (who alone may read `admin.cgi`).
 fn read_credentials(
     p: &std::path::Path,
     report: bool,
-) -> anyhow::Result<tb_eqam::types::Credentials> {
+) -> anyhow::Result<(tb_eqam::types::Credentials, bool)> {
     let text = std::fs::read_to_string(p).with_context(|| p.display().to_string())?;
     let l: Vec<&str> = text.lines().map(str::trim).collect();
     let at = |i: usize| l.get(i).copied().unwrap_or("");
-    let (u, pw) = if report && !at(2).is_empty() && !at(3).is_empty() {
+    let (u, pw, admin) = if report && !at(2).is_empty() && !at(3).is_empty() {
         tracing::info!(user = at(2), "device: polling with the read-only account");
-        (at(2), at(3))
+        (at(2), at(3), false)
     } else {
-        (at(0), at(1))
+        (at(0), at(1), true)
     };
-    tb_eqam::types::Credentials::new(u, pw).map_err(|e| anyhow::anyhow!("{}: {e}", p.display()))
+    tb_eqam::types::Credentials::new(u, pw)
+        .map(|c| (c, admin))
+        .map_err(|e| anyhow::anyhow!("{}: {e}", p.display()))
 }
 
 #[cfg(test)]
@@ -1091,12 +1096,13 @@ mod tests {
         std::fs::write(&both, "Admin\nsecret\nGuest\nother\n").unwrap();
         let admin_only = dir.join("admin");
         std::fs::write(&admin_only, "Admin\nsecret\n").unwrap();
-        assert_eq!(read_credentials(&both, true).unwrap().username(), "Guest");
-        assert_eq!(read_credentials(&both, false).unwrap().username(), "Admin");
-        assert_eq!(
-            read_credentials(&admin_only, true).unwrap().username(),
-            "Admin"
-        );
+        let user = |p: &std::path::Path, report| {
+            let (c, admin) = read_credentials(p, report).unwrap();
+            (c.username().to_owned(), admin)
+        };
+        assert_eq!(user(&both, true), ("Guest".into(), false));
+        assert_eq!(user(&both, false), ("Admin".into(), true));
+        assert_eq!(user(&admin_only, true), ("Admin".into(), true));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

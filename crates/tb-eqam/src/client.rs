@@ -60,6 +60,8 @@ pub enum Observation {
     Debug(DebugPage),
     /// `errorlog.cgi`.
     EventLog(EventLogPage),
+    /// `admin.cgi`.
+    Admin(crate::pages::admin::AdminPage),
 }
 
 impl Observation {
@@ -82,6 +84,7 @@ impl Observation {
             ReadPage::Diagnostic => Observation::Diagnostic(DiagnosticPage::parse(body)?),
             ReadPage::Debug => Observation::Debug(DebugPage::parse(body)?),
             ReadPage::EventLog => Observation::EventLog(EventLogPage::parse(body)?),
+            ReadPage::Admin => Observation::Admin(crate::pages::admin::AdminPage::parse(body)?),
         })
     }
 }

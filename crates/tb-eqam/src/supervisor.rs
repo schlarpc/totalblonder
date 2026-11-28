@@ -56,6 +56,10 @@ pub struct SupervisorConfig {
     pub defect_d_limit: Option<Duration>,
     /// Consecutive failed status reads before the device is declared unreachable (3).
     pub unreachable_after: u32,
+    /// The session is an Administrator's, so `admin.cgi` can be read: the configuration mode
+    /// is checked (alarm unless Manual) and, in apply mode, nothing is written until Manual
+    /// mode has been seen (defect B, SPEC §10.3). A read-only account cannot read the page.
+    pub admin_reads: bool,
 }
 
 impl Default for SupervisorConfig {
@@ -71,6 +75,7 @@ impl Default for SupervisorConfig {
             reboot_tolerance: Duration::from_secs(60),
             defect_d_limit: None,
             unreachable_after: 3,
+            admin_reads: false,
         }
     }
 }
@@ -146,6 +151,9 @@ pub enum Alarm {
         /// The count at the poll before.
         previous: u64,
     },
+    /// The admin page shows a configuration mode other than Manual (`None`: none marked).
+    /// In apply mode nothing is written while this holds.
+    NotManualMode(Option<crate::pages::admin::ConfigMode>),
     /// The login was refused (wrong credentials).
     LoginRejected,
     /// Another Administrator holds the session; the supervisor waits.
@@ -173,6 +181,8 @@ pub enum AlarmKey {
     Oversubscribed(Slot),
     /// [`Alarm::InputAbsent`].
     InputAbsent(Slot),
+    /// [`Alarm::NotManualMode`].
+    NotManualMode,
 }
 
 /// Something the supervisor wants done or known.
@@ -354,7 +364,19 @@ pub struct Supervisor {
     /// Consecutive status polls showing each slot's input absent.
     absent_polls: [u32; 16],
     rate_limited_noted: bool,
+    /// The admin page's configuration mode is Manual (`None`: not read yet).
+    manual: Option<bool>,
     metrics: DeviceMetrics,
+}
+
+/// The pages polled with `config`: [`all_pages`], and the admin page when the session may
+/// read it.
+fn pages_for(config: &SupervisorConfig) -> Vec<ReadPage> {
+    let mut v = all_pages();
+    if config.admin_reads {
+        v.push(ReadPage::Admin);
+    }
+    v
 }
 
 /// Every page polled, in the order a full comparison reads them.
@@ -373,10 +395,11 @@ pub fn all_pages() -> Vec<ReadPage> {
 impl Supervisor {
     /// A supervisor keeping the device at `desired`, starting at `now` with every page due.
     pub fn new(config: SupervisorConfig, desired: DesiredState, now: Duration) -> Self {
+        let due = pages_for(&config).into_iter().map(|p| (p, now)).collect();
         Supervisor {
             config,
             desired,
-            due: all_pages().into_iter().map(|p| (p, now)).collect(),
+            due,
             outstanding: BTreeSet::new(),
             paused_until: None,
             uptime: None,
@@ -395,6 +418,7 @@ impl Supervisor {
             status_failures: 0,
             absent_polls: [0; 16],
             rate_limited_noted: false,
+            manual: None,
             metrics: DeviceMetrics::default(),
         }
     }
@@ -446,7 +470,7 @@ impl Supervisor {
 
     /// Run a full comparison now (`POST /api/device/reconcile`, or after a reboot).
     pub fn compare_now(&mut self, now: Duration) {
-        for p in all_pages() {
+        for p in pages_for(&self.config) {
             self.due.insert(p, now);
         }
     }
@@ -548,6 +572,14 @@ impl Supervisor {
             return;
         }
         if self.mode_seen != Some(TsMode::Mpts) {
+            return;
+        }
+        // Defect B: no write before the admin page has shown Manual mode.
+        if self.config.mode == ReconcileMode::Apply
+            && self.config.admin_reads
+            && self.manual != Some(true)
+        {
+            out.extend(self.raise(AlarmKey::Drift, Alarm::Drift(drift)));
             return;
         }
         let ready: Vec<WriteKind> = [WriteKind::StreamTable, WriteKind::RfPlan]
@@ -663,7 +695,7 @@ impl Supervisor {
                     ReadPage::Status => self.config.status_interval,
                     _ => self.config.slow_interval,
                 };
-                if all_pages().contains(&page) {
+                if pages_for(&self.config).contains(&page) {
                     self.due.insert(page, now + retry);
                 }
                 if page == ReadPage::Status {
@@ -701,6 +733,7 @@ impl Supervisor {
             Observation::Diagnostic(_) => ReadPage::Diagnostic,
             Observation::Debug(_) => ReadPage::Debug,
             Observation::EventLog(_) => ReadPage::EventLog,
+            Observation::Admin(_) => ReadPage::Admin,
         };
         self.outstanding.remove(&page);
         let interval = if page == ReadPage::Status {
@@ -709,7 +742,7 @@ impl Supervisor {
             self.config.slow_interval
         };
         // A reboot detected below may pull this forward again.
-        if all_pages().contains(&page) {
+        if pages_for(&self.config).contains(&page) {
             self.due.insert(page, now + interval);
         }
         match o {
@@ -747,6 +780,18 @@ impl Supervisor {
             }
             Observation::StreamInfo(p) => self.on_stream_info(&p, out),
             Observation::Diagnostic(p) => self.on_diagnostic(&p, out),
+            Observation::Admin(p) => {
+                use crate::pages::admin::ConfigMode;
+                let manual = p.config_mode == Some(ConfigMode::Manual);
+                self.manual = Some(manual);
+                if manual {
+                    out.extend(self.clear(AlarmKey::NotManualMode));
+                } else {
+                    out.extend(
+                        self.raise(AlarmKey::NotManualMode, Alarm::NotManualMode(p.config_mode)),
+                    );
+                }
+            }
             Observation::StatusEdit(_) => {}
         }
     }

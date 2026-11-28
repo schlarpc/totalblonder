@@ -1,0 +1,381 @@
+<html>
+  <head>
+    <title>Admin - Ball Holdings</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+    <link rel="stylesheet" type="text/css" href="../eqam.css">
+    <script language="JavaScript">
+      <!-- Begin
+      function logout()
+      {
+        var temp;
+        temp = "admin.cgi?logout=1&session_id=" + document.configForm.session_id.value;
+        document.location = temp;
+        return 0;
+      }
+      function golink(field)
+      {
+        var temp;
+        temp = field + "?session_id=" + document.configForm.session_id.value;
+        document.location = temp;
+        return 0;
+      }
+
+      function confirm_action(field)
+      {
+        var ip             = "10.42.0.184";
+        var subnet         = "255.255.252.0";
+        var gateway        = "10.42.0.1";
+        var lc1_ip         = "192.168.253.2";
+        var lc1_subnet     = "255.255.255.0";
+        var lc1_gateway    = "10.42.0.1";
+        var gige2a_ip      = "10.42.20.2";
+        var gige2a_subnet  = "255.255.255.0";
+        var gige2a_gateway = "10.42.20.1";
+        var gige2b_ip      = "10.42.21.2";
+        var gige2b_subnet  = "255.255.255.0";
+        var gige2b_gateway = "10.42.21.1";
+        if((ip        != document.configForm.ipAddress.value)        || (subnet        != document.configForm.subnetMask.value)        || (gateway        != document.configForm.defaultGateway.value)        ||
+           (lc1_ip    != document.configForm.local1ipAddress.value)  || (lc1_subnet    != document.configForm.local1subnetMask.value)  || (lc1_gateway    != document.configForm.local1defaultGateway.value)  ||
+           (gige2a_ip != document.configForm.ipAddressGigE_2a.value) || (gige2a_subnet != document.configForm.subnetMaskGigE_2a.value) || (gige2a_gateway != document.configForm.defaultGatewayGigE_2a.value) ||
+           (gige2b_ip != document.configForm.ipAddressGigE_2b.value) || (gige2b_subnet != document.configForm.subnetMaskGigE_2b.value) || (gige2b_gateway != document.configForm.defaultGatewayGigE_2b.value) )
+        {
+          input = confirm("The EQAM unit will be automatically rebooted when the IP change has completed.  Proceed with this action?");
+          if(input == true)
+            document.configForm.submit();
+        }
+        else
+          document.configForm.submit();
+      }
+
+      function confirm_flush_action(field)
+      {
+        input = confirm("Are you sure you wish to delete all stream addresses.  Proceed with this action?");
+        if(input == true)
+          temp = field + "?session_id=" + document.configForm.session_id.value + "&btnFlush=Flush";
+          document.location = temp;
+      }
+
+      function confirm_config_delete_action(field)
+      {
+        input = confirm("This will delete the current Config File.  Proceed with this action?");
+        if(input == true)
+          temp = field + "?session_id=" + document.configForm.session_id.value + "&btnDeleteConfig=Flush";
+          document.location = temp;
+      }
+
+      function confirm_reboot_action(field)
+      {
+        input = confirm("This will reboot the EQAM unit.  Proceed with this action?");
+        if(input == true)
+          temp = field + "?session_id=" + document.configForm.session_id.value + "&btnReboot=reboot";
+          document.location = temp;
+      }
+
+      function getCookie(c_name)
+      {
+        if(document.cookie.length > 0)
+        {
+          c_start = document.cookie.indexOf(c_name + "=");
+          if(c_start != -1)
+          {
+            c_start = c_start + c_name.length + 1;
+            c_end = document.cookie.indexOf(";", c_start);
+            if(c_end == -1) c_end = document.cookie.length;
+            document.configForm.session_id.value = document.cookie.substring(c_start, c_end);
+          }
+        }
+        return "";
+      }
+
+    //  End -->
+    </script>
+  </head>
+  <body onload="getCookie('session_id')">
+    <form name="configForm" action="admin.cgi" method="post">
+      <div align="center">
+        <table style="border-collapse: collapse;" width="1000" bgcolor="#ffffff" border="0" cellpadding="0">
+          <tbody>
+          <tr>
+            <td>
+            <a href="http://www.blondertongue.com"><img border="0" src="../images/logo.png" alt="Blonder Tongue Laboratories, Inc."></a></td>
+          </tr>
+          <tr>
+            <td bgcolor="#66CEF6" align="center"><font size="6">EQAM-420B-4-64</font></td>
+          </tr>
+          <tr>
+            <td bgcolor="#66CEF6" align="center">
+              <table>
+                <tbody>
+                  <tr>
+                    <td></td>
+                    <td width="25%">ESN: 2013090274</td>
+                    <td></td>
+                    <td width="25%">Temperature: 80.1ºF</td>
+                    <td></td>
+                    <td width="25%">Uptime: 0d 14h 42m 57s</td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td>Headend Name: Ball Holdings</td>
+                    <td></td>
+                    <td>Mode: MPTS</td>
+                    <td></td>
+                    <td>Location: </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="left" style="font-size: medium; background-color: #66CEF6;">
+              <table style="width: 700px; background-color: #000000;" cellpadding="4" cellspacing="1">
+                <tbody>
+                  <tr>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('status.cgi')">Main</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('network.cgi')">Network</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('time.cgi')">Time</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('errorlog.cgi')">Event Log</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:golink('config.cgi')">Config</a></td>
+                    <td style="width: 100px; text-align: center; background-color: #C0C0C0;">
+                    <a href="javascript:logout()">Logout</a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+            <tr>
+              <td align="center">
+                <br>
+                <table>
+                  <tbody>
+                    <tr>
+                      <td>Remote Control MAC Address:</td>
+                      <td>00:14:39:00:35:C3</td>
+                    </tr>
+                    <tr>
+                      <td>Local Control 1 MAC Address:</td>
+                      <td>00:14:39:00:35:C4</td>
+                    </tr>
+                    <tr>
+                      <td>1 GIGE MAC Address (GIGE1):</td>
+                      <td>00:14:39:00:35:C6</td>
+                    </tr>
+                    <tr>
+                      <td>1 GIGE MAC Address (GIGE2):</td>
+                      <td>00:14:39:00:35:C7</td>
+                    </tr>
+                    <tr>
+                    </tr><tr>
+                      <td>EQAM-420B Serial Number:</td>
+                      <td>2013090274</td>
+                    </tr>
+                    <tr>
+                      <td colspan="2"><hr width="500" color="#99ccff" size="3"></td>
+                    </tr>
+                    <tr>
+                      <td>Login:</td>
+                      <td><input  name="adminUsername" maxlength="10" size="20" value="Admin" type="text"></td>
+                    </tr>
+                    <tr>
+                      <td>Current Password:</td>
+                      <td><input  name="adminPasswordCurrent" maxlength="10" size="20" type="password"></td>
+                    </tr>
+                    <tr>
+                      <td>New Password:</td>
+                      <td><input  name="adminPasswordNew" maxlength="10" size="20" type="password"></td>
+                    </tr>
+                    <tr>
+                      <td>Confirm New Password:</td>
+                      <td><input  name="adminPasswordConfirm" maxlength="10" size="20" type="password"></td>
+                    </tr>
+                    <tr>
+                      <td>Guest Login:</td>
+                      <td><input  name="guestUsername" maxlength="10" size="20" value="Guest" type="text"></td>
+                    </tr>
+                    <tr>
+                      <td>Current Guest Password:</td>
+                      <td><input  name="guestPasswordCurrent" maxlength="10" size="20" type="password"></td>
+                    </tr>
+                    <tr>
+                      <td>New Guest Password:</td>
+                      <td><input  name="guestPasswordNew" maxlength="10" size="20" type="password"></td>
+                    </tr>
+                    <tr>
+                      <td>Confirm Guest Password:</td>
+                      <td><input  name="guestPasswordConfirm" maxlength="10" size="20" type="password"></td>
+                    </tr>
+                    <tr>
+                      <td colspan="2"><hr width="500" color="#99ccff" size="3"></td>
+                    </tr>
+                    <tr>
+                      <td>Database Control:</td>
+                      <td><input  value="Flush Stream Database" style="width: 175px;" name="btnFlush" onclick="confirm_flush_action('admin.cgi')" type="button"></td>
+                    </tr>
+                    <tr>
+                      <td>Config File Control:</td>
+                      <td><input  value="Delete Config File" style="width: 175px;" name="btnDeleteConfig" onclick="confirm_config_delete_action('admin.cgi')" type="button"></td>
+                    </tr>
+                    <tr>
+                      <td colspan="2"><hr width="500" color="#99ccff" size="3"></td>
+                    </tr>
+                    <tr>
+                      <td>Configuration Mode:</td>
+                      <td>
+                        <select  size="1" name="configMode">
+                          <option value="0">Automatic</option>
+                          <option selected value="1">Manual</option>
+                        </select>
+<p><input type="submit"  value="Commit Changes to Config File" style="width: 210px" name="commitConfig")"></p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colspan="2"><hr width="500" color="#99ccff" size="3"></td>
+                    </tr>
+                    <tr>
+                      <td>System Watchdog:</td>
+                      <td>
+                        <select  size="1" name="watchdogEnable">
+                          <option value="0">Disabled</option>
+                          <option selected value="1">Enabled</option>
+                        </select>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>System Reboot:</td>
+                      <td><input  value="Reboot EQAM Unit" style="width: 175px;" name="btnReboot" onclick="confirm_reboot_action('admin.cgi')" type="button"></td>
+                    </tr>
+                    <tr>
+                      <td colspan="2"><hr width="500" color="#99ccff" size="3"></td>
+                    </tr>
+                    <tr>
+                      <td>Remote Control IP Address:</td>
+                      <td><input  type="text" name="ipAddress" maxlength="15" size="20" value="10.42.0.184"></td>
+                    </tr>
+                    <tr>
+                      <td>Remote Control Subnet Mask:</td>
+                      <td><input  type="text" name="subnetMask" maxlength="15" size="20" value="255.255.252.0"></td>
+                    </tr>
+                    <tr>
+                      <td>Remote Control Default Gateway:</td>
+                      <td><input  type="text" name="defaultGateway" maxlength="15" size="20" value="10.42.0.1"></td>
+                    </tr>
+                    <tr>
+                      <td colspan="2"><hr size="3" color="#99CCFF" width="350"></td>
+                    </tr>
+                    <tr>
+                      <td>Local Control 1 IP Address:</td>
+                      <td><input  type="text" name="local1ipAddress" maxlength="15" size="20" value="192.168.253.2"></td>
+                    </tr>
+                    <tr>
+                      <td>Local Control 1 Control Subnet Mask:</td>
+                      <td><input  type="text" name="local1subnetMask" maxlength="15" size="20" value="255.255.255.0"></td>
+                    </tr>
+                    <tr>
+                      <td>Local Control 1 Control Default Gateway:</td>
+                      <td><input  type="text" name="local1defaultGateway" maxlength="15" size="20" value="10.42.0.1"></td>
+                    </tr>
+                    <tr>
+                      <td colspan="2"><hr size="3" color="#99CCFF" width="350"></td>
+                    </tr>
+                    <tr>
+                      <td>1 GIGE IP Address (GIGE1):</td>
+                      <td><input  type="text" name="ipAddressGigE_2a" maxlength="15" size="20" value="10.42.20.2"></td>
+                    </tr>
+                    <tr>
+                      <td>1 GIGE Subnet Mask (GIGE1):</td>
+                      <td><input  type="text" name="subnetMaskGigE_2a" maxlength="15" size="20" value="255.255.255.0"></td>
+                    </tr>
+                    <tr>
+                      <td>1 GIGE Default Gateway (GIGE1):</td>
+                      <td><input  type="text" name="defaultGatewayGigE_2a" maxlength="15" size="20" value="10.42.20.1"></td>
+                    </tr>
+                    <tr>
+                      <td colspan="2"><hr size="3" color="#99CCFF" width="350"></td>
+                    </tr>
+                    <tr>
+                      <td>1 GIGE IP Address (GIGE2):</td>
+                      <td><input  type="text" name="ipAddressGigE_2b" maxlength="15" size="20" value="10.42.21.2"></td>
+                    </tr>
+                    <tr>
+                      <td>1 GIGE Subnet Mask (GIGE2):</td>
+                      <td><input  type="text" name="subnetMaskGigE_2b" maxlength="15" size="20" value="255.255.255.0"></td>
+                    </tr>
+                    <tr>
+                      <td>1 GIGE Default Gateway (GIGE2):</td>
+                      <td><input  type="text" name="defaultGatewayGigE_2b" maxlength="15" size="20" value="10.42.21.1"></td>
+                    </tr>
+                    <tr>
+                      <td colspan="2"><hr size="3" color="#99CCFF" width="350"></td>
+                    </tr>
+                    <tr>
+                      <td>Event Log Destination:</td>
+                      <td><input  type="text" name="logDestination" maxlength="15" size="20" value="10.42.0.10"></td>
+                        </tr>
+                    <tr>
+                      <td>Log Destination Port #:</td>
+                      <td><input  type="text" name="logPort" maxlength="5" size="20" value="514"></td>
+                    </tr>
+                    <tr>
+                      <td>Time Server IP:</td>
+                      <td><input  type="text" name="timeServer" maxlength="15" size="20" value="129.6.15.28"></td>
+                    </tr>
+                    <tr>
+                      <td colspan="2"><hr size="3" color="#99CCFF" width="500"></td>
+                    </tr>
+                    <tr>
+                      <td>IGMP Version Support:</td>
+                      <td>
+                        <select size="1" name="igmpType">
+                        <option selected value="2">IGMPv2</option>
+                        <option  value="3">IGMPv3</option>
+                        </select>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colspan="2"><hr size="3" color="#99CCFF" width="500"></td>
+                    </tr>
+                    <tr>
+                      <td>Syslog Errors:</td>
+                      <td>
+                        <input name="errors" type="radio" checked value="1">Enabled
+                        <input name="errors" type="radio" value="0">Disabled
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Syslog Informational:</td>
+                      <td>
+                        <input name="info" type="radio" checked value="1">Enabled
+                        <input name="info" type="radio" value="0">Disabled
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Syslog Feedback:</td>
+                      <td>
+                        <input name="feedback" type="radio" checked value="1">Enabled
+                        <input name="feedback" type="radio" value="0">Disabled
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colspan="2"><hr size="3" color="#99CCFF" width="500"></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <input name="session_id" value="" type="hidden">
+                <input value="Save" style="width: 85px;" name="btnSave" onclick="confirm_action('admin.cgi')" type="button">
+                <br>
+                <br>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </form>
+  </body>
+</html>

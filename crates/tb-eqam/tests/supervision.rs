@@ -612,6 +612,55 @@ mod live_pages {
             .collect()
     }
 
+    /// Defect B: with an Administrator session, apply mode writes nothing until the admin
+    /// page has shown Manual mode; Automatic raises an alarm.
+    #[test]
+    fn apply_mode_waits_for_manual_mode() {
+        use tb_eqam::client::Job;
+        use tb_eqam::supervisor::ReconcileMode;
+        const STATUS: &[u8] = include_bytes!("fixtures/status.cgi.html");
+        const ADMIN: &[u8] = include_bytes!("fixtures/admin.cgi.html");
+        let cfg = SupervisorConfig {
+            mode: ReconcileMode::Apply,
+            admin_reads: true,
+            ..SupervisorConfig::default()
+        };
+        let desired = DesiredState {
+            rf: live_plan(),
+            streams: one_stream(),
+            programs: Default::default(),
+        };
+        let mut s = Supervisor::new(cfg, desired, Duration::ZERO);
+        assert!(
+            s.tick(Duration::ZERO)
+                .contains(&Action::Job(Job::Read(ReadPage::Admin)))
+        );
+        let writes = |a: &[Action]| {
+            a.iter()
+                .filter(|a| matches!(a, Action::Job(Job::WriteStreams(_))))
+                .count()
+        };
+        // The surveyed page has no streams: drift on two polls, but no admin page yet.
+        feed(&mut s, 1, ReadPage::Status, STATUS);
+        feed(&mut s, 31, ReadPage::Status, STATUS);
+        assert_eq!(
+            writes(&s.tick(secs(32))),
+            0,
+            "not before Manual mode is seen"
+        );
+        // Automatic: an alarm, and still no write.
+        let auto = String::from_utf8_lossy(ADMIN)
+            .replace("<option value=\"0\">", "<option selected value=\"0\">")
+            .replace("<option selected value=\"1\">", "<option value=\"1\">");
+        let out = feed(&mut s, 33, ReadPage::Admin, auto.as_bytes());
+        assert!(matches!(alarms(&out).as_slice(), [Alarm::NotManualMode(_)]));
+        assert_eq!(writes(&s.tick(secs(34))), 0);
+        // Manual: cleared, and the write goes ahead.
+        let out = feed(&mut s, 35, ReadPage::Admin, ADMIN);
+        assert!(out.contains(&Action::Clear(AlarmKey::NotManualMode)));
+        assert_eq!(writes(&s.tick(secs(36))), 1);
+    }
+
     #[test]
     fn one_absent_poll_is_not_an_alarm_two_are() {
         // Slots 1 and 9 assigned and green (2026-11-27, just after slot 9 was written).

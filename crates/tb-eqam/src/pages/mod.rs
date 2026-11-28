@@ -3,6 +3,7 @@
 //! Every parser first classifies the page ([`classify`]) so that a "Logged Out" page, a
 //! "Modulator Error" page or the login form is never mistaken for an empty table.
 
+pub mod admin;
 pub mod debug;
 pub mod diagnostic;
 pub mod eventlog;
@@ -39,6 +40,9 @@ pub enum ParseError {
         /// What was missing or odd.
         what: String,
     },
+    /// The account may not read this page (a Guest asking for `admin.cgi`).
+    #[error("the account may not read this page")]
+    Unauthorized,
     /// A value did not parse.
     #[error("{page}: {source}")]
     Value {

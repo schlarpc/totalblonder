@@ -978,7 +978,7 @@ and covered by unit tests that need no network:
 
 | Refused | Why |
 |---|---|
-| Any request to `admin.cgi` or `admin_redir.cgi`, by any method | Holds reboot, flush, delete-config, passwords and every editable network setting (device §11.3) |
+| Any request to `admin.cgi` or `admin_redir.cgi`, by any method, except one bare `GET admin.cgi?session_id=<digits>` (spelled exactly, nothing else in query or body) | Holds reboot, flush, delete-config, passwords and every editable network setting (device §11.3). The bare read applies nothing (firmware §4.1) and gives the configuration mode |
 | Any URL whose query contains a parameter starting with `btn` | The CGIs read action fields from the query string; `btnReboot`, `btnFlush` and `btnDeleteConfig` act on a GET (device §9) |
 | Any change to network or login settings, through any channel | Owner's rule (design-inputs "Facts from the owner") |
 | `config.cgi` upload | The restore parser has unbounded copies and index bugs (corruption-48 §3 row L4, §5 item 3) |
@@ -1044,8 +1044,9 @@ write (design-inputs "Decisions so far"; corruption-48 §5 item 1). That setting
 `admin.cgi`, which the client refuses, so the owner makes this one change by hand. What a
 save of that form writes is now known (firmware §4.1): only the fields in the POST are
 applied, so the save carries Manual mode together with the GigE re-addressing (§18 item 2).
-Still unresolved (§18): the supervisor needs a way to confirm Manual mode without requesting
-`admin.cgi`. Independently, the supervisor treats the
+The supervisor confirms Manual mode by that one bare read of `admin.cgi` (§10.1), which only
+an Administrator session may make: with one it alarms unless the mode is Manual, and in apply
+mode writes nothing until it has seen Manual (§18 item 3). Independently, the supervisor treats the
 event-log line "Difference detected in Config File" as an alarm and re-checks everything after
 any reboot.
 
@@ -1740,9 +1741,10 @@ For the owner:
    only `configMode=1` and the six GigE fields. The box then reboots into Manual mode with both
    GigE ports re-addressed and GIGE2's mask and gateway overwritten. Take a fresh EEPROM dump
    before the POST and compare after. Deleting the flash config file stays an optional extra.
-3. **Confirming Manual mode at run time.** A bare GET of `admin.cgi` shows the mode and was
-   done safely once (device §11.3), but the refusal list bans the page outright. Allow that
-   one read, or rely on a recorded manual check?
+3. **Confirming Manual mode at run time. [done 2026-11-28: the one bare read is allowed]**
+   A bare GET of `admin.cgi` shows the mode and was done safely once (device §11.3). A Guest
+   gets "Unauthorized Access", so the read happens only with an Administrator session (apply
+   mode, or no read-only account configured).
 4. **Defect D.** Is a daily reboot of the modulator acceptable as the first mitigation, and
    at what time of day? May a restart of `mux_sync` be tested, and may a RAM-only patched
    `mux_sync` be run if it validates (§10.4)?

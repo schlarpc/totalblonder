@@ -33,6 +33,9 @@ pub enum ReadPage {
     Debug,
     /// `errorlog.cgi` (the Event Log)
     EventLog,
+    /// `admin.cgi`, a bare read with `session_id` only (Administrator sessions only): the
+    /// configuration mode (defect B, SPEC §10.3) and the syslog destination.
+    Admin,
 }
 
 impl ReadPage {
@@ -46,6 +49,7 @@ impl ReadPage {
             ReadPage::Diagnostic => "diagnostic.cgi",
             ReadPage::Debug => "debug.cgi",
             ReadPage::EventLog => "errorlog.cgi",
+            ReadPage::Admin => "admin.cgi",
         }
     }
 }
