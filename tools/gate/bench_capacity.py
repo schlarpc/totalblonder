@@ -45,6 +45,9 @@ import formats as F  # noqa: E402
 import bench as B  # noqa: E402
 
 EXTRA = ["--stagger", "--overlap"]
+# Processes whose use of the card does not disturb a run (M2V_IGNORE_PROCS, comma-separated
+# substrings of the pmon name): a production server that is always there falls on every run alike.
+IGNORE = ["tb-m2venc"] + [x for x in os.environ.get("M2V_IGNORE_PROCS", "").split(",") if x]
 POINTS = "1080i=67,1080p=75,720p=90,480i=400,mixed=24"   # the capacity the C++ spike measured (spike notes 0.1), held by the Rust encoder (G2)
 
 
@@ -55,7 +58,7 @@ def parse_pmon(text):
     busy = {}
     for line in text.splitlines():
         t = line.split()
-        if line.startswith("#") or len(t) < 8 or t[1] == "-" or "tb-m2venc" in t[-1]:
+        if line.startswith("#") or len(t) < 8 or t[1] == "-" or any(x in t[-1] for x in IGNORE):
             continue
         use = max((float(x) for x in t[3:7] if x.replace(".", "").isdigit()), default=0.0)
         if use > 0:

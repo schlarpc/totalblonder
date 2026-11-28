@@ -10,7 +10,7 @@ cd "$(dirname "$0")/../.."
 . tools/gate/env.sh
 label=$1; bin=${2:-$M2VENC}; shift; [ $# -gt 0 ] && shift
 NSYS=$(cat $WORK/nsys.path 2>/dev/null || true)
-[ -x "$NSYS" ] || { NSYS=$(./scripts/capped.sh -m 4G nix build .#nsys --no-link --print-out-paths | tail -1)/bin/nsys; echo "$NSYS" > $WORK/nsys.path; }
+[ -x "$NSYS" ] || { NSYS=$(./tools/gate/capped.sh -m 4G nix build .#nsys --no-link --print-out-paths | tail -1)/bin/nsys; echo "$NSYS" > $WORK/nsys.path; }
 mkdir -p $RES/nsys $RES/ncu
 T=$WORK/tmp
 rm -f $WORK/nsys-$label.nsys-rep $WORK/nsys-$label.sqlite
@@ -23,10 +23,10 @@ else
   work=(--input $MEDIA/crowd_run_1080i.yuv --size 1920x1080 --interlaced --gop 15 --bframes 2
         --bitrate 15000000 --vbv 7487488 --sessions 16 --frames 45 --write 0 --max-in-frames 16)
 fi
-./scripts/capped.sh env TMPDIR=$T LD_LIBRARY_PATH=/run/opengl-driver/lib "$NSYS" profile -t cuda --sample=none --cpuctxsw=none \
+./tools/gate/capped.sh env TMPDIR=$T LD_LIBRARY_PATH=/run/opengl-driver/lib "$NSYS" profile -t cuda --sample=none --cpuctxsw=none \
   -o $WORK/nsys-$label -f true "$bin" "${work[@]}" --tickmark "$@" > $WORK/nsys-$label.log 2>&1 || { tail $WORK/nsys-$label.log; exit 1; }
-./scripts/capped.sh env TMPDIR=$T "$NSYS" stats -q --report cuda_gpu_kern_sum --report cuda_api_sum --report cuda_gpu_mem_time_sum \
+./tools/gate/capped.sh env TMPDIR=$T "$NSYS" stats -q --report cuda_gpu_kern_sum --report cuda_api_sum --report cuda_gpu_mem_time_sum \
   $WORK/nsys-$label.nsys-rep > $RES/nsys/$label-summary.txt 2>&1
-./scripts/capped.sh env TMPDIR=$T "$NSYS" export -q true --type sqlite -o $WORK/nsys-$label.sqlite -f true $WORK/nsys-$label.nsys-rep
+./tools/gate/capped.sh env TMPDIR=$T "$NSYS" export -q true --type sqlite -o $WORK/nsys-$label.sqlite -f true $WORK/nsys-$label.nsys-rep
 python3 -I tools/gate/nsys_tick.py $WORK/nsys-$label.sqlite > $RES/nsys/$label-tick.txt
 tail -30 $RES/nsys/$label-tick.txt
