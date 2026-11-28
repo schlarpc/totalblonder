@@ -65,7 +65,8 @@ frame clock and fallback selector are used by the server (`source.rs`).
 | Crate | What | Evidence |
 |---|---|---|
 | `tb-ac3` | AC-3 encoder (A/52) in Rust: block switching, rematrixing, exact bit allocation; 1/0 to 3/2+LFE, 32–448 kbit/s; silent frame | 7,392 frames decoded by ffmpeg (strictest) and liba52 without error |
-| `tb-audio` | Resampler with trimmed ratio, A/52 channel order and downmix, BS.1770-4 meter, −24 LKFS normalizer, −2 dBTP limiter, the sample clock of exact 1536-sample frames | inputs at −10/−24/−35 LKFS out at −24.0 |
+| `tb-audio` | Resampler with trimmed ratio, A/52 channel order and downmix (to 5.1, stereo or mono), BS.1770-4 meter, −24 LKFS normalizer, −2 dBTP limiter, the sample clock of exact 1536-sample frames | inputs at −10/−24/−35 LKFS out at −24.0 |
+| Second audio (`audio_routes`, `live.rs`) | Each track takes the input's audio stream in its language (or `input_track`), falling back to the main audio; one decode per stream, fanned out to the tracks it feeds | nixark, 2026-11-28: a TS input with `spa` 880 Hz listed before `eng` 440 Hz gave eng 440, spa 880, and a `fra` mono track the English audio; self-check silent |
 
 ### 1.5 Inputs and decoding
 

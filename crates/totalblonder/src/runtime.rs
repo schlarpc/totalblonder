@@ -87,7 +87,8 @@ fn build_carriers(plant: &Plant, unix0: i128) -> anyhow::Result<Built> {
 struct LiveProg {
     /// Live (index 0) and standby (index 1).
     video: [Option<std::sync::mpsc::Receiver<crate::source::LiveEvent>>; 2],
-    audio: [Option<std::sync::mpsc::Receiver<crate::audio::LiveAudio>>; 2],
+    /// Per role, one queue per audio track.
+    audio: [Vec<Option<std::sync::mpsc::Receiver<crate::audio::LiveAudio>>>; 2],
     stats: crate::source::SourceStats,
 }
 
@@ -145,14 +146,18 @@ fn start_live(
             continue;
         };
         let (vtx, vrx) = std::sync::mpsc::sync_channel(256);
-        let (atx, arx) = std::sync::mpsc::sync_channel(1024);
+        let (atx, arx): (Vec<_>, Vec<_>) = p
+            .audio
+            .iter()
+            .map(|_| std::sync::mpsc::sync_channel(1024))
+            .unzip();
         let entry = map.entry((ci, p.index)).or_insert_with(|| LiveProg {
             video: [None, None],
-            audio: [None, None],
+            audio: [Vec::new(), Vec::new()],
             stats: crate::source::SourceStats::default(),
         });
         entry.video[role] = Some(vrx);
-        entry.audio[role] = Some(arx);
+        entry.audio[role] = arx.into_iter().map(Some).collect();
         if role == 0 || p.live.is_none() {
             reg.add(
                 "program_source",
@@ -166,16 +171,15 @@ fn start_live(
             );
         }
         let l = vec![("input", id.to_owned())];
-        let (vspec, aspec) = crate::live::specs(p);
         let target = crate::live::LiveTarget {
             video: vtx,
-            audio: (!p.audio.is_empty()).then_some(atx),
-            video_spec: vspec,
-            audio_spec: aspec,
+            audio: atx,
+            audio_tracks: crate::live::audio_tracks(p),
+            video_spec: crate::live::specs(p),
             specs: p
                 .ladder
                 .iter()
-                .map(|&f| crate::live::specs(&p.at(f)).0)
+                .map(|&f| crate::live::specs(&p.at(f)))
                 .collect(),
             interlaced: p.ladder.iter().map(|f| f.interlaced()).collect(),
             rung: p.rung.clone(),
@@ -289,12 +293,15 @@ fn audio_tracks(
     for (ci, c) in plant.carriers.iter().enumerate() {
         for p in &c.programs {
             for (k, a) in p.audio.iter().enumerate() {
+                // Every track follows the program's source; one its input does not feed stays
+                // on the slate's audio.
                 let (rx, follow) = match live.get_mut(&(ci, p.index)) {
-                    Some(l) if k == 0 => (
-                        [l.audio[0].take(), l.audio[1].take()],
-                        Some(l.stats.source.clone()),
-                    ),
-                    _ => ([None, None], None),
+                    Some(l) => {
+                        let mut take =
+                            |role: usize| l.audio[role].get_mut(k).and_then(Option::take);
+                        ([take(0), take(1)], Some(l.stats.source.clone()))
+                    }
+                    None => ([None, None], None),
                 };
                 v.push(
                     crate::audio::Track::new(

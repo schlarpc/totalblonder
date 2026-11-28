@@ -108,6 +108,8 @@ destination = "udp://239.10.0.1:5000"   # udp://, rtp://, or file:/path.ts
   number = 2
   service = "bars"
   video = { format = "480i29.97", max_kbps = 4000 }
+  # Each track takes the live input's audio stream in its language (input_track = N picks the
+  # N-th instead); a track the input has no stream for carries the main track's audio.
   audio = [ { language = "eng", layout = "stereo", kbps = 192 },
             { language = "spa", layout = "stereo", kbps = 192 } ]
 

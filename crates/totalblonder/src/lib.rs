@@ -21,6 +21,7 @@
 #![forbid(unsafe_code)]
 
 pub mod audio;
+pub mod audio_routes;
 pub mod carrier;
 pub mod config;
 pub mod control;

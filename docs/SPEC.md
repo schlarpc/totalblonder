@@ -782,6 +782,11 @@ MPEG-2 allows 1080p at 29.97 or 30 fps, so no interlacing is needed for it (stan
   encoder itself has failed (§6.6; software-survey §1).
 - Up to three audio streams per program (manual §4.2). All tracks of a program are encoded
   frame-synchronously with identical PTS (standards-digest §4.3).
+- **[built]** Each track takes one of the live input's audio streams: `input_track = N` if
+  set, else the stream in the track's language, else (main track) the first left, else an
+  unlabeled one in order, else the main track's stream (`totalblonder::audio_routes`). Only
+  the streams a track takes are decoded; one stream may feed several tracks, each downmixed
+  to its own layout. Layouts: mono (1/0), stereo (2/0), 5.1 (3/2 + LFE).
 
 ### 8.4 Statmux control loop
 

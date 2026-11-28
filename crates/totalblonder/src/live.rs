@@ -12,18 +12,25 @@
 //! relative timing (SPEC §5.4). Frames are handed to the mapper as if they had arrived `Δ` later
 //! than they did, so its jitter buffer `J` sits on the presentation timeline. A decoded picture
 //! is a whole picture, so every one may start a mapper session.
+//!
+//! Audio: each of the program's tracks takes one of the input's audio streams
+//! ([`crate::audio_routes`]); only the streams some track takes are opened, each resampled to
+//! the layout of the first track it feeds, and its blocks go to every track it feeds.
 
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, SyncSender, TryRecvError, sync_channel};
 use std::time::{Duration, Instant};
 
-use tb_decoder_client::proto::wire::{Aspect, AudioLayout, AudioSpec, Deinterlace, VideoSpec};
+use tb_decoder_client::proto::wire::{
+    Aspect, AudioLayout, AudioSpec, Deinterlace, OutputSpec, StreamOpen, VideoSpec,
+};
 use tb_decoder_client::{Decoded, Decoder, DecoderPool, Event};
 use tb_media::{InputEvent, MediaKind, Rational, StreamIndex};
 use tb_timeline::{Mapper, MapperConfig, Ticks27};
 
 use crate::audio::LiveAudio;
-use crate::config::ProgramPlan;
+use crate::audio_routes::{InputAudio, TrackWant, assign};
+use crate::config::{AudioPlan, ProgramPlan};
 use crate::ingest::{EventSink, InputStats};
 use crate::metrics::Counter;
 use crate::source::LiveEvent;
@@ -61,12 +68,12 @@ pub struct LiveStats {
 pub struct LiveTarget {
     /// The program's video queue.
     pub video: SyncSender<LiveEvent>,
-    /// Its first audio track's queue, if it has one.
-    pub audio: Option<SyncSender<LiveAudio>>,
+    /// Each audio track's queue, in track order.
+    pub audio: Vec<SyncSender<LiveAudio>>,
+    /// What each track asks of the input, and its layout.
+    pub audio_tracks: Vec<(TrackWant, AudioLayout)>,
     /// Pictures at the program's size.
     pub video_spec: VideoSpec,
-    /// Audio in the track's layout.
-    pub audio_spec: Option<AudioSpec>,
     /// Pictures at each rung of the program's ladder (`video_spec` is rung 0).
     pub specs: Vec<VideoSpec>,
     /// Whether each rung's format is interlaced (for the bar data's line numbers).
@@ -77,11 +84,80 @@ pub struct LiveTarget {
     pub delay: u64,
 }
 
-/// The worker's output specs for a program.
-pub fn specs(p: &ProgramPlan) -> (VideoSpec, Option<AudioSpec>) {
+/// A track's layout as the worker delivers it.
+pub fn audio_layout(a: &AudioPlan) -> AudioLayout {
+    match a.channels {
+        6 => AudioLayout::Surround51,
+        1 => AudioLayout::Mono,
+        _ => AudioLayout::Stereo,
+    }
+}
+
+/// What each of a program's tracks asks of a live input, and its layout.
+pub fn audio_tracks(p: &ProgramPlan) -> Vec<(TrackWant, AudioLayout)> {
+    p.audio
+        .iter()
+        .map(|a| {
+            (
+                TrackWant {
+                    language: a.lang.bytes(),
+                    input_track: a.input_track,
+                },
+                audio_layout(a),
+            )
+        })
+        .collect()
+}
+
+/// The streams to open for the worker, with their outputs, and which tracks each audio stream
+/// feeds. Audio streams no track takes are left out (their packets are not sent).
+fn opens(
+    list: &[tb_media::StreamInfo],
+    video: VideoSpec,
+    tracks: &[(TrackWant, AudioLayout)],
+) -> (Vec<StreamOpen>, HashMap<StreamIndex, Vec<usize>>) {
+    let audio: Vec<InputAudio> = list
+        .iter()
+        .filter(|i| i.codec.kind() == MediaKind::Audio)
+        .map(|i| InputAudio {
+            index: i.index,
+            language: i.language,
+        })
+        .collect();
+    let wants: Vec<TrackWant> = tracks.iter().map(|t| t.0).collect();
+    let mut routes: HashMap<StreamIndex, Vec<usize>> = HashMap::new();
+    for (k, s) in assign(&audio, &wants).into_iter().enumerate() {
+        if let Some(s) = s {
+            routes.entry(s).or_default().push(k);
+        }
+    }
+    let opens = list
+        .iter()
+        .filter_map(|info| {
+            let output = match info.codec.kind() {
+                MediaKind::Video => OutputSpec::Video(video),
+                MediaKind::Audio => {
+                    let k = *routes.get(&info.index)?.first()?;
+                    OutputSpec::Audio(AudioSpec {
+                        layout: tracks[k].1,
+                    })
+                }
+                MediaKind::Data => OutputSpec::Native,
+            };
+            Some(StreamOpen {
+                info: info.clone(),
+                output,
+            })
+        })
+        .collect();
+    (opens, routes)
+}
+
+/// The worker's video output spec for a program.
+pub fn specs(p: &ProgramPlan) -> VideoSpec {
     let (w, h) = p.format.size();
     let (an, ad) = p.format.display_aspect();
-    let video = VideoSpec {
+    VideoSpec {
         width: w,
         height: h,
         // the coded frame's aspect: the source is fitted into what the TV will show
@@ -89,15 +165,7 @@ pub fn specs(p: &ProgramPlan) -> (VideoSpec, Option<AudioSpec>) {
         aspect: Aspect::Fit,
         // Interlaced outputs take frames as they come; the encoder codes them as frames.
         deinterlace: Deinterlace::Off,
-    };
-    let audio = p.audio.first().map(|a| AudioSpec {
-        layout: match a.channels {
-            6 => AudioLayout::Surround51,
-            1 => AudioLayout::Mono,
-            _ => AudioLayout::Stereo,
-        },
-    });
-    (video, audio)
+    }
 }
 
 /// The Active Format Description and bar data of a converted picture: the rectangle its source
@@ -201,13 +269,37 @@ pub fn run_decoder(
     let mut rung = target.rung.get();
     let mut spec = target.specs.get(rung).copied().unwrap_or(target.video_spec);
     dec.set_video_output(Some(spec));
-    dec.set_audio_output(target.audio_spec);
     // the session's streams, announced again with the new spec when the program changes format
     let mut streams: Option<Vec<tb_media::StreamInfo>> = None;
+    // audio stream -> the tracks it feeds; the streams the worker has open
+    let mut routes: HashMap<StreamIndex, Vec<usize>> = HashMap::new();
+    let mut opened: std::collections::HashSet<StreamIndex> = Default::default();
+    let announce = |dec: &mut Decoder,
+                    list: &[tb_media::StreamInfo],
+                    spec: VideoSpec,
+                    routes: &mut HashMap<StreamIndex, Vec<usize>>,
+                    opened: &mut std::collections::HashSet<StreamIndex>| {
+        let (o, r) = opens(list, spec, &target.audio_tracks);
+        *opened = o.iter().map(|s| s.info.index).collect();
+        if r != *routes {
+            let mut desc: Vec<String> = r
+                .iter()
+                .map(|(s, ks)| {
+                    let tracks: Vec<String> = ks.iter().map(|k| (k + 1).to_string()).collect();
+                    format!("stream {} -> track {}", s.0, tracks.join("+"))
+                })
+                .collect();
+            desc.sort();
+            tracing::info!(input = name, "audio routes: {}", desc.join(", "));
+            tb_telemetry::wide!("live.audio_routes", input = name, routes = desc.join(", ")).emit();
+        }
+        *routes = r;
+        let _ = dec.try_send_streams(o);
+    };
     let mut mapper = Mapper::new(MapperConfig::default());
     let mut bases: HashMap<StreamIndex, (Rational, MediaKind)> = HashMap::new();
     let mut grids: HashMap<StreamIndex, GridSnap> = HashMap::new();
-    let mut audio_format_sent = false;
+    let mut format_sent = vec![false; target.audio.len()];
     let delay = target.delay;
     while !clock.stopping() {
         // Everything the socket delivered goes to the worker (never blocking).
@@ -216,6 +308,7 @@ pub fn run_decoder(
                 Ok(ev) => {
                     match &ev {
                         InputEvent::Streams(s) => {
+                            announce(&mut dec, s, spec, &mut routes, &mut opened);
                             streams = Some(s.clone());
                             bases = s
                                 .iter()
@@ -231,14 +324,18 @@ pub fn run_decoder(
                         InputEvent::End(_) => {
                             let _ = mapper.closed();
                             let _ = target.video.try_send(LiveEvent::Closed);
-                            if let Some(a) = &target.audio {
+                            for a in &target.audio {
                                 let _ = a.try_send(LiveAudio::Closed);
                             }
-                            audio_format_sent = false;
+                            format_sent.iter_mut().for_each(|f| *f = false);
                         }
+                        // a stream no track takes is not decoded
+                        InputEvent::Packet(p) if !opened.contains(&p.stream) => continue,
                         InputEvent::Packet(_) => {}
                     }
-                    let _ = dec.try_send(ev);
+                    if !matches!(ev, InputEvent::Streams(_)) {
+                        let _ = dec.try_send(ev);
+                    }
                 }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => return,
@@ -254,7 +351,7 @@ pub fn run_decoder(
             spec = s;
             dec.set_video_output(Some(spec));
             if let Some(list) = &streams {
-                let _ = dec.try_send(InputEvent::Streams(list.clone()));
+                announce(&mut dec, list, spec, &mut routes, &mut opened);
             }
         }
         // What the worker made.
@@ -306,13 +403,16 @@ pub fn run_decoder(
                     }
                 }
                 Decoded::Audio(a) => {
-                    let Some(tx) = &target.audio else { continue };
+                    let Some(ks) = routes.get(&a.desc.stream) else {
+                        continue;
+                    };
                     let Some(pts) = a.desc.pts else { continue };
                     // Audio follows the video's session; before the first picture it waits.
                     let Some(at) = mapper.map(Ticks27(to_ticks(pts, tb))) else {
                         continue;
                     };
-                    if !audio_format_sent {
+                    let mut fmt = None;
+                    if ks.iter().any(|&k| !format_sent[k]) {
                         use tb_audio::layout::{InputLayout, Speaker};
                         // The worker resamples to the track's layout, in A/52 order for 5.1.
                         let layout = match a.desc.channels {
@@ -332,25 +432,31 @@ pub fn run_decoder(
                         ) else {
                             continue;
                         };
-                        let _ = tx.try_send(LiveAudio::Format(tb_audio::pipeline::InputFormat {
-                            rate,
-                            layout,
-                        }));
-                        audio_format_sent = true;
+                        fmt = Some(tb_audio::pipeline::InputFormat { rate, layout });
                     }
                     let planes: Vec<Vec<f32>> = (0..usize::from(a.desc.channels))
                         .filter_map(|c| a.channel(c))
                         .collect();
-                    if tx
-                        .try_send(LiveAudio::Block {
-                            at: at.0.max(0) as u64,
-                            planes,
-                        })
-                        .is_ok()
-                    {
-                        stats.audio_blocks.inc();
-                        if let Some(w) = worker.as_mut() {
-                            w.2 += 1;
+                    for &k in ks {
+                        let Some(tx) = target.audio.get(k) else {
+                            continue;
+                        };
+                        if !format_sent[k] {
+                            let Some(f) = fmt else { continue };
+                            let _ = tx.try_send(LiveAudio::Format(f));
+                            format_sent[k] = true;
+                        }
+                        if tx
+                            .try_send(LiveAudio::Block {
+                                at: at.0.max(0) as u64,
+                                planes: planes.clone(),
+                            })
+                            .is_ok()
+                        {
+                            stats.audio_blocks.inc();
+                            if let Some(w) = worker.as_mut() {
+                                w.2 += 1;
+                            }
                         }
                     }
                 }

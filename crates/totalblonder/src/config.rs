@@ -386,6 +386,9 @@ struct AudioFile {
     #[serde(default = "k192")]
     kbps: u32,
     name: Option<String>,
+    /// Which of the live input's audio streams (1-based) feeds this track; by default the
+    /// one in the track's language (`audio_routes`).
+    input_track: Option<u8>,
 }
 
 fn eng() -> String {
@@ -550,6 +553,8 @@ pub struct AudioPlan {
     pub channels: u8,
     /// Bit rate, kbit/s (an A/52 rate ≤ 448).
     pub kbps: u32,
+    /// `input_track`: an explicit 1-based position among the live input's audio streams.
+    pub input_track: Option<u8>,
 }
 
 /// One program as the runtime needs it.
@@ -1187,10 +1192,14 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
                     "5.1" => (6, 7),
                     x => return Err(rule(format!("audio layout {x:?}: mono, stereo or 5.1"))),
                 };
+                if a.input_track == Some(0) {
+                    return Err(rule("audio input_track counts from 1"));
+                }
                 audio.push(AudioPlan {
                     lang,
                     channels,
                     kbps: a.kbps,
+                    input_track: a.input_track,
                 });
                 ps_audio.push(Audio {
                     pid: EsPid::new(base + 4 + k as u16)?,
