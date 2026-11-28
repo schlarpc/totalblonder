@@ -227,6 +227,9 @@ pub enum AudioLayout {
     Mono,
     /// 5.1 in A/52 order: L, C, R, Ls, Rs, LFE.
     Surround51,
+    /// The source's own: mono stays mono, stereo stays stereo, anything wider becomes 5.1 in
+    /// A/52 order. Frames say which (their channel count).
+    Source,
 }
 
 impl AudioLayout {
@@ -235,7 +238,8 @@ impl AudioLayout {
         match self {
             Self::Mono => 1,
             Self::Stereo => 2,
-            Self::Surround51 => 6,
+            // Surround51, and Source at most
+            Self::Surround51 | Self::Source => 6,
         }
     }
 }
@@ -958,6 +962,7 @@ fn put_output(w: &mut Writer<'_>, o: &OutputSpec) -> Result<(), WireError> {
                 AudioLayout::Stereo => 0,
                 AudioLayout::Surround51 => 1,
                 AudioLayout::Mono => 2,
+                AudioLayout::Source => 3,
             });
         }
     }
@@ -999,6 +1004,7 @@ fn get_output(r: &mut Reader<'_>) -> Result<OutputSpec, WireError> {
                 0 => AudioLayout::Stereo,
                 1 => AudioLayout::Surround51,
                 2 => AudioLayout::Mono,
+                3 => AudioLayout::Source,
                 v => return Err(bad("layout", v)),
             },
         }),

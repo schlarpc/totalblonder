@@ -786,7 +786,12 @@ MPEG-2 allows 1080p at 29.97 or 30 fps, so no interlacing is needed for it (stan
   set, else the stream in the track's language, else (main track) the first left, else an
   unlabeled one in order, else the main track's stream (`totalblonder::audio_routes`). Only
   the streams a track takes are decoded; one stream may feed several tracks, each downmixed
-  to its own layout. Layouts: mono (1/0), stereo (2/0), 5.1 (3/2 + LFE).
+  to its own layout. Layouts: mono (1/0), stereo (2/0), 5.1 (3/2 + LFE), or `auto`: the
+  coding mode follows the source on air (mono, stereo, or 5.1 for anything wider; the slate is
+  stereo), at one constant rate, with the AC-3 descriptor's `num_channels` = '1101', "at most
+  6 channels" (A/52 Table A4.5). All three modes are encoded every frame from the 5.1 bed
+  (the narrower ones by the A/52 downmix) so a change has no gap; the one matching the
+  source is sent.
 
 ### 8.4 Statmux control loop
 

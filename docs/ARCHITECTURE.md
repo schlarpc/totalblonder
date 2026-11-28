@@ -548,7 +548,7 @@ by `tb-sandbox` and takes decoded frames back from shared memory.
 - **Outputs per stream**: native frames (planar 4:2:0, NV12, P010; f32 planar audio), or
   converted in the worker: video by libswscale to the program's size in the encoder's host
   layout (Lanczos, fit or stretch, bob, BT.601/BT.709), audio by libswresample to 48 kHz
-  mono, stereo or 5.1 in A/52 order.
+  mono, stereo or 5.1 in A/52 order, or the source's own of those (`Source`).
 - **GPU**: NVDEC through the `cuda` hwaccel in the worker where an NVIDIA card is, else VA-API
   through the `vaapi` hwaccel (AMD: Mesa's radeonsi VA driver on the DRM render node), frames
   copied to host (`av_hwframe_transfer_data`); a wider seccomp profile and Landlock rules for

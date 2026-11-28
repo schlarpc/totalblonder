@@ -67,6 +67,9 @@ pub struct Ac3Descriptor {
     pub bsmod: u8,
     /// acmod (1..=7; 0, dual mono, is prohibited on cable).
     pub acmod: u8,
+    /// A stream whose coding mode follows its source: `num_channels` says "at most this many
+    /// channels", LFE counted (1..=6; A/52 Table A4.5, MSB 1), and `acmod` is not sent.
+    pub max_channels: Option<u8>,
     /// mainid, for bsmod < 2.
     pub mainid: u8,
     /// priority (1 primary, 2 other, 3 unspecified), for bsmod < 2.
@@ -163,15 +166,25 @@ impl Descriptor {
                 b.extend_from_slice(&[*profile_idc, *constraint_flags, *level_idc, 0x3F]);
             }
             Descriptor::Ac3(a) => {
-                if a.bit_rate_index > 18 || a.acmod == 0 || a.acmod > 7 || a.bsmod > 7 {
+                if a.bit_rate_index > 18
+                    || a.acmod == 0
+                    || a.acmod > 7
+                    || a.bsmod > 7
+                    || a.max_channels.is_some_and(|n| !(1..=6).contains(&n))
+                {
                     return Err(Error::Invalid("AC-3 descriptor field out of range"));
                 }
+                // MSB 0 and acmod, or MSB 1 and the largest channel count less one.
+                let num_channels = match a.max_channels {
+                    None => a.acmod & 7,
+                    Some(n) => 0x08 | (n - 1),
+                };
                 // sample_rate_code '000' (48 kHz), bsid 8 (A/52 Table A4.2; digest §4.4).
                 b.push(0x08);
                 // bit_rate_code: MSB 0 = exact rate (Table A4.3); surround_mode.
                 b.push((a.bit_rate_index << 2) | (a.surround_mode & 3));
-                // bsmod, num_channels (MSB 0, acmod), full_svc 1.
-                b.push((a.bsmod << 5) | ((a.acmod & 7) << 1) | 1);
+                // bsmod, num_channels, full_svc 1.
+                b.push((a.bsmod << 5) | (num_channels << 1) | 1);
                 // langcod: reserved, 0xFF on cable (SCTE 54 §7.9.3.1 item 3).
                 b.push(0xFF);
                 if a.bsmod < 2 {
@@ -289,6 +302,7 @@ mod tests {
             surround_mode: 0,
             bsmod: 0,
             acmod: 2,
+            max_channels: None,
             mainid: 0,
             priority: 1,
             asvcflags: 0,
@@ -300,6 +314,30 @@ mod tests {
                 0x81, 10, 0x08, 0x28, 0x05, 0xFF, 0x0F, 0x01, 0xBF, b'e', b'n', b'g'
             ]
         );
+    }
+
+    /// A/52 Table A4.5: MSB 1 and "≤6" is '1101'; with bsmod 0 and full_svc 1 the byte is
+    /// 0b000_1101_1. Out-of-range counts are refused.
+    #[test]
+    fn ac3_up_to_six_channels() {
+        let a = Ac3Descriptor {
+            bit_rate_index: 14, // 384 kbit/s
+            surround_mode: 0,
+            bsmod: 0,
+            acmod: 7,
+            max_channels: Some(6),
+            mainid: 0,
+            priority: 1,
+            asvcflags: 0,
+            lang: Lang::ENG,
+        };
+        assert_eq!(bytes(Descriptor::Ac3(a.clone()))[4], 0x1B);
+        let mut two = a.clone();
+        two.max_channels = Some(2);
+        assert_eq!(bytes(Descriptor::Ac3(two))[4], 0b0001_0011);
+        let mut bad = a;
+        bad.max_channels = Some(7);
+        assert!(Descriptor::Ac3(bad).write(&mut Vec::new()).is_err());
     }
 
     #[test]

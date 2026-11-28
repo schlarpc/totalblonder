@@ -36,6 +36,7 @@ pub fn program(n: u16) -> Program {
                 surround_mode: 0,
                 bsmod: 0,
                 acmod: 2,
+                max_channels: None,
                 mainid: 0,
                 priority: 1,
                 asvcflags: 0,

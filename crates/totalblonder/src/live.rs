@@ -15,7 +15,9 @@
 //!
 //! Audio: each of the program's tracks takes one of the input's audio streams
 //! ([`crate::audio_routes`]); only the streams some track takes are opened, each resampled to
-//! the layout of the first track it feeds, and its blocks go to every track it feeds.
+//! 48 kHz in its own layout (mono, stereo, or 5.1 for anything wider), and its blocks go to
+//! every track it feeds, whose own mixer makes the track's layout. A change of the source's
+//! channel count is announced to the tracks again (`auto` tracks follow it).
 
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, SyncSender, TryRecvError, sync_channel};
@@ -70,8 +72,8 @@ pub struct LiveTarget {
     pub video: SyncSender<LiveEvent>,
     /// Each audio track's queue, in track order.
     pub audio: Vec<SyncSender<LiveAudio>>,
-    /// What each track asks of the input, and its layout.
-    pub audio_tracks: Vec<(TrackWant, AudioLayout)>,
+    /// What each track asks of the input.
+    pub audio_tracks: Vec<TrackWant>,
     /// Pictures at the program's size.
     pub video_spec: VideoSpec,
     /// Pictures at each rung of the program's ladder (`video_spec` is rung 0).
@@ -84,27 +86,13 @@ pub struct LiveTarget {
     pub delay: u64,
 }
 
-/// A track's layout as the worker delivers it.
-pub fn audio_layout(a: &AudioPlan) -> AudioLayout {
-    match a.channels {
-        6 => AudioLayout::Surround51,
-        1 => AudioLayout::Mono,
-        _ => AudioLayout::Stereo,
-    }
-}
-
-/// What each of a program's tracks asks of a live input, and its layout.
-pub fn audio_tracks(p: &ProgramPlan) -> Vec<(TrackWant, AudioLayout)> {
+/// What each of a program's tracks asks of a live input.
+pub fn audio_tracks(p: &ProgramPlan) -> Vec<TrackWant> {
     p.audio
         .iter()
-        .map(|a| {
-            (
-                TrackWant {
-                    language: a.lang.bytes(),
-                    input_track: a.input_track,
-                },
-                audio_layout(a),
-            )
+        .map(|a: &AudioPlan| TrackWant {
+            language: a.lang.bytes(),
+            input_track: a.input_track,
         })
         .collect()
 }
@@ -114,7 +102,7 @@ pub fn audio_tracks(p: &ProgramPlan) -> Vec<(TrackWant, AudioLayout)> {
 fn opens(
     list: &[tb_media::StreamInfo],
     video: VideoSpec,
-    tracks: &[(TrackWant, AudioLayout)],
+    tracks: &[TrackWant],
 ) -> (Vec<StreamOpen>, HashMap<StreamIndex, Vec<usize>>) {
     let audio: Vec<InputAudio> = list
         .iter()
@@ -124,9 +112,8 @@ fn opens(
             language: i.language,
         })
         .collect();
-    let wants: Vec<TrackWant> = tracks.iter().map(|t| t.0).collect();
     let mut routes: HashMap<StreamIndex, Vec<usize>> = HashMap::new();
-    for (k, s) in assign(&audio, &wants).into_iter().enumerate() {
+    for (k, s) in assign(&audio, tracks).into_iter().enumerate() {
         if let Some(s) = s {
             routes.entry(s).or_default().push(k);
         }
@@ -137,9 +124,9 @@ fn opens(
             let output = match info.codec.kind() {
                 MediaKind::Video => OutputSpec::Video(video),
                 MediaKind::Audio => {
-                    let k = *routes.get(&info.index)?.first()?;
+                    routes.get(&info.index)?;
                     OutputSpec::Audio(AudioSpec {
-                        layout: tracks[k].1,
+                        layout: AudioLayout::Source,
                     })
                 }
                 MediaKind::Data => OutputSpec::Native,
@@ -299,7 +286,8 @@ pub fn run_decoder(
     let mut mapper = Mapper::new(MapperConfig::default());
     let mut bases: HashMap<StreamIndex, (Rational, MediaKind)> = HashMap::new();
     let mut grids: HashMap<StreamIndex, GridSnap> = HashMap::new();
-    let mut format_sent = vec![false; target.audio.len()];
+    // the channel count each track was last told of
+    let mut format_sent: Vec<Option<u8>> = vec![None; target.audio.len()];
     let delay = target.delay;
     while !clock.stopping() {
         // Everything the socket delivered goes to the worker (never blocking).
@@ -327,7 +315,7 @@ pub fn run_decoder(
                             for a in &target.audio {
                                 let _ = a.try_send(LiveAudio::Closed);
                             }
-                            format_sent.iter_mut().for_each(|f| *f = false);
+                            format_sent.iter_mut().for_each(|f| *f = None);
                         }
                         // a stream no track takes is not decoded
                         InputEvent::Packet(p) if !opened.contains(&p.stream) => continue,
@@ -412,9 +400,9 @@ pub fn run_decoder(
                         continue;
                     };
                     let mut fmt = None;
-                    if ks.iter().any(|&k| !format_sent[k]) {
+                    if ks.iter().any(|&k| format_sent[k] != Some(a.desc.channels)) {
                         use tb_audio::layout::{InputLayout, Speaker};
-                        // The worker resamples to the track's layout, in A/52 order for 5.1.
+                        // The worker resamples to mono, stereo or 5.1 (A/52 order).
                         let layout = match a.desc.channels {
                             6 => InputLayout::new(&[
                                 Speaker::FrontLeft,
@@ -441,10 +429,10 @@ pub fn run_decoder(
                         let Some(tx) = target.audio.get(k) else {
                             continue;
                         };
-                        if !format_sent[k] {
+                        if format_sent[k] != Some(a.desc.channels) {
                             let Some(f) = fmt else { continue };
                             let _ = tx.try_send(LiveAudio::Format(f));
-                            format_sent[k] = true;
+                            format_sent[k] = Some(a.desc.channels);
                         }
                         if tx
                             .try_send(LiveAudio::Block {

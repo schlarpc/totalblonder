@@ -555,6 +555,9 @@ pub struct AudioPlan {
     pub kbps: u32,
     /// `input_track`: an explicit 1-based position among the live input's audio streams.
     pub input_track: Option<u8>,
+    /// `layout = "auto"`: the coding mode follows the source (mono, stereo or 5.1; the
+    /// descriptor says "at most 6 channels"); `channels` is then 6.
+    pub auto: bool,
 }
 
 /// One program as the runtime needs it.
@@ -1189,9 +1192,14 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
                 let (channels, acmod) = match a.layout.as_str() {
                     "mono" => (1u8, 1u8),
                     "stereo" => (2, 2),
-                    "5.1" => (6, 7),
-                    x => return Err(rule(format!("audio layout {x:?}: mono, stereo or 5.1"))),
+                    "5.1" | "auto" => (6, 7),
+                    x => {
+                        return Err(rule(format!(
+                            "audio layout {x:?}: mono, stereo, 5.1 or auto"
+                        )));
+                    }
                 };
+                let auto = a.layout == "auto";
                 if a.input_track == Some(0) {
                     return Err(rule("audio input_track counts from 1"));
                 }
@@ -1200,6 +1208,7 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
                     channels,
                     kbps: a.kbps,
                     input_track: a.input_track,
+                    auto,
                 });
                 ps_audio.push(Audio {
                     pid: EsPid::new(base + 4 + k as u16)?,
@@ -1208,6 +1217,7 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
                         surround_mode: 0,
                         bsmod: 0,
                         acmod,
+                        max_channels: auto.then_some(6),
                         mainid: k as u8,
                         priority: if k == 0 { 1 } else { 2 },
                         asvcflags: 0,

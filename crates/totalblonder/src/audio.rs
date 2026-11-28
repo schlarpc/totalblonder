@@ -9,7 +9,7 @@ use std::sync::mpsc::{Receiver, SyncSender, TryRecvError};
 
 use tb_ac3::{AudioCodingMode, BitRate, ConfigBuilder, Encoder};
 use tb_audio::clock::AudioFrame;
-use tb_audio::layout::OutputLayout;
+use tb_audio::layout::{Mixer, OutputLayout};
 use tb_audio::pipeline::{InputFormat, TrackConfig, TrackPipeline};
 use tb_mux::AudioAu;
 use tb_timeline::{Source, Ticks27};
@@ -53,6 +53,10 @@ pub struct Track {
     pub tx: SyncSender<CarrierMsg>,
     pipeline: TrackPipeline,
     encoder: Encoder,
+    /// `layout = "auto"`: the mono and stereo encoders and the downmixes that feed them. The
+    /// pipeline runs at 5.1; all three encoders code every frame (so a change of mode has no
+    /// gap in their overlap), and the one matching the source on air is sent.
+    narrow: Option<Narrow>,
     frame: AudioFrame,
     /// Live (index 0) and standby (index 1) audio, and whether each is open in the pipeline.
     feeds: [Option<Receiver<LiveAudio>>; 2],
@@ -68,6 +72,35 @@ pub struct Track {
     pub dropped: Counter,
 }
 
+/// The narrower coding modes of an auto track.
+struct Narrow {
+    mono: (Mixer, Encoder, Vec<Vec<f32>>),
+    stereo: (Mixer, Encoder, Vec<Vec<f32>>),
+    /// The mode sent last (channels: 1, 2 or 6), for the log.
+    on: usize,
+}
+
+/// Downmixes the 5.1 frame and codes it in a narrower mode.
+fn code(
+    (mixer, enc, out): &mut (Mixer, Encoder, Vec<Vec<f32>>),
+    planes: &[&[f32]],
+) -> Result<Vec<u8>, String> {
+    mixer.process(planes, out).map_err(|e| e.to_string())?;
+    let refs: Vec<&[f32]> = out.iter().map(Vec::as_slice).collect();
+    enc.encode_frame(&refs)
+        .map(<[u8]>::to_vec)
+        .map_err(|e| e.to_string())
+}
+
+/// The coding mode for a source of `channels`: 1 stays mono, 2 stereo, more 5.1.
+fn mode_for(channels: usize) -> usize {
+    match channels {
+        1 => 1,
+        2 => 2,
+        _ => 6,
+    }
+}
+
 /// A track that cannot be set up.
 #[derive(Debug, thiserror::Error)]
 pub enum TrackError {
@@ -80,6 +113,9 @@ pub enum TrackError {
     /// A rate the encoder does not have.
     #[error("no A/52 rate of {0} kbit/s")]
     Rate(u32),
+    /// A channel layout.
+    #[error("layout: {0}")]
+    Layout(#[from] tb_audio::layout::LayoutError),
 }
 
 impl Track {
@@ -103,6 +139,30 @@ impl Track {
         };
         let rate = BitRate::from_kbps(plan.kbps).ok_or(TrackError::Rate(plan.kbps))?;
         let cfg = ConfigBuilder::new(mode, lfe, rate).build()?;
+        let narrow = if plan.auto {
+            use tb_audio::layout::{DownmixScaling, InputLayout, Speaker::*};
+            // the pipeline's 5.1 in A/52 order
+            let bed =
+                InputLayout::new(&[FrontLeft, FrontCenter, FrontRight, SideLeft, SideRight, Lfe])?;
+            let enc = |m| -> Result<Encoder, TrackError> {
+                Ok(Encoder::new(ConfigBuilder::new(m, false, rate).build()?))
+            };
+            Some(Narrow {
+                mono: (
+                    Mixer::new(bed, OutputLayout::Mono, DownmixScaling::Unscaled),
+                    enc(AudioCodingMode::Mono)?,
+                    vec![Vec::new()],
+                ),
+                stereo: (
+                    Mixer::new(bed, OutputLayout::Stereo, DownmixScaling::Unscaled),
+                    enc(AudioCodingMode::STEREO)?,
+                    vec![Vec::new(), Vec::new()],
+                ),
+                on: 2,
+            })
+        } else {
+            None
+        };
         let pipeline = TrackPipeline::new(TrackConfig::new(Ticks27(p0 as i64), layout))?;
         Ok(Track {
             carrier,
@@ -112,6 +172,7 @@ impl Track {
             tx,
             pipeline,
             encoder: Encoder::new(cfg),
+            narrow,
             frame: AudioFrame::new(layout),
             feeds,
             open: [false; 2],
@@ -164,10 +225,49 @@ impl Track {
         }
         self.next_pts += FRAME_TICKS;
         let info = self.pipeline.next_frame(&mut self.frame);
-        match self.encoder.encode_frame(&self.frame.planes()) {
-            Ok(bytes) => {
+        let planes = self.frame.planes();
+        // The source on air decides an auto track's mode; the slate is stereo.
+        let want = match (&self.narrow, info.source) {
+            (None, _) => 0,
+            (Some(_), Source::Slate) => 2,
+            (Some(_), s) => self
+                .pipeline
+                .format(s)
+                .map_or(2, |f| mode_for(f.layout.channels())),
+        };
+        let full = self
+            .encoder
+            .encode_frame(&planes)
+            .map(<[u8]>::to_vec)
+            .map_err(|e| e.to_string());
+        let data = match self.narrow.as_mut() {
+            None => full,
+            Some(n) => {
+                if want != n.on {
+                    tracing::info!(
+                        carrier = self.carrier,
+                        program = self.program + 1,
+                        track = self.track + 1,
+                        "audio coding mode: {} -> {} channels",
+                        n.on,
+                        want
+                    );
+                    n.on = want;
+                }
+                // Every encoder codes every frame, so each stays continuous.
+                let m = code(&mut n.mono, &planes);
+                let s = code(&mut n.stereo, &planes);
+                match want {
+                    1 => m,
+                    2 => s,
+                    _ => full,
+                }
+            }
+        };
+        match data {
+            Ok(data) => {
                 let au = AudioAu {
-                    data: bytes.to_vec(),
+                    data,
                     pts: Stc(self.stc0 + info.pts.0.max(0) as u64),
                 };
                 self.frames.inc();

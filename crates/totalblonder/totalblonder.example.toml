@@ -96,7 +96,7 @@ destination = "udp://239.10.0.1:5000"   # udp://, rtp://, or file:/path.ts
   number = 1                  # 1..=6; PMT PID 0x30 + 0x10·(n−1), video +1, audio +4..+6
   service = "wall"
   video = { format = "720p59.94", max_kbps = 12000, min_kbps = 3000, weight = 1.0, priority = 0 }
-  audio = [ { language = "eng", layout = "stereo", kbps = 192 } ]   # layout: mono, stereo or 5.1
+  audio = [ { language = "eng", layout = "stereo", kbps = 192 } ]   # layout: mono, stereo, 5.1 or auto (follows the source; give it 5.1's rate, e.g. 384)
   captions = false            # caption service descriptors for captions the source carries
   # subtitles = "/srv/subs/wall.srt"   # SubRip/WebVTT sent as CEA-608 CC1 + CEA-708 service 1
   live = "studio"           # an [[input]] id; without one the program shows its slate

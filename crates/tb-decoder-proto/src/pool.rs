@@ -327,7 +327,7 @@ impl Streams {
         Ok(())
     }
 
-    /// Resampled audio is 48 kHz with the spec's channel count.
+    /// Resampled audio is 48 kHz with the spec's channel count (`Source`: 1, 2 or 6).
     fn check_audio_spec(&self, d: &AudioFrameDesc) -> Result<(), Violation> {
         let a = self
             .find(d.stream, MediaKind::Audio)
@@ -335,7 +335,11 @@ impl Streams {
         let OutputSpec::Audio(s) = a.output else {
             return Ok(());
         };
-        if d.sample_rate != RESAMPLED_RATE || d.channels != s.layout.channels() {
+        let channels_ok = match s.layout {
+            crate::wire::AudioLayout::Source => matches!(d.channels, 1 | 2 | 6),
+            l => d.channels == l.channels(),
+        };
+        if d.sample_rate != RESAMPLED_RATE || !channels_ok {
             return Err(Violation::Spec(d.stream.0));
         }
         Ok(())
@@ -1081,6 +1085,25 @@ mod tests {
         let _ = t.release(ok);
         au.desc.sample_rate = 44_100;
         assert_eq!(t.accept_audio(&au, &streams, &l), Err(Violation::Spec(1)));
+        au.desc.sample_rate = 48_000;
+        au.desc.channels = 2;
+        assert_eq!(t.accept_audio(&au, &streams, &l), Err(Violation::Spec(1)));
+        // `Source`: mono, stereo or 5.1, and nothing else.
+        streams.replace(&[StreamOpen {
+            info: info(1, CodecId::Aac),
+            output: OutputSpec::Audio(AudioSpec {
+                layout: AudioLayout::Source,
+            }),
+        }]);
+        streams.note_packet(StreamIndex(1), Some(0), None);
+        for (ch, ok) in [(1, true), (2, true), (6, true), (3, false), (8, false)] {
+            au.desc.channels = ch;
+            let r = t.accept_audio(&au, &streams, &l);
+            assert_eq!(r.is_ok(), ok, "{ch} channels: {r:?}");
+            if let Ok(s) = r {
+                let _ = t.release(s);
+            }
+        }
     }
 
     #[test]

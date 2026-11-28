@@ -222,6 +222,8 @@ struct Stream {
     resampler: Option<av::Resampler>,
     /// Resampled audio: position of the next output sample, in 1/48000 s.
     next48: Option<i64>,
+    /// `AudioLayout::Source`: the target chosen for the frames now passing (mask, order).
+    source_target: Option<(u64, &'static [usize])>,
     /// Duration of the last packet (for what a parser still holds at the end).
     last_dur: Option<i64>,
     pool: Option<Pool>,
@@ -405,6 +407,7 @@ impl Worker {
                 pending_mpa: false,
                 scaler: None,
                 resampler: None,
+                source_target: None,
                 next48: None,
                 last_dur: None,
                 pool: None,
@@ -1141,16 +1144,30 @@ impl Worker {
         }
     }
 
-    /// Resampled audio: libswresample to 48 kHz f32 planar, stereo or 5.1 in A/52 order
-    /// (L, C, R, Ls, Rs, LFE). `flush`: what the resampler still holds (at the session's end).
+    /// Resampled audio: libswresample to 48 kHz f32 planar, mono, stereo or 5.1 in A/52 order
+    /// (L, C, R, Ls, Rs, LFE), or (`AudioLayout::Source`) whichever of those the frame is: one
+    /// channel stays mono, two stay stereo, more become 5.1. `flush`: what the resampler still
+    /// holds (at the session's end).
     fn emit_resampled(&mut self, i: usize, spec: AudioSpec, flush: bool) {
-        let (mask, order): (u64, &[usize]) = match spec.layout {
-            // libav's native order of the mask's bits: FL FR
-            AudioLayout::Stereo => (0x3, &[0, 1]),
-            // FC
-            AudioLayout::Mono => (0x4, &[0]),
-            // FL FR FC LFE SL SR in native order; A/52 wants L C R Ls Rs LFE
-            AudioLayout::Surround51 => (0x60f, &[0, 2, 1, 4, 5, 3]),
+        // libav's native order of the mask's bits: FC; FL FR; FL FR FC LFE SL SR (A/52 wants
+        // L C R Ls Rs LFE)
+        const MONO: (u64, &[usize]) = (0x4, &[0]);
+        const STEREO: (u64, &[usize]) = (0x3, &[0, 1]);
+        const FIVE_ONE: (u64, &[usize]) = (0x60f, &[0, 2, 1, 4, 5, 3]);
+        let (mask, order): (u64, &'static [usize]) = match spec.layout {
+            AudioLayout::Stereo => STEREO,
+            AudioLayout::Mono => MONO,
+            AudioLayout::Surround51 => FIVE_ONE,
+            AudioLayout::Source if flush => self.streams[i].source_target.unwrap_or(STEREO),
+            AudioLayout::Source => {
+                let t = match self.frame.audio().2 {
+                    1 => MONO,
+                    2 => STEREO,
+                    _ => FIVE_ONE,
+                };
+                self.streams[i].source_target = Some(t);
+                t
+            }
         };
         let tb = self.streams[i].info.time_base;
         let r48 = match Rational::new(1, RESAMPLED_RATE) {
@@ -1189,7 +1206,7 @@ impl Worker {
         let pts48 = s.next48;
         s.next48 = pts48.map(|p| p + n as i64);
         let pts = pts48.map(|p| r48.rescale(p, tb));
-        let ch = spec.layout.channels();
+        let ch = order.len() as u8;
         let n32 = n as u32;
         let need = audio_bytes(ch, n32);
         if !self.ensure_pool(
@@ -1376,6 +1393,7 @@ fn placeholder() -> Stream {
         pending_mpa: false,
         scaler: None,
         resampler: None,
+        source_target: None,
         next48: None,
         last_dur: None,
         pool: None,
