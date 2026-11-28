@@ -87,6 +87,9 @@ pub struct StatmuxSetup {
     pub pools_ts: Vec<u64>,
     /// PCR interval, ms (for the transport overhead).
     pub pcr_ms: u64,
+    /// Per carrier, its auto audio tracks: the pool grows by what they leave of their ceiling
+    /// and shrinks before one is granted more (`crate::audio::CarrierFlex`).
+    pub flex: Vec<std::sync::Arc<crate::audio::CarrierFlex>>,
 }
 
 /// A program's place in the hub.
@@ -363,6 +366,8 @@ fn finish<D: TickDevice>(
 
 struct Statmux {
     ctl: Vec<Option<tb_statmux::Controller>>,
+    /// Per carrier: the flexible audio budget and its bookkeeping.
+    flex: Vec<FlexState>,
     /// Session index of (carrier, program).
     sessions: Vec<Vec<usize>>,
     pcr_ms: u64,
@@ -406,10 +411,107 @@ fn run_commands(
     }
 }
 
+/// A carrier's auto audio tracks as the statmux sees them.
+struct FlexState {
+    flex: std::sync::Arc<crate::audio::CarrierFlex>,
+    /// The video pool with every auto track at its ceiling (the configuration's).
+    base_ts: u64,
+    /// The programs' fixed transport overhead (for the elementary pool).
+    overhead_ts: u64,
+    /// Per track: since when it has wanted less than it was granted.
+    down_since: Vec<Option<u64>>,
+    /// The elementary pool asked of the controller last.
+    requested: u64,
+}
+
+/// A track that dropped to a cheaper mode gives its rate back after this long (its frames at
+/// the old rate have left the mux by then).
+const FLEX_RELEASE: u64 = HZ;
+
+/// The elementary pool of a transport pool.
+fn pool_es(pool_ts: u64, overhead_ts: u64) -> u64 {
+    pool_ts.saturating_sub(overhead_ts) * 184 / 188
+}
+
+impl FlexState {
+    /// The transport pool when the auto tracks hold `rates`.
+    fn pool_ts(&self, rates: impl Iterator<Item = u64>) -> u64 {
+        let spare: u64 = self
+            .flex
+            .tracks
+            .iter()
+            .zip(rates)
+            .map(|(t, r)| t.ceiling_ts.saturating_sub(r))
+            .sum();
+        self.base_ts + spare
+    }
+
+    /// One pass (SPEC §8.4): a track wanting less is granted less after [`FLEX_RELEASE`] and
+    /// the pool grows; a track wanting more makes the pool shrink and is granted when the
+    /// controller has reached the smaller pool.
+    fn step(&mut self, ctl: &mut tb_statmux::Controller, now: u64) {
+        use std::sync::atomic::Ordering::Relaxed;
+        if self.flex.tracks.is_empty() {
+            return;
+        }
+        let mut hold = Vec::with_capacity(self.flex.tracks.len());
+        let mut ups = Vec::new();
+        for (k, t) in self.flex.tracks.iter().enumerate() {
+            let (w, mut g) = (t.want_ts.load(Relaxed), t.granted_ts.load(Relaxed));
+            if w < g {
+                let since = *self.down_since[k].get_or_insert(now);
+                if now >= since + FLEX_RELEASE {
+                    tracing::info!(
+                        program = t.program + 1,
+                        track = t.track + 1,
+                        "audio rate given back to video: {} -> {} bit/s (transport)",
+                        g,
+                        w
+                    );
+                    t.granted_ts.store(w, Relaxed);
+                    g = w;
+                    self.down_since[k] = None;
+                }
+            } else {
+                self.down_since[k] = None;
+            }
+            if w > g {
+                ups.push(k);
+            }
+            hold.push(w.max(g));
+        }
+        let target = pool_es(self.pool_ts(hold.into_iter()), self.overhead_ts);
+        if target != self.requested {
+            match ctl.request_pool(target) {
+                Ok(()) => self.requested = target,
+                Err(e) => {
+                    tracing::warn!("statmux: an audio track's wider mode does not fit: {e}");
+                    return;
+                }
+            }
+        }
+        if !ups.is_empty() && ctl.pool() <= self.requested {
+            for k in ups {
+                let t = &self.flex.tracks[k];
+                let w = t.want_ts.load(Relaxed);
+                tracing::info!(
+                    program = t.program + 1,
+                    track = t.track + 1,
+                    "audio rate granted from the video pool: {} -> {} bit/s (transport)",
+                    t.granted_ts.load(Relaxed),
+                    w
+                );
+                t.granted_ts.store(w, Relaxed);
+            }
+        }
+    }
+}
+
 fn statmux_setup(setup: &StatmuxSetup, sessions: &[HubSession]) -> Result<Statmux, String> {
     let n = setup.pools_ts.len();
     let mut sm = Statmux {
         ctl: Vec::new(),
+        flex: Vec::new(),
         sessions: vec![Vec::new(); n],
         pcr_ms: setup.pcr_ms,
         next_tick: 0,
@@ -429,6 +531,13 @@ fn statmux_setup(setup: &StatmuxSetup, sessions: &[HubSession]) -> Result<Statmu
             .collect();
         if progs.is_empty() {
             sm.ctl.push(None);
+            sm.flex.push(FlexState {
+                flex: Default::default(),
+                base_ts: *pool_ts,
+                overhead_ts: 0,
+                down_since: Vec::new(),
+                requested: 0,
+            });
             continue;
         }
         // Elementary pool: the transport pool less each program's fixed overhead, at 184/188.
@@ -436,7 +545,23 @@ fn statmux_setup(setup: &StatmuxSetup, sessions: &[HubSession]) -> Result<Statmu
             .iter()
             .map(|s| s.plan.ts_bps_for(0, setup.pcr_ms) + 1)
             .sum();
-        let pool_es = pool_ts.saturating_sub(overhead) * 184 / 188;
+        let mut flex = FlexState {
+            flex: setup.flex.get(c).cloned().unwrap_or_default(),
+            base_ts: *pool_ts,
+            overhead_ts: overhead,
+            down_since: Vec::new(),
+            requested: 0,
+        };
+        flex.down_since = vec![None; flex.flex.tracks.len()];
+        // The pool starts with what the auto tracks leave of their ceilings.
+        let start_ts = flex.pool_ts(
+            flex.flex
+                .tracks
+                .iter()
+                .map(|t| t.granted_ts.load(std::sync::atomic::Ordering::Relaxed)),
+        );
+        let pool_es = pool_es(start_ts, overhead);
+        flex.requested = pool_es;
         let params: Vec<tb_statmux::ProgramParams> = progs
             .iter()
             .map(|s| tb_statmux::ProgramParams {
@@ -456,6 +581,7 @@ fn statmux_setup(setup: &StatmuxSetup, sessions: &[HubSession]) -> Result<Statmu
         let (ctl, _) = tb_statmux::Controller::new(cfg, &params)
             .map_err(|e| format!("statmux carrier {c}: {e}"))?;
         sm.ctl.push(Some(ctl));
+        sm.flex.push(flex);
     }
     Ok(sm)
 }
@@ -785,6 +911,10 @@ pub fn run<D: TickDevice>(
                 if !cmds.is_empty() {
                     run_commands(cmds, c, m, &sessions, &ids, eng.enc_mut());
                 }
+                // After the commands: a grant is made only once the mux has been lowered.
+                if let (Some(ctl), Some(f)) = (m.ctl[c].as_mut(), m.flex.get_mut(c)) {
+                    f.step(ctl, wake);
+                }
             }
         }
         // The encoder's counters, once a second.
@@ -932,5 +1062,90 @@ pub fn run<D: TickDevice>(
             }
         }
         k += 1;
+    }
+}
+
+#[cfg(test)]
+mod flex_tests {
+    use super::*;
+    use crate::audio::{CarrierFlex, FlexTrack};
+    use std::sync::Arc;
+    use std::sync::atomic::Ordering::Relaxed;
+
+    const STEREO: u64 = 235_000;
+    const FIVE_ONE: u64 = 423_000;
+
+    fn setup(max_bps: u64) -> (FlexState, tb_statmux::Controller) {
+        let flex = Arc::new(CarrierFlex {
+            tracks: vec![FlexTrack::new(0, 0, FIVE_ONE, STEREO)],
+        });
+        let mut f = FlexState {
+            flex,
+            base_ts: 30_000_000,
+            overhead_ts: 0,
+            down_since: vec![None],
+            requested: 0,
+        };
+        f.requested = pool_es(f.pool_ts([STEREO].into_iter()), 0);
+        let cfg = tb_statmux::Config {
+            pool_bps: f.requested,
+            alpha: 0.85,
+            max_step: 0.15,
+            hysteresis: 0.03,
+            smoothing: 0.3,
+            delay: HZ / 2,
+        };
+        let p = tb_statmux::ProgramParams {
+            min_bps: 2_000_000,
+            max_bps,
+            weight: 1.0,
+        };
+        let (ctl, _) = tb_statmux::Controller::new(cfg, &[p, p]).unwrap();
+        (f, ctl)
+    }
+
+    /// Video uses all of the pool: a wider mode waits until the controller has made room.
+    #[test]
+    fn a_wider_mode_waits_for_the_room() {
+        let (mut f, mut ctl) = setup(50_000_000);
+        let flex = f.flex.clone();
+        let t = &flex.tracks[0];
+        let before = ctl.pool();
+        t.want_ts.store(FIVE_ONE, Relaxed);
+        f.step(&mut ctl, 0);
+        assert_eq!(
+            t.granted_ts.load(Relaxed),
+            STEREO,
+            "not before the mux is lowered"
+        );
+        assert_eq!(ctl.pool(), before);
+        assert_eq!(
+            f.requested,
+            pool_es(30_000_000, 0),
+            "the pool asked for leaves the track its ceiling"
+        );
+    }
+
+    /// Video leaves room: granted in the same pass; and a narrower mode gives the rate back
+    /// only after FLEX_RELEASE, growing the pool.
+    #[test]
+    fn room_is_granted_at_once_and_given_back_later() {
+        let (mut f, mut ctl) = setup(5_000_000);
+        let flex = f.flex.clone();
+        let t = &flex.tracks[0];
+        t.want_ts.store(FIVE_ONE, Relaxed);
+        f.step(&mut ctl, 0);
+        assert_eq!(t.granted_ts.load(Relaxed), FIVE_ONE);
+        let small = ctl.pool();
+        t.want_ts.store(STEREO, Relaxed);
+        f.step(&mut ctl, HZ / 2);
+        assert_eq!(
+            t.granted_ts.load(Relaxed),
+            FIVE_ONE,
+            "held while its frames drain"
+        );
+        f.step(&mut ctl, HZ / 2 + FLEX_RELEASE);
+        assert_eq!(t.granted_ts.load(Relaxed), STEREO);
+        assert!(ctl.pool() > small);
     }
 }

@@ -827,6 +827,20 @@ order differs by direction (software-survey §5.3 item 4):
 - **Funding.** An increase may use only rate released by decreases that have completed. In
   between, the released rate is sent as nulls.
 
+**Audio that follows its source [built].** An `auto` audio track (§8.3) codes mono at most
+96, stereo at most 192 and 5.1 at its `kbps` (the descriptor's `bit_rate_code` says "at most
+`kbps`", MSB 1, A/53-3 §5.8.1.1), and with the statmux on, what it leaves of its ceiling is
+part of the video pool. The carrier's budget still holds every track at its ceiling, so the
+worst case always fits. The same order holds across audio and video: a track that needs a
+wider mode says so and keeps its current one until the statmux has *reached* a pool smaller
+by the difference (`tb_statmux::Controller::request_pool`: the decreases it needs are made at
+the next tick without hysteresis, and the pool shrinks only once the mux rates fit under
+it), and only then is it granted. A track that drops to a narrower mode does so at once and
+gives the rate back one second later, when its frames at the old rate have left the mux.
+Checked on nixark (2026-11-28) with three live 720p programs filling the pool: a program
+gave up about 370 kbit/s before each grant, the track's frames were 1536 bytes in 5.1 and 768
+in stereo, and the self-check found nothing.
+
 ### 8.6 Encoder lag
 
 "Has taken effect" is measured, not assumed (software-survey §11 item 3). `set_rate` returns a

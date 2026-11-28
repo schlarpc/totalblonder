@@ -68,16 +68,89 @@ pub struct Track {
     next_pts: u64,
     /// Frames made.
     pub frames: Counter,
+    /// The rate being sent, bit/s (an auto track's follows its mode).
+    pub rate: crate::metrics::Gauge,
     /// Frames refused by a full carrier queue.
     pub dropped: Counter,
+}
+
+/// The rates of a carrier's auto tracks, shared between the audio thread and the statmux
+/// (SPEC §8.4): a track says what its source's mode needs, the statmux frees that from the
+/// video pool first and only then grants it. The rates are transport bit/s.
+#[derive(Debug, Default)]
+pub struct CarrierFlex {
+    /// The carrier's auto tracks.
+    pub tracks: Vec<FlexTrack>,
+}
+
+/// One auto track's share of [`CarrierFlex`].
+#[derive(Debug)]
+pub struct FlexTrack {
+    /// Program index within the carrier.
+    pub program: usize,
+    /// Track index within the program.
+    pub track: usize,
+    /// The rate of its widest mode: what the carrier's budget reserves for it.
+    pub ceiling_ts: u64,
+    /// What the mode of the source on air needs.
+    pub want_ts: std::sync::atomic::AtomicU64,
+    /// What the statmux has made room for: the track sends nothing that needs more.
+    pub granted_ts: std::sync::atomic::AtomicU64,
+}
+
+impl FlexTrack {
+    /// A track starting granted `start_ts` (its stereo rate: the slate is stereo).
+    pub fn new(program: usize, track: usize, ceiling_ts: u64, start_ts: u64) -> Self {
+        FlexTrack {
+            program,
+            track,
+            ceiling_ts,
+            want_ts: start_ts.into(),
+            granted_ts: start_ts.into(),
+        }
+    }
 }
 
 /// The narrower coding modes of an auto track.
 struct Narrow {
     mono: (Mixer, Encoder, Vec<Vec<f32>>),
     stereo: (Mixer, Encoder, Vec<Vec<f32>>),
-    /// The mode sent last (channels: 1, 2 or 6), for the log.
+    /// The mode sent last (channels: 1, 2 or 6).
     on: usize,
+    /// Each mode's rate, kbit/s: mono, stereo, 5.1.
+    kbps: [u32; 3],
+    /// Its share of the carrier's flexible budget (none without the statmux: every mode may
+    /// be sent at any time, the budget holding the ceiling).
+    flex: Option<(std::sync::Arc<CarrierFlex>, usize)>,
+}
+
+impl Narrow {
+    fn kbps(&self, mode: usize) -> u32 {
+        match mode {
+            1 => self.kbps[0],
+            2 => self.kbps[1],
+            _ => self.kbps[2],
+        }
+    }
+
+    /// The mode to send when the source wants `want`: it, if its rate is granted; else the
+    /// mode in use (whose rate is).
+    fn choose(&self, want: usize) -> usize {
+        let Some((f, k)) = &self.flex else {
+            return want;
+        };
+        let Some(t) = f.tracks.get(*k) else {
+            return want;
+        };
+        use std::sync::atomic::Ordering::Relaxed;
+        let need = crate::config::ac3_ts_bps(self.kbps(want));
+        t.want_ts.store(need, Relaxed);
+        if need <= t.granted_ts.load(Relaxed) {
+            want
+        } else {
+            self.on
+        }
+    }
 }
 
 /// Downmixes the 5.1 frame and codes it in a narrower mode.
@@ -131,6 +204,7 @@ impl Track {
         tx: SyncSender<CarrierMsg>,
         feeds: [Option<Receiver<LiveAudio>>; 2],
         follow: Option<crate::metrics::Gauge>,
+        flex: Option<(std::sync::Arc<CarrierFlex>, usize)>,
     ) -> Result<Track, TrackError> {
         let (layout, mode, lfe) = match plan.channels {
             6 => (OutputLayout::FivePointOne, AudioCodingMode::THREE_TWO, true),
@@ -144,21 +218,24 @@ impl Track {
             // the pipeline's 5.1 in A/52 order
             let bed =
                 InputLayout::new(&[FrontLeft, FrontCenter, FrontRight, SideLeft, SideRight, Lfe])?;
-            let enc = |m| -> Result<Encoder, TrackError> {
+            let enc = |m, kbps: u32| -> Result<Encoder, TrackError> {
+                let rate = BitRate::from_kbps(kbps).ok_or(TrackError::Rate(kbps))?;
                 Ok(Encoder::new(ConfigBuilder::new(m, false, rate).build()?))
             };
             Some(Narrow {
                 mono: (
                     Mixer::new(bed, OutputLayout::Mono, DownmixScaling::Unscaled),
-                    enc(AudioCodingMode::Mono)?,
+                    enc(AudioCodingMode::Mono, plan.mode_kbps[0])?,
                     vec![Vec::new()],
                 ),
                 stereo: (
                     Mixer::new(bed, OutputLayout::Stereo, DownmixScaling::Unscaled),
-                    enc(AudioCodingMode::STEREO)?,
+                    enc(AudioCodingMode::STEREO, plan.mode_kbps[1])?,
                     vec![Vec::new(), Vec::new()],
                 ),
                 on: 2,
+                kbps: plan.mode_kbps,
+                flex,
             })
         } else {
             None
@@ -180,6 +257,17 @@ impl Track {
             on: Source::Slate,
             next_pts: p0,
             frames: Counter::default(),
+            rate: {
+                let g = crate::metrics::Gauge::default();
+                g.set(
+                    u64::from(if plan.auto {
+                        plan.mode_kbps[1]
+                    } else {
+                        plan.kbps
+                    }) * 1000,
+                );
+                g
+            },
             dropped: Counter::default(),
         })
     }
@@ -227,7 +315,7 @@ impl Track {
         let info = self.pipeline.next_frame(&mut self.frame);
         let planes = self.frame.planes();
         // The source on air decides an auto track's mode; the slate is stereo.
-        let want = match (&self.narrow, info.source) {
+        let source_wants = match (&self.narrow, info.source) {
             (None, _) => 0,
             (Some(_), Source::Slate) => 2,
             (Some(_), s) => self
@@ -243,6 +331,7 @@ impl Track {
         let data = match self.narrow.as_mut() {
             None => full,
             Some(n) => {
+                let want = n.choose(source_wants);
                 if want != n.on {
                     tracing::info!(
                         carrier = self.carrier,
@@ -253,6 +342,7 @@ impl Track {
                         want
                     );
                     n.on = want;
+                    self.rate.set(u64::from(n.kbps(want)) * 1000);
                 }
                 // Every encoder codes every frame, so each stays continuous.
                 let m = code(&mut n.mono, &planes);

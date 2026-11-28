@@ -558,6 +558,21 @@ pub struct AudioPlan {
     /// `layout = "auto"`: the coding mode follows the source (mono, stereo or 5.1; the
     /// descriptor says "at most 6 channels"); `channels` is then 6.
     pub auto: bool,
+    /// An auto track's rate in each mode, kbit/s: mono, stereo, 5.1 (`kbps`, the ceiling;
+    /// the others at most 96 and 192). With the statmux the difference to the ceiling goes to
+    /// video while it is not used.
+    pub mode_kbps: [u32; 3],
+}
+
+impl AudioPlan {
+    /// The rate of the mode for `channels` (1, 2 or 6), kbit/s.
+    pub fn kbps_for(&self, channels: usize) -> u32 {
+        match channels {
+            1 => self.mode_kbps[0],
+            2 => self.mode_kbps[1],
+            _ => self.mode_kbps[2],
+        }
+    }
 }
 
 /// One program as the runtime needs it.
@@ -1209,6 +1224,11 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
                     kbps: a.kbps,
                     input_track: a.input_track,
                     auto,
+                    mode_kbps: if auto {
+                        [a.kbps.min(96), a.kbps.min(192), a.kbps]
+                    } else {
+                        [a.kbps; 3]
+                    },
                 });
                 ps_audio.push(Audio {
                     pid: EsPid::new(base + 4 + k as u16)?,
@@ -1218,6 +1238,7 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
                         bsmod: 0,
                         acmod,
                         max_channels: auto.then_some(6),
+                        rate_upper_limit: auto,
                         mainid: k as u8,
                         priority: if k == 0 { 1 } else { 2 },
                         asvcflags: 0,

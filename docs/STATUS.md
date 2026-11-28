@@ -57,7 +57,7 @@ frame clock and fallback selector are used by the server (`source.rs`).
 | `tb-mux` | Constant-rate MPTS per carrier: slot clock with exact PCR, T-STD admission (transport, system, smoothing, AC-3 buffers), video by `DTS − D` through token buckets, audio by PTS, late-AU policy, table carousel with STT | 20 s simulations; TSDuck: 0 PCR over 1 µs jitter, rate exactly 38.8 Mbit/s, 0 continuity errors |
 | `tb-output` | UDP and RTP framing, UDP (multicast with interface and TTL) and file sinks, the pacer that owns time and covers a late mux with nulls | real time on nixark: 99.8 % of datagrams within 50 µs |
 | `tb-ts-verify` | Independent checker (147 rules): TR 101 290, cable table rules, PSIP cross-checks, T-STD; library and CLI | agrees with TSDuck; finds nothing in our streams, offline or real time |
-| `tb-statmux` | A carrier's video pool by complexity, lower before raise, never overcommitted | simulation tests |
+| `tb-statmux` | A carrier's video pool by complexity, lower before raise, never overcommitted; the pool moves for `auto` audio tracks (a smaller pool only once the mux fits it) | simulation tests; nixark, three live programs, 2026-11-28 |
 | Step-down (`overload.rs`, `video.rs`) | Under sustained overload the lowest-priority program steps down its ladder (default to 480i): new session opened first, the old one ended with `sequence_end_code`, a gap of the new buffer delay, the mux and statmux reconfigured with the new stream, the decoder worker re-specced; back up after 5 min without loss (SPEC §12.1) | 96 × 1080i on nixark: steps every window, the switched stream conformant at the switch |
 
 ### 1.4 Audio

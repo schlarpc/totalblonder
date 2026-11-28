@@ -56,6 +56,7 @@ fn program(n: u16) -> Program {
                 bsmod: 0,
                 acmod: 2,
                 max_channels: None,
+                rate_upper_limit: false,
                 mainid: 0,
                 priority: 1,
                 asvcflags: 0,

@@ -639,6 +639,7 @@ mod tests {
         let mut reached = None;
         for k in 0..300u64 {
             let t = k * frame;
+            #[allow(clippy::needless_range_loop)]
             for i in 0..2 {
                 let tk = if seen[i] != sim.ticket[i] {
                     seen[i] = sim.ticket[i];

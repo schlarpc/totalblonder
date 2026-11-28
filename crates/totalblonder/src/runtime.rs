@@ -54,6 +54,48 @@ pub enum Mode {
 struct Built {
     carriers: Vec<CarrierState>,
     senders: Vec<std::sync::mpsc::SyncSender<CarrierMsg>>,
+    /// Per carrier, its auto tracks' rates (empty without the statmux: nothing flexes).
+    flex: Vec<std::sync::Arc<crate::audio::CarrierFlex>>,
+}
+
+/// The auto tracks of each carrier, starting at their stereo rate (the slate is stereo).
+fn carrier_flex(plant: &Plant) -> Vec<std::sync::Arc<crate::audio::CarrierFlex>> {
+    plant
+        .carriers
+        .iter()
+        .map(|c| {
+            let tracks = c
+                .programs
+                .iter()
+                .flat_map(|p| p.audio.iter().enumerate().map(move |(k, a)| (p, k, a)))
+                .filter(|(_, _, a)| a.auto && plant.statmux.is_some())
+                .map(|(p, k, a)| {
+                    crate::audio::FlexTrack::new(
+                        p.index,
+                        k,
+                        crate::config::ac3_ts_bps(a.kbps_for(6)),
+                        crate::config::ac3_ts_bps(a.kbps_for(2)),
+                    )
+                })
+                .collect();
+            std::sync::Arc::new(crate::audio::CarrierFlex { tracks })
+        })
+        .collect()
+}
+
+/// A track's share of its carrier's flexible budget, if it has one.
+fn flex_of(
+    built: &Built,
+    carrier: usize,
+    program: usize,
+    track: usize,
+) -> Option<(std::sync::Arc<crate::audio::CarrierFlex>, usize)> {
+    let f = built.flex.get(carrier)?;
+    let k = f
+        .tracks
+        .iter()
+        .position(|t| t.program == program && t.track == track)?;
+    Some((f.clone(), k))
 }
 
 fn stc0_for(id: u8, unix_nanos: i128) -> u64 {
@@ -80,7 +122,11 @@ fn build_carriers(plant: &Plant, unix0: i128) -> anyhow::Result<Built> {
         carriers.push(state);
         senders.push(tx);
     }
-    Ok(Built { carriers, senders })
+    Ok(Built {
+        carriers,
+        senders,
+        flex: carrier_flex(plant),
+    })
 }
 
 /// A program's live wiring: what its input's decoder thread sends it.
@@ -314,6 +360,7 @@ fn audio_tracks(
                         built.senders[ci].clone(),
                         rx,
                         follow,
+                        flex_of(built, ci, p.index, k),
                     )
                     .with_context(|| {
                         format!("carrier {} program {} audio {k}", c.id, p.index + 1)
@@ -456,6 +503,7 @@ fn hub<D: TickDevice>(
 /// is reported here.
 fn start_video(
     plant: &Plant,
+    flex: &[std::sync::Arc<crate::audio::CarrierFlex>],
     sessions: Vec<HubSession>,
     timing: HubTiming,
     clock: Box<dyn Clock>,
@@ -486,6 +534,7 @@ fn start_video(
         plan,
         pools_ts: plant.carriers.iter().map(|c| c.video_pool_ts).collect(),
         pcr_ms: plant.output.pcr_interval_ms,
+        flex: flex.to_vec(),
     });
     let overload = Some(video::OverloadSetup {
         plan: plant.overload,
@@ -582,6 +631,7 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
             });
             let video = start_video(
                 &plant,
+                &built.flex,
                 sessions,
                 HubTiming {
                     p0,
@@ -728,9 +778,10 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
                 );
                 reg.add(
                     "audio_queue_full_total",
-                    l,
+                    l.clone(),
                     Value::Counter(t.dropped.clone()),
                 );
+                reg.add("audio_rate_bps", l, Value::Gauge(t.rate.clone()));
             }
             let aclock = RealClock::new(epoch, stop.clone());
             let audio = std::thread::Builder::new()
@@ -746,6 +797,7 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
                 .collect();
             let video = start_video(
                 &plant,
+                &built.flex,
                 sessions,
                 HubTiming {
                     p0,

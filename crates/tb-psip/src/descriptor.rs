@@ -67,6 +67,9 @@ pub struct Ac3Descriptor {
     pub bsmod: u8,
     /// acmod (1..=7; 0, dual mono, is prohibited on cable).
     pub acmod: u8,
+    /// `bit_rate_index` is the upper limit of a rate that varies (MSB 1, A/52 Table A4.3;
+    /// A/53-3 §5.8.1.1 allows '100000' to '101111').
+    pub rate_upper_limit: bool,
     /// A stream whose coding mode follows its source: `num_channels` says "at most this many
     /// channels", LFE counted (1..=6; A/52 Table A4.5, MSB 1), and `acmod` is not sent.
     pub max_channels: Option<u8>,
@@ -181,8 +184,9 @@ impl Descriptor {
                 };
                 // sample_rate_code '000' (48 kHz), bsid 8 (A/52 Table A4.2; digest §4.4).
                 b.push(0x08);
-                // bit_rate_code: MSB 0 = exact rate (Table A4.3); surround_mode.
-                b.push((a.bit_rate_index << 2) | (a.surround_mode & 3));
+                // bit_rate_code: MSB 0 exact, 1 upper limit (Table A4.3); surround_mode.
+                let code = a.bit_rate_index | if a.rate_upper_limit { 0x20 } else { 0 };
+                b.push((code << 2) | (a.surround_mode & 3));
                 // bsmod, num_channels, full_svc 1.
                 b.push((a.bsmod << 5) | (num_channels << 1) | 1);
                 // langcod: reserved, 0xFF on cable (SCTE 54 §7.9.3.1 item 3).
@@ -303,6 +307,7 @@ mod tests {
             bsmod: 0,
             acmod: 2,
             max_channels: None,
+            rate_upper_limit: false,
             mainid: 0,
             priority: 1,
             asvcflags: 0,
@@ -326,12 +331,17 @@ mod tests {
             bsmod: 0,
             acmod: 7,
             max_channels: Some(6),
+            rate_upper_limit: false,
             mainid: 0,
             priority: 1,
             asvcflags: 0,
             lang: Lang::ENG,
         };
         assert_eq!(bytes(Descriptor::Ac3(a.clone()))[4], 0x1B);
+        // bit_rate_code '101110': at most 384 kbit/s.
+        let mut upto = a.clone();
+        upto.rate_upper_limit = true;
+        assert_eq!(bytes(Descriptor::Ac3(upto))[3] >> 2, 0b10_1110);
         let mut two = a.clone();
         two.max_channels = Some(2);
         assert_eq!(bytes(Descriptor::Ac3(two))[4], 0b0001_0011);
