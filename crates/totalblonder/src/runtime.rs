@@ -931,7 +931,8 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
             }
             if let Some(d) = plant.device.clone() {
                 let g = crate::device::DeviceGauges::register(&mut reg, &d.desired);
-                match read_credentials(&d.credentials_file) {
+                let report = d.supervisor.mode == tb_eqam::supervisor::ReconcileMode::Report;
+                match read_credentials(&d.credentials_file, report) {
                     Ok(creds) => {
                         let clock = RealClock::new(epoch, stop.clone());
                         threads.push(std::thread::Builder::new().name("device".into()).spawn(
@@ -1058,9 +1059,44 @@ pub fn run(plant: Plant, mode: Mode, tel: &tb_telemetry::Telemetry) -> anyhow::R
 }
 
 /// Reads `user\npassword` from a credentials file (SPEC §10.1: never from the TOML).
-fn read_credentials(p: &std::path::Path) -> anyhow::Result<tb_eqam::types::Credentials> {
+/// The account the supervisor logs in with. The file holds the Administrator (user, then
+/// password) and optionally, on lines 3 and 4, a read-only account (the box's Guest): in
+/// report mode, which never writes, that one is used, so the supervisor does not hold the
+/// single Administrator session and log people out of the web UI (SPEC §18 item 10).
+fn read_credentials(
+    p: &std::path::Path,
+    report: bool,
+) -> anyhow::Result<tb_eqam::types::Credentials> {
     let text = std::fs::read_to_string(p).with_context(|| p.display().to_string())?;
-    let mut l = text.lines();
-    let (u, pw) = (l.next().unwrap_or("").trim(), l.next().unwrap_or("").trim());
+    let l: Vec<&str> = text.lines().map(str::trim).collect();
+    let at = |i: usize| l.get(i).copied().unwrap_or("");
+    let (u, pw) = if report && !at(2).is_empty() && !at(3).is_empty() {
+        tracing::info!(user = at(2), "device: polling with the read-only account");
+        (at(2), at(3))
+    } else {
+        (at(0), at(1))
+    };
     tb_eqam::types::Credentials::new(u, pw).map_err(|e| anyhow::anyhow!("{}: {e}", p.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn report_mode_polls_with_the_read_only_account_when_there_is_one() {
+        let dir = std::env::temp_dir().join(format!("tb-creds-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let both = dir.join("both");
+        std::fs::write(&both, "Admin\nsecret\nGuest\nother\n").unwrap();
+        let admin_only = dir.join("admin");
+        std::fs::write(&admin_only, "Admin\nsecret\n").unwrap();
+        assert_eq!(read_credentials(&both, true).unwrap().username(), "Guest");
+        assert_eq!(read_credentials(&both, false).unwrap().username(), "Admin");
+        assert_eq!(
+            read_credentials(&admin_only, true).unwrap().username(),
+            "Admin"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

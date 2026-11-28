@@ -1754,8 +1754,11 @@ For the owner:
    "now/next" call from producers, or placeholders only?
 9. **Caption and audio sources.** No current producer has audio or captions. Which comes
    first?
-10. **Supervisor login.** The supervisor's Admin session logs a human out of the web UI and
-    the reverse. Is the Guest account (read-only, untested here) acceptable for polling?
+10. **Supervisor login. [done 2026-11-28]** The supervisor's Admin session logs a human out
+    of the web UI and the reverse. A Guest login reads every page the supervisor polls
+    (status, QAM config, Stream Info, Diagnostics, Debug, event log, Status Edit) without
+    ending the Admin session. In report mode the supervisor now uses the read-only account
+    from lines 3-4 of its credentials file when they are there; apply mode still needs Admin.
 11. **Syslog. [done 2026-11-27: destination 10.42.0.10:514 (VictoriaLogs), all three
     categories on; takes effect at the next boot; FIRST-AIR §0]** The box sent syslog to
     10.42.0.53 with all categories disabled (device §4, §11.3).

@@ -62,7 +62,7 @@ hysteresis = 0.03
 
 [device]                      # the modulator's supervisor; omit the section to run without one
 base_url = "http://10.42.0.184"
-credentials_file = "/run/credentials/totalblonder/eqam"   # two lines: user, password
+credentials_file = "/run/credentials/totalblonder/eqam"   # user, password; optionally a read-only user and password on lines 3-4 (used in report mode)
 reconcile = "report"          # report | apply (writes only the stream table and RF plan forms)
 status_interval_s = 30
 level_dbmv = 40
