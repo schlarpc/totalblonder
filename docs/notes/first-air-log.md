@@ -1,4 +1,8 @@
-# First air: putting a carrier on the modulator
+# First air: the log of one plant
+
+> This is the record of how the first plant was brought up, with that plant's addresses,
+> switch ports and dates. It is kept as evidence for what the docs claim. To set up your own,
+> follow [`../GUIDE.md`](../GUIDE.md) §9.
 
 A runbook for the first time a stream from `totalblonder` reaches the EQAM-420B. It replaces
 SPEC M0's ffmpeg-plus-`tsp` spike: the server now produces the stream itself

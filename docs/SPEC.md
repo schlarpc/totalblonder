@@ -1,5 +1,10 @@
 # totalblonder — design spec
 
+> This is the design record: what the server must do and why, written before the code and
+> kept as decisions were made and features were built (sections marked **[built]**). For using
+> the server, see [`GUIDE.md`](GUIDE.md); for what exists today, [`STATUS.md`](STATUS.md).
+> Dates and "has not been run" statements below are from when each part was written.
+
 Status: draft v1, 2026-11-24. Written before any server code exists and before anything has
 been sent to the modulator's data ports. §19 lists what has been verified so far. The
 hardware spike M0 (§16) has not been run; it settles the items marked [unknown] in §2 and
@@ -1767,7 +1772,7 @@ For the owner:
    one receiver, so multicast reaches the box even if no switch acts on its IGMP joins. GIGE1
    answers ARP, so unicast is the fallback.
 2. **Manual mode. [done 2026-11-27: Manual mode set and both GigE ports re-addressed by one
-   save, verified by EEPROM dumps; FIRST-AIR §0]** What an `admin.cgi` save writes is now known (firmware §4.1).
+   save, verified by EEPROM dumps; notes/first-air-log.md §0]** What an `admin.cgi` save writes is now known (firmware §4.1).
    Only the fields present in the POST are applied, and a changed GigE address reboots the box
    right after the write. The plan is one POST, made by hand with the owner present, carrying
    only `configMode=1` and the six GigE fields. The box then reboots into Manual mode with both
@@ -1794,7 +1799,7 @@ For the owner:
     ending the Admin session. In report mode the supervisor now uses the read-only account
     from lines 3-4 of its credentials file when they are there; apply mode still needs Admin.
 11. **Syslog. [done 2026-11-27: destination 10.42.0.10:514 (VictoriaLogs), all three
-    categories on; takes effect at the next boot; FIRST-AIR §0]** The box sent syslog to
+    categories on; takes effect at the next boot; notes/first-air-log.md §0]** The box sent syslog to
     10.42.0.53 with all categories disabled (device §4, §11.3).
 12. **1080i.** Is interlaced MPEG-2 output wanted at all? It costs about 3.5 times a 720p
     channel (software-survey §12 item 5).

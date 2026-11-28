@@ -1,134 +1,101 @@
 # totalblonder
 
 totalblonder turns network video into digital cable channels. It is a Rust server that feeds a
-Blonder Tongue EQAM-420B edge QAM modulator, so that an ordinary cable-ready TV can tune the
-streams as numbered channels with names and a program guide. The repository also holds the
-reverse engineering of that modulator: its firmware, its web interface and its defects.
+Blonder Tongue EQAM-420B edge QAM modulator, so that ordinary cable-ready TVs can tune your
+streams as numbered channels, with names, a program guide, second-language audio, closed
+captions and parental ratings.
 
-## What it does
+It takes live pushes (RTMP, SRT, MPEG-TS), pulls HLS, and can run a generated VOD playlist as
+a 24/7 scheduled channel. It encodes MPEG-2 video on the GPU and AC-3 audio, builds one
+constant-rate transport stream per QAM carrier with all the tables a TV needs, and supervises
+the modulator through its web interface.
 
-- **Takes live inputs**: RTMP pushes (tested with ffmpeg, GStreamer and librtmp publishers), MPEG-TS over UDP or
-  RTP, and MPEG-TS files played in a loop. Each channel can have a live input, a standby
-  input and a generated slate, and switches between them on its own when an input fails.
-- **Encodes for cable TVs**: MPEG-2 video on an NVIDIA GPU (480i up to 1080i/1080p), AC-3
-  audio with loudness control, and closed captions from SubRip or WebVTT files.
-- **Builds the transport streams**: one constant-rate multi-program stream per QAM carrier,
-  with exact clock references and the cable tables a TV needs for channel numbers, names, the
-  clock, the guide and content ratings. An independent checker in this repository verifies
-  every output packet while the server runs.
-- **Supervises the modulator**: reads its configuration and status through its web forms,
-  reports drift and, when allowed, writes the stream table and RF plan.
+The repository also holds the reverse engineering of the EQAM-420B: its firmware, its web
+interface and its defects.
 
-The whole plant is set up in one TOML file
-(`crates/totalblonder/totalblonder.example.toml` lists every key). The guide comes from a JSON
-file that the server reads again every 10 seconds.
+## Features
+
+- **Inputs:** RTMP and Enhanced RTMP (H.264, HEVC, AV1, VP9; AAC, Opus, MP3, AC-3, E-AC-3;
+  several audio tracks), SRT with optional encryption, MPEG-TS over UDP or RTP, HLS and
+  Low-Latency HLS, and looping files. Decoding runs in a sandboxed child process.
+- **Scheduled channels from HLS:** a VOD playlist with `EXT-X-PROGRAM-DATE-TIME` plays on its
+  own schedule, rejoins at the right point after a restart, and its `EXT-X-DATERANGE`s become
+  the program guide.
+- **Fallback:** each channel has a live input, an optional standby input and a generated
+  slate, and switches between them on its own.
+- **Video:** MPEG-2 encoded on an NVIDIA (CUDA) or AMD (HIP) GPU, 480i to 1080i/1080p, with
+  Active Format Description and bar data, film mode for 24p sources, and captions from
+  SubRip or WebVTT files.
+- **Audio:** AC-3 in mono, stereo, 5.1 or following the source, normalized to −24 LKFS, up
+  to three tracks per channel picked from the input by language (SAP).
+- **Bit rate:** a statistical multiplexer shares each carrier between its channels by how hard
+  each is to encode, audio included, and never overfills the carrier.
+- **Tables:** channel numbers and names, the clock, a guide of up to 16 days from a schedule
+  file or from HLS, and US or custom content ratings.
+- **The modulator:** a supervisor that reads the box's configuration and status, alarms on
+  drift and faults, and can rewrite its stream table and RF plan, through a request screen
+  that cannot reach the dangerous pages.
+- **Checked output:** an independent transport stream checker in the repository reads every
+  carrier as it is sent.
+- **Operations:** Prometheus metrics, OpenTelemetry logs and metrics, and a NixOS module.
 
 ## Status
 
-As of 2026-11-26, the server runs in real time and its output passes the repository's own
-checker and TSDuck, but no stream has reached the modulator yet. `docs/STATUS.md` says what
-is built and what is still missing; `docs/FIRST-AIR.md` is the plan for the first broadcast.
+totalblonder runs in production on one plant: two carriers into an EQAM-420B. Every input type
+has been run end to end on that plant's GPU host. Not yet checked: the picture on a range of
+real TVs, and the RF output with a tuner. [`docs/STATUS.md`](docs/STATUS.md) has the details.
 
-## Building and running
+## Requirements
 
-The build uses Nix with flakes. The video encoder needs an NVIDIA GPU with CUDA; everything
-else, the tests included, also runs without one.
+- An NVIDIA GPU with CUDA, or an AMD GPU with HIP, for the encoder.
+- Linux with user namespaces (for the decoder sandbox).
+- Nix with flakes, to build.
+- An EQAM-420B, or another IP-to-QAM modulator that passes an MPTS through (untested).
+
+## Quick start
 
 ```sh
-nix flake check                                   # build and test everything that needs no GPU
-nix develop                                       # a shell with the Rust toolchain and tools
-nix build .#totalblonder                          # the server
-totalblonder --config FILE --check                # validate a configuration
-totalblonder --config FILE                        # run
-totalblonder --config FILE --offline 10 --out DIR # 10 s of output into files, no real time
+nix build .#totalblonder .#tb-avworker
+cp crates/totalblonder/totalblonder.example.toml my.toml   # every key, with its default
+totalblonder --config my.toml --check                      # validate
+TB_AVWORKER=$PWD/result-1/bin/tb-avworker totalblonder --config my.toml
 ```
 
-`docs/SERVER.md` explains how the server is built and run; `nix/module.nix` is a NixOS module
-for it (`services.totalblonder`).
+On NixOS, use the flake's module (`services.totalblonder`). [`docs/GUIDE.md`](docs/GUIDE.md)
+explains every part of the configuration, with examples.
 
-## License
+To build and test everything that needs no GPU:
 
-MIT, see `LICENSE`. Vendor firmware, manuals and standards documents are not included:
-`docs/external/README.md` says where they come from.
+```sh
+nix flake check
+```
 
-## Where things are
+## Documentation
+
+| Document | For |
+|---|---|
+| [`docs/GUIDE.md`](docs/GUIDE.md) | Setting up and running the server: inputs, channels, audio, guide, modulator, monitoring, NixOS |
+| [`docs/STATUS.md`](docs/STATUS.md) | What is built, how it was checked, and what is still missing |
+| [`docs/EQAM-420B.md`](docs/EQAM-420B.md) | The modulator in short: what it is, what it accepts, its defects, how not to break it |
+| [`docs/SERVER.md`](docs/SERVER.md) | How the server is put together: data flow, threads, clocks, the libav sandbox, telemetry |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The Rust workspace: crates, the sans-io rule, the GPU device protocol, the Nix build, how the encoder is checked |
+| [`docs/SPEC.md`](docs/SPEC.md) | The design specification and its decisions |
+| [`docs/notes/`](docs/notes/) | Reference notes: the modulator's firmware and defects, the standards, conformance rules, the software survey, the first plant's log |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Working on the code |
+
+## Repository layout
 
 | Path | Content |
 |---|---|
-| `crates/` | The Rust workspace: the server (`totalblonder`), the encoder, mux, tables, audio, captions, ingest, the decoder sandbox, the modulator client, the stream checkers |
-| `crates/tb-kernel-abi/kernels/` | The CUDA kernels (one copy, built by Nix into the device image and for the host) |
-| `crates/tb-golden/vectors/` | Golden vectors: the encoder's decisions and device operations for small cases, and how to regenerate them |
-| `nix/`, `flake.nix` | The build (with `github:schlarpc/breakbulk`), the kernels, the gate's apps and checks, the NixOS module |
-| `docs/STATUS.md` | What is built and what is still needed |
-| `docs/SPEC.md` | Design specification: output contract, clocking, mux, tables, encode, ingest, device control, monitoring, milestones, open questions |
-| `docs/ARCHITECTURE.md` | The workspace: crate map, sans-io rule, device protocol, kernel ABI, Nix build, how the encoder is checked |
-| `docs/SERVER.md` | The server: data flow, threads, clocks, isolation of libav, how to run it, measurements |
-| `docs/FIRST-AIR.md` | Runbook for the first stream into the modulator |
-| `docs/notes/` | Reference notes: the modulator (`device.md`, `firmware.md`, `manual.md`, `research.md`, `corruption-48.md`), the standards (`standards-digest.md`), conformance rules and findings, the software survey, design inputs, the encoder's work queue |
-| `docs/external/` | Gitignored: vendor manuals, firmware images, spec sheets and standards (fetch lists and checksums for the standards are tracked) |
-| `tools/gate/` | The GPU gate and benchmarks: decoders, buffer models, capacity, line-ups, contention, corpus recipes (`tools/gate/README.md`) |
-| `tools/` | Firmware extractors, the Nios II Ghidra module, device login/crawl/mirror scripts |
-| `work/` | Gitignored: extracted firmware, decompilation, device captures, flash dump |
+| `crates/totalblonder/` | The server |
+| `crates/tb-*/` | The libraries: encoder, mux, tables, audio, captions, inputs, the decoder sandbox, the modulator client, the stream checkers |
+| `crates/tb-kernel-abi/kernels/` | The GPU kernels |
+| `nix/`, `flake.nix` | The build (with [breakbulk](https://github.com/schlarpc/breakbulk)), the NixOS module |
+| `tools/gate/` | The GPU test gate and benchmarks |
+| `tools/` | Firmware extractors, a Nios II module for Ghidra, device scripts |
+| `docs/external/` | Not in the repository: vendor manuals, firmware and standards; how to fetch them |
 
-## What the box is
+## License
 
-- An IP-to-QAM modulator, not an encoder. It takes MPEG-2 transport streams over UDP or RTP
-  on two GigE ports and modulates them onto 16 QAM carriers (4 RF modules × 4 adjacent
-  carriers). It does not transcode.
-- An Altera FPGA design with a Nios II soft CPU running uClinux 2.6.26. The stream path is in
-  FPGA; Linux only does configuration, IGMP joins and the web UI.
-- Software 1.1.13, the latest and only published build. The device's files are byte-identical
-  to `docs/external/eqam-420b.zip`.
-- Management is Boa CGI forms, plus root FTP and telnet on one shared credential. Firmware
-  update has no signature or checksum, so patched firmware is mechanically possible.
-
-### Input contract
-
-| | SPTS mode | MPTS mode |
-|---|---|---|
-| Inputs | 64 single-program streams, 4 per carrier | 16 multi-program streams, 1 per carrier |
-| Programs | 1 video + at most 1 audio each | At most 6 per carrier, 1 video + at most 3 audio each |
-| PAT/PMT, PIDs | Regenerated and remapped by the box | Passed through |
-| PSIP (channel numbers, names) | Generated by the box from its web UI | Passed through; we generate it |
-| EPG | Not supported | Passes through; we generate it (reported working on another unit, not yet tested on ours) |
-| SAP / second audio | Not possible | Possible |
-
-Common to both: at most 38.8 Mbps per carrier (256-QAM Annex B), MPEG-2 or H.264 video, AC-3
-audio, multicast with IGMP v2/v3 or unicast. The box inserts and deletes null packets and
-corrects PCR, but does no rate control: overflow pixelates.
-
-Not documented and still to measure: TS packets per datagram, jitter tolerance, FEC, unicast
-behavior.
-
-## Trajectory
-
-The target is a Rust server, `totalblonder`, that owns everything above the modulator. The
-box runs in MPTS mode and only modulates what arrives. The server re-encodes network inputs
-(first an RTMP-push producer), builds one constant-bitrate MPTS per carrier with its own tables,
-divides each carrier's bit rate between its programs, keeps every carrier on air when inputs
-fail, supervises the modulator's configuration and checks the RF output with a tuner.
-
-The design, the milestones (starting with a hardware spike, M0) and the open questions are
-in `docs/SPEC.md`.
-
-## Safety rules for the device
-
-- Never change network or login settings. Never submit `admin.cgi`.
-- These GET URLs are destructive: `admin.cgi` with `btnReboot`, `btnFlush` or
-  `btnDeleteConfig` in the query. `tools/eqam_get.sh` refuses any URL containing `btn`.
-- Recovery path: hold the front-panel IP RESET button about 10 s, power-cycle, then reach the
-  box at 172.16.70.1 on the 10/100 control port with the vendor default logins.
-- A wrong or ASCII-mode firmware upload can brick the unit.
-- Safety copies: `work/device/flash/mtd0.bin` (2 MB config flash),
-  `work/device/eeprom.bin` (8 KB EEPROM) and `work/device/config_file.dat` (web export).
-
-## Open questions
-
-- Which of the three confirmed config/memory defects is the reported ">48" corruption
-  (`docs/notes/corruption-48.md`): the `mux_sync` table overrun, the `qamconfig.cgi` shared
-  offset, or the `update_config` boot reconcile. None is dimensioned 48.
-- Who wrote the table at EEPROM 0xF10 during the 2026-09-07 setup (`docs/notes/corruption-48.md`
-  section 8).
-- Feed tolerances listed under "Input contract".
-- EAS trigger packet format on UDP 5050.
-- Which TVs on the plant decode H.264 over QAM; MPEG-2 is the safe default.
+MIT, see [`LICENSE`](LICENSE). Vendor firmware, manuals and standards are not included;
+[`docs/external/README.md`](docs/external/README.md) says where they come from.

@@ -1,6 +1,9 @@
 # totalblonder: architecture of the Rust workspace
 
-State of 2026-11-25 (after package X1). This document describes the Rust workspace at the
+> For contributors: the workspace's rules, crates and build. Using the server is in
+> [`GUIDE.md`](GUIDE.md); the server's own structure in [`SERVER.md`](SERVER.md).
+
+State of 2026-11-25 (after package X1); §9 and the crate map have grown since. This document describes the Rust workspace at the
 repository root: what each crate is for, where the line between pure logic and I/O runs, how
 the GPU is modeled, how the kernels are built for NVIDIA and AMD cards, and how the encoder is
 checked.

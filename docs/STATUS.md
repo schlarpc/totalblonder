@@ -1,21 +1,16 @@
 # Status: what is built and what is needed
 
-As of 2026-11-26, morning.
+As of 2026-11-28.
 
-The goal is a server that takes content pushed over the network, makes compliant MPEG-2
-transport streams from it, and feeds a Blonder Tongue EQAM-420B so that cable-ready TVs show
-numbered channels with a guide (`docs/SPEC.md`).
+The goal is a server that takes video from the network, makes compliant MPEG-2 transport
+streams from it, and feeds a Blonder Tongue EQAM-420B so that cable-ready TVs show numbered
+channels with a guide ([`SPEC.md`](SPEC.md)). How to use it is in [`GUIDE.md`](GUIDE.md).
 
-**Where it stands.** The server exists and runs (`docs/SERVER.md`): carriers of constant-rate
-MPTS with exact PCR, PAT/PMT and the cable PSIP tables (channel map, clock, guide, ratings),
-MPEG-2 video from the GPU encoder, AC-3 audio from our own encoder with loudness control,
-captions from subtitle files, UDP/RTP output paced to the slot clock, a supervisor of the
-modulator's web forms, metrics over HTTP, and inputs over RTMP and MPEG-TS/UDP/RTP whose
-decoding runs in a sandboxed child process. It has run in real time on nixark's card: three
-carriers and seven programs with audio, subtitles and the statmux; and an RTMP producer
-switched in and out of a program, picture and sound, with the independent checker finding
-nothing at any severity (`docs/SERVER.md` §7). **Nothing has been sent to the modulator yet**:
-its GigE input port is not reachable from the hosts (`docs/FIRST-AIR.md`).
+**Where it stands.** The server runs in production on one plant: two carriers into an
+EQAM-420B (one on each GigE port), with the statmux, `auto` audio and the modulator
+supervisor in report mode. Every input type has been run end to end on the plant's GPU host
+against real or simulated sources. What has not been checked yet is the picture on real TVs
+and the RF output with a tuner: that waits for an HDHomeRun.
 
 Terms used below:
 
@@ -23,14 +18,15 @@ Terms used below:
 - **Transport stream:** the container a modulator and a TV expect.
 - **Mux:** the component that builds a transport stream.
 - **Gate:** our automated test run (`tools/gate/`), and `nix flake check` for everything without a GPU.
+- **nixark:** the plant's host, with an NVIDIA RTX 2000 Ada; most real-time measurements are
+  from it. **bagel:** a development machine without a GPU.
 
 ## 1. Built
 
 ### 1.1 Video encode (MPEG-2, on the GPU)
 
 Crates: `tb-m2v-syntax`, `tb-m2v-rate`, `tb-m2v-encoder`, `tb-device`, `tb-device-gpu`,
-`tb-device-ref`, `tb-kernel-abi`, `tb-engine`, `tb-m2venc`; kernels in `crates/tb-kernel-abi/kernels/`. Unchanged
-tonight apart from captions from text (`--cc-text`).
+`tb-device-ref`, `tb-kernel-abi`, `tb-engine`, `tb-m2venc`; kernels in `crates/tb-kernel-abi/kernels/`.
 
 | Capability | State | Evidence |
 |---|---|---|
@@ -72,51 +68,52 @@ frame clock and fallback selector are used by the server (`source.rs`).
 
 | Crate | What | Evidence |
 |---|---|---|
-| `tb-hls` | HLS and LL-HLS pull: playlists with parts and preload hints, an fMP4 demuxer, the fetch planner (blocking reloads, live-edge start, whole-segment fallback) | unit tests; nixark against a simulated live LL-HLS origin with a separate audio rendition |
+| `tb-hls`, `hls_input.rs` | HLS and LL-HLS pull: playlists with parts, preload hints and date ranges, an fMP4 demuxer, the fetch planner (blocking reloads, live-edge start, whole-segment fallback, scheduled VOD by air time), audio renditions by language, the guide from `DATERANGE` | unit tests; nixark against a simulated live LL-HLS origin with a separate audio rendition, ffmpeg's live HLS (TS and fMP4), and a generated two-episode VOD channel |
 | `tb-rtmp` | RTMP server for publishers (handshake, chunks, AMF0, publish flow, FLV and Enhanced RTMP v2: H.264, HEVC, AV1, VP9, AAC, Opus, MP3, AC-3, E-AC-3, multitrack audio as one stream per track) | ffmpeg, GStreamer and librtmp publishers; multitrack audio by unit tests (no local producer sends it) |
 | `tb-tsin` | MPEG-TS over UDP or RTP: reordering, PAT/PMT/PES demux | ffmpeg streams checked against ffprobe |
+| SRT (`ingest.rs`, `srt-tokio`) | MPEG-TS over SRT, one caller at a time, optional AES-128 passphrase; through the same demuxer as UDP | ffmpeg as an encrypted caller |
 | `tb-sandbox`, `tb-decoder-proto`, `tb-avworker`, `tb-decoder-client` | libavcodec in a confined child process (user, mount, PID, network, IPC, UTS namespaces; Landlock; seccomp in kill mode; rlimits), shared-memory rings, supervision, restarts and a circuit breaker; scaling and resampling inside the worker; NVDEC inside the sandbox | 13 of 13 layers on bagel and nixark; H.264/AAC bit-exact against ffmpeg; every injected fault classified |
 
 ### 1.6 The server (`totalblonder`)
 
-Configuration (validated TOML), carriers, video hub on the CUDA or reference device, audio
-thread, table builder with version persistence and a schedule file for the guide, slate,
-live and standby sources through mapper/frame clock/fallback (live → standby → slate; MPEG-TS
-files as looping standby inputs), film mode per program (24p sources as film pictures with
-3:2 display flags; a steady 3,2 cadence measured from an RTMP source), a clean stop (the last
-GOP whole, every queued access unit sent, then the output), RTMP and TS/UDP listeners, statmux, the
-modulator supervisor (report by default), the continuous self-check (`tb-ts-verify` on every
-carrier, findings in the metrics), control API (`/healthz`, `/api/metrics`, `/api/state`), offline mode on a virtual clock, clean stop on SIGTERM, a NixOS module.
-Measured: `docs/SERVER.md` §7.
+Configuration (validated TOML), carriers, video hub on the CUDA, HIP or reference device, audio
+thread, table builder with version persistence, the guide from a schedule file or from HLS
+date ranges, slate, live and standby sources through mapper, frame clock and fallback (live →
+standby → slate), film mode per program, statmux and step-down under overload, the modulator
+supervisor, the continuous self-check (`tb-ts-verify` on every carrier, findings in the
+metrics), control API (`/healthz`, `/api/metrics`, `/api/state`), OpenTelemetry export,
+offline mode on a virtual clock, a clean stop on SIGTERM (the last GOP whole, every queued
+access unit sent), and a NixOS module. Measured: [`SERVER.md`](SERVER.md) §7.
+
+Inputs: RTMP and Enhanced RTMP (multitrack audio included), SRT, MPEG-TS over UDP or RTP,
+HLS and Low-Latency HLS (multivariant with audio renditions; scheduled VOD playlists that play
+on their `PROGRAM-DATE-TIME` and give the guide from `DATERANGE`), and looping files.
 
 ### 1.7 The modulator
 
 | Item | State |
 |---|---|
-| `tb-eqam` | Typed client of the web forms: refusal screen enforced by types, parsers for every page, whole-form writes with read-back, four-module RF saves, supervisor with drift, write limits, reboot and defect-D bookkeeping |
-| Live check | Every page of the live box parsed (2026-11-26); the supervisor run in report mode: drift and the boot alarm reported, nothing written. With slot 1 in use (2026-11-27), Stream Info, Diagnostics and Debug pages saved as fixtures; slot 1 confirmed as FPGA2A stream 1 |
-| Monitoring | Stream Info compared with each carrier's lineup (alarm per slot); Diagnostics oversubscription and TS sync errors alarmed; every device metric exported, including per-carrier timestamp and TS sync errors and the number of active alarms |
+| `tb-eqam` | Typed client of the web forms: refusal screen enforced by types (one bare admin read allowed), parsers for every page, whole-form writes with read-back, four-module RF saves, supervisor with drift, write limits, reboot, Manual-mode and defect-D bookkeeping |
+| On the plant | Supervisor in report mode, polling as the box's read-only Guest; carriers 1 (GIGE1) and 9 (GIGE2) on air; the box's syslog sent to the log store; slot-to-FPGA mapping confirmed for both input FPGAs |
+| Monitoring | Stream Info compared with each carrier's lineup; Diagnostics oversubscription and TS sync errors; absent inputs; every device metric exported (per-carrier bitrate, timestamp and TS sync errors, RF lock, temperature, active alarms); the event log forwarded as structured events |
 | RF probe (`tb-probe`) | HDHomeRun replies parsed and judged; the adapter waits for the hardware |
 
 ## 2. Not built
 
 | Area | What is needed |
 |---|---|
-| First air | Network, Manual mode and re-addressing done; next the first stream (`docs/FIRST-AIR.md` §2) |
-| The first producer | The live path is proven with ffmpeg standing in for it (H.264 + AAC over RTMP, with the same ffmpeg RTMP client the producer uses); the producer itself has not been run against the server |
 | RF probe adapter | `hdhomerun_config` driver and captures, when the HDHomeRun arrives |
+| Defect D mitigation | Being measured on the plant first (`EQAM-420B.md`) |
 | Emergency alerts | Not designed beyond the digest |
-| H.264 output, flexible placement | Not designed |
+| H.264 output | Not designed |
+| E-AC-3 audio | Not planned: clear-QAM TVs need only decode AC-3 |
 
-## 3. Open decisions and unknowns
+## 3. Open questions
 
-| Item | Needed from |
+| Item | Answered by |
 |---|---|
-| How the host reaches the GigE ports; multicast or unicast (`docs/FIRST-AIR.md` §1) | Owner |
-| Configuration Mode Manual before the first write (defect B) | Owner |
-| Line-up: channels, formats, carriers | Owner |
-| Where guide titles come from (the schedule file exists) | Owner |
-| TV models; H.264 support | Owner |
-| What the modulator tolerates (datagrams, jitter, rate ceiling, EIT pass-through) | First air |
-| Caption field order on real TVs (ffmpeg's automatic mode misses ours) | First TV test |
-| Film mode, captions and channel changes on TVs | First TV test |
+| Defect D: what happens when its table overruns, and when | Measurement on the plant |
+| Why the second input FPGA reports no bitrate (`notes/device.md` §11.3) | The RF probe: does slot 9's program reach its RF channel? |
+| What the modulator tolerates (datagram sizes, jitter) | Measurement |
+| Captions, film mode, channel changes, 5.1 ↔ 2.0 switches and rate changes on real TVs | First TV test |
+| Which TVs on a plant decode H.264 over QAM | Per plant |

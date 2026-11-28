@@ -1,6 +1,9 @@
 # The server: how it is put together
 
-State of 2026-11-26. `docs/SPEC.md` says what the server must do; `docs/ARCHITECTURE.md`
+> Using the server (configuration, inputs, the modulator, monitoring) is in
+> [`GUIDE.md`](GUIDE.md). This document is how it works inside.
+
+State of 2026-11-26, with the inputs added since (SRT, HLS). `docs/SPEC.md` says what the server must do; `docs/ARCHITECTURE.md`
 describes the workspace's rules and the encoder. This document describes the server built on
 top of them: the crates of the stream path, the threads and clocks of the process, and where
 the untrusted parts are isolated.
@@ -8,10 +11,10 @@ the untrusted parts are isolated.
 ## 1. Data flow
 
 ```
- producer ──TCP──► ingest thread ──InputEvent──► decoder worker ──frames──► program source
- (RTMP push,       (tb-rtmp / tb-tsin:            (tb-avworker:              (tb-timeline:
-  TS over UDP/RTP)  sans-io protocols)             libavcodec in a            mapper, frame
-                                                   sandboxed child)           clock, fallback)
+ producer ───────► ingest thread ──InputEvent──► decoder worker ──frames──► program source
+ (RTMP, SRT,       (tb-rtmp / tb-tsin /           (tb-avworker:              (tb-timeline:
+  TS over UDP/RTP,  tb-hls: sans-io protocols)     libavcodec in a            mapper, frame
+  HLS pull)                                        sandboxed child)           clock, fallback)
                                                                                    │
                      slate (generated) ─────────────────────────────────────────►─┤
                                                                                    ▼
@@ -38,7 +41,8 @@ the untrusted parts are isolated.
 |---|---|---|
 | `tb-media` | pure | The contract between receivers, the decoder worker and the server: codecs, streams, packets, decoded-frame descriptors |
 | `tb-rtmp` | pure | RTMP server for publishers: handshake, chunk streams, AMF0, the publish flow, FLV tags (legacy and Enhanced RTMP) into `tb-media` events |
-| `tb-tsin` | pure | MPEG-TS input over UDP or RTP: reordering, PAT/PMT/PES demuxing into `tb-media` events |
+| `tb-tsin` | pure | MPEG-TS input over UDP or RTP: reordering, PAT/PMT/PES demuxing into `tb-media` events (also used for SRT and for HLS's TS segments) |
+| `tb-hls` | pure | HLS and LL-HLS: playlists (parts, preload hints, date ranges), a fragmented-MP4 demuxer, the fetch planner; the HTTP side is the server's `hls_input.rs` |
 | `tb-ts` | pure | Transport stream primitives from H.222.0: PIDs, continuity counters, PCR and 33-bit time stamps, packets with adaptation fields, PES headers and a packet cursor, sections with CRC-32/MPEG-2, section packetizer and reassembler |
 | `tb-psip` | pure | PAT, PMT, CVCT, MGT, STT, EIT, ETT and their descriptors, built from one validated lineup; guide windows; versions that change only with content; US rating messages limited to those CTA-766 permits |
 | `tb-mux` | pure | One carrier's constant-rate multiplexer: slot clock with exact PCR, T-STD admission, table carousel, video by `DTS − D` through token buckets, audio by PTS, late-AU policy |
