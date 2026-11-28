@@ -110,3 +110,74 @@ Nsight Compute holds the card while it profiles: each `ncu_profile.sh` run cost 
 server about 20 pictures (repeats; its programs were color bars). The paced runs at 56 ×
 1080i with unthrottled competitors cost it about a thousand. Free runs and the gates cost it
 none. It stepped no program down, and its counters were level again afterwards.
+
+## 6. The AMD card of a desktop (bagel, RX 7900 XTX, ROCm 7.2, 2026-11-28)
+
+The same pass on the card that serves the developer's desktop (Wayland, radeonsi on the same
+card; amdgpu with hardware scheduling and wave save/restore, the defaults). There is no
+Nsight Compute here: the tools are the stage times, the per-tick log and interleaved builds.
+
+### 6.1 Does the encoder starve the desktop?
+
+`gfxprobe.py` draws a desktop-like frame on the card's graphics queue and waits for it. Its
+frame times next to the encoder:
+
+| Encoder | Trivial frame (0.4 ms alone): p99, max | Frame of 3.3 ms alone: median, p99, max of a second |
+|---|---|---|
+| none | 0.7 ms, 0.7 ms | 3.3, 3.6 ms |
+| paced, 16 × 1080i (tick 8 ms of 33) | 0.8 ms | 3.6, 4.3, 4.5 ms |
+| paced, 48 × 1080i (tick 20 ms of 33) | 0.8 ms | 3.3, 4.4, 5.1 ms |
+| free-running, 16 × 1080i | 1.2 ms, 1.4 ms | 3.2, 4.3, 4.5 ms |
+| free-running, 48 × 1080i (10 ms of kernels back to back per tick), probe at 240 Hz | 3.1 ms (p99) | – |
+| every free run of the comparisons below (50 runs, probe at 120 Hz) | worst p99 1.5 ms, worst max 2.3 ms, none over 8 ms | – |
+
+The card runs the graphics queue beside the compute queue: a frame waits one to three
+milliseconds more, whatever the encoder's load, and a frame that has work of its own is
+stretched by a third at most. No launch of the encoder is long enough to matter (the longest
+are a few milliseconds), so there is no place where giving the card up would give the desktop
+anything, and none was built. What would change this: a kernel that runs for tens of
+milliseconds, or a driver without wave save/restore. The probe runs beside every bench run on
+this machine so that either shows.
+
+On NVIDIA the question is the other way round (who takes time from the encoder): contexts
+take turns in slices of about 2 ms whatever the encoder queues, so a gap left by the encoder
+gives a transcode nothing it does not already get (§1; spike notes on time-slicing).
+
+### 6.2 What stalls the encoder here
+
+Free-running, every run has one tick of about 100 ms some 0.4 s in, and the 50 ticks after it
+fall from 20 ms back to 5. It is not the card's clock (it follows the stall; forcing the
+performance level high changes nothing) and not the desktop: the driver's eviction counter of
+the process (`/sys/class/kfd/kfd/proc/PID/stats_*/evicted_ms`) grows by 90 ms at that tick.
+The compute driver evicted the process's queues and restored them after its fixed 100 ms.
+During such a run the kernel compacted memory (`compact_stall` 11, `pgmigrate_success` 66,000
+in two seconds; the machine had 3 GB free of 62): migrating pages the driver mirrors is one
+of the things that evict. No call of the process coincides with it. For a paced server this
+is three late ticks whenever the host compacts; not investigated further (does it happen on
+a host with free memory; would locked or huge pages for the host arena prevent it).
+
+Because of it, means over a short run mean little on this card: the bench prints the ratio of
+median ticks, and runs of 15 s of video. Identical builds differ by up to 1.4 % that way.
+
+### 6.3 Thread blocks
+
+| Change | 1080i | 1080p | 720p | 480i | mixed |
+|---|---|---|---|---|---|
+| Layout and luma pairs of §3 (`XB` still 32), two series | −0.5 to +4.4 % | – | +2.6 to +3.8 % | +1.5 to +2.5 % | +2 % |
+| `k_xf` in blocks of 8 (two waves of 32), the NVIDIA choice | −22 % | −25 % | −20 % | −19 % | −17 % |
+| `k_xf` in blocks of 64 | +2.8 % | – | +6.1 % | +3.7 % | +4.6 % |
+| As committed (`XB_HIP` 64) against the start, five rounds | +5.8 % | +4.9 % | +6.5 % | +6.1 % | +8.9 % |
+| `k_me` in blocks of 256 or 512 threads instead of 64 | +4.5 % | – | 0 | +0.5 % | −1 to −2.4 % |
+| The other kernels in blocks of 1024 instead of 256 | −0.8 % | – | −1.3 % | +0.4 % | −0.4 % |
+
+(Rows two and three against the start, with the layout.) What the RTX 2000 Ada gains from
+small blocks in `k_xf` this card loses several times over, so the block size is the kernel
+image's (`XB`, `XB_HIP`). The other block sizes do not matter here.
+
+### 6.4 Paced ticks are slower than free-running ones
+
+16 × 1080i: 4.9 ms per tick free-running, 7.8 ms paced. Between ticks the card drops its clock
+(to 35 MHz within tens of milliseconds) and every tick starts on the way up. With
+`power_dpm_force_performance_level` set to `high` the paced tick is 5.6 ms and the card draws
+90 W instead of 69 to 78 W at that line-up; the power profile `COMPUTE` changes nothing. A
+setting of the machine, left at `auto`.
