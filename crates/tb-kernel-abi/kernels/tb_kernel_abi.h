@@ -78,6 +78,13 @@
 /// 8x8 blocks per CUDA block in the transform kernel (`k_xf` runs `XB * 8` threads per block).
 #define XB 32
 
+/// Blocks of one group of the coefficient and level buffers ([`lev_at`]): a warp.
+#define LEV_GROUP 32
+
+/// log2 of how many stored values of a block lie together in the coefficient and level buffers
+/// ([`lev_idx`]). Measured on the RTX 2000 Ada: 8 values is the fastest of 1, 4, 8, 16 and 64.
+#define LEV_SH 3
+
 /// One variable-length code: `len` bits, right-aligned in `code`. `len == 0`: no code.
 struct VlcCode {
   /// The code bits.

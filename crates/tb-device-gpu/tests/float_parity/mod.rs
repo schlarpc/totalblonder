@@ -26,7 +26,7 @@ use tb_device_gpu::{GpuDevice, Runtime};
 use tb_device_ref::RefDevice;
 use tb_kernel_abi::{
     Geo, MODE_BI, MODE_INTRA, MbInfo, PIC_B, PIC_I, PIC_P, RowStat as RowStatRec, SL_CUR, SL_REC,
-    SL_ZERO, SessPar, Tables, XB,
+    SL_ZERO, SessPar, Tables, XB, lev_len,
 };
 
 use super::card;
@@ -454,7 +454,7 @@ fn layout(c: &Clip) -> (Layout, Vec<Geo>) {
             BS,
         );
         let nblk = N * nmb * 6;
-        let coef = l.output(format!("{tick} coef"), "k_xf", 6 * 64 * nmbtot * 2);
+        let coef = l.output(format!("{tick} coef"), "k_xf", lev_len(6 * nmbtot) * 2);
         let pred = l.output(format!("{tick} pred"), "k_xf", 6 * 64 * nmbtot);
         let hist = l.output(format!("{tick} hist"), "k_xf", 6 * nmbtot * 16);
         let cmask = l.output(format!("{tick} cmask"), "k_xf", 6 * nmbtot * 8);
@@ -512,7 +512,7 @@ fn layout(c: &Clip) -> (Layout, Vec<Geo>) {
         for (qname, rowq) in sets {
             let at = format!("{tick} {qname}");
             let drowq = l.input(&format!("{at} rowq"), &rowq);
-            let lev = l.output(format!("{at} lev"), "k_quant", 6 * 64 * nmbtot * 2);
+            let lev = l.output(format!("{at} lev"), "k_quant", lev_len(6 * nmbtot) * 2);
             let nzmask = l.output(format!("{at} nzmask"), "k_quant", 6 * nmbtot * 8);
             let nz = l.output(format!("{at} nz"), "k_quant", 6 * nmbtot);
             let mbq = l.output(format!("{at} mbq"), "k_quant", nmbtot);

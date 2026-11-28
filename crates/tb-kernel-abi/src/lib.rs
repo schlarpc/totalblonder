@@ -74,6 +74,36 @@ pub const VLC_DCT_CODES: usize = 1312;
 const _: () = assert!(VLC_DCT_CODES == VLC_DCT_MAXRUN * VLC_DCT_MAXLEV);
 /// 8x8 blocks per CUDA block in the transform kernel (`k_xf` runs `XB * 8` threads per block).
 pub const XB: usize = 32;
+/// Blocks of one group of the coefficient and level buffers ([`lev_at`]): a warp.
+pub const LEV_GROUP: usize = 32;
+/// log2 of how many stored values of a block lie together in the coefficient and level buffers
+/// ([`lev_idx`]). Measured on the RTX 2000 Ada: 8 values is the fastest of 1, 4, 8, 16 and 64.
+pub const LEV_SH: usize = 3;
+
+/// Where the stored values of block `blk` begin in the coefficient and level buffers (`coef`,
+/// `lev`: `i16`). Value `k` of the block, counted in coded order over the positions its mask
+/// names (`cmask`, `nzmask`), is at `lev_at(blk) + lev_idx(k)`.
+///
+/// The values of a block are dense, the blocks lie in groups of [`LEV_GROUP`], and inside a
+/// group the values go eight by eight: values 0..8 of the 32 blocks (16 bytes each), then
+/// values 8..16, and so on. A kernel with one thread per block reads value `k` of the 32
+/// neighboring blocks of its warp from those 512 bytes, and the kernel with eight threads per
+/// block stores a block's first values into half a 32-byte sector. One plane per coded position
+/// (the layout before) cost the readers a sector per value, 6.5 times the sectors the
+/// quantizer needed.
+pub const fn lev_at(blk: usize) -> usize {
+    blk / LEV_GROUP * (64 * LEV_GROUP) + ((blk % LEV_GROUP) << LEV_SH)
+}
+
+/// Offset of a block's `k`-th stored value from [`lev_at`].
+pub const fn lev_idx(k: usize) -> usize {
+    (k >> LEV_SH) * (LEV_GROUP << LEV_SH) + (k & ((1 << LEV_SH) - 1))
+}
+
+/// Elements (`i16`) of a coefficient or level buffer for `nblk` blocks: whole groups.
+pub const fn lev_len(nblk: usize) -> usize {
+    nblk.next_multiple_of(LEV_GROUP) * 64
+}
 
 /// One variable-length code: `len` bits, right-aligned in `code`. `len == 0`: no code.
 #[repr(C)]

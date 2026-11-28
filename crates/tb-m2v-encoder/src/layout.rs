@@ -320,8 +320,11 @@ impl BatchLayout {
         let d_info = a.dev(mul(nmbtot, sz::<MbInfo>())?)?;
         let d_info_me = a.dev(mul(nmbtot, sz::<MbInfo>())?)?;
         let d_act = a.dev(mul(nmbtot, 2)?)?;
-        let d_coef = a.dev(mul(nblk, 64 * 2)?)?;
-        let d_lev = a.dev(mul(nblk, 64 * 2)?)?;
+        // Whole groups of blocks (`tb_kernel_abi::lev_at`, `lev_len`).
+        let group = tb_kernel_abi::LEV_GROUP as u64;
+        let lev_bytes = mul(mul(nblk.div_ceil(group), group)?, 64 * 2)?;
+        let d_coef = a.dev(lev_bytes)?;
+        let d_lev = a.dev(lev_bytes)?;
         let d_pred = a.dev(mul(nblk, 64)?)?;
         let d_nz = a.dev(nblk)?;
         let d_mbq = a.dev(nmbtot)?;

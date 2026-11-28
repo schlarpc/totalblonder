@@ -1,7 +1,7 @@
 {"k":"golden","version":1,"args":"--device ref --conformance h262 --input ../qcif.yuv --size 176x144 --interlaced --gop 15 --bframes 2 --bitrate 400000 --max-bitrate 600000 --frames 40 --cc --film 3,2,3,2,3,2,2,i,i,3,3,2 --rate-now 17:300000 --hold 0:0:26:30 --output film --golden film.jsonl"}
-{"k":"batch","b":0,"w":176,"h":144,"fps_n":30000,"fps_d":1001,"interlaced":1,"capacity":1,"geo":"01000000b0000000a00000000b0000000a0000006e000000040000000100000001000000010000000100000008000000040000000c0000000000c03f0100000001000000","row_bs":32,"dev_bytes":886528,"cap_words":9504,"fbytes":38016,"arena":1,"keep_recon":0}
+{"k":"batch","b":0,"w":176,"h":144,"fps_n":30000,"fps_d":1001,"interlaced":1,"capacity":1,"geo":"01000000b0000000a00000000b0000000a0000006e000000040000000100000001000000010000000100000008000000040000000c0000000000c03f0100000001000000","row_bs":32,"dev_bytes":889600,"cap_words":9504,"fbytes":38016,"arena":1,"keep_recon":0}
 {"k":"open","s":0,"b":0,"slot":0,"error":"","w":176,"h":144,"fps_n":30000,"fps_d":1001,"interlaced":1,"tff":1,"gop":15,"m":3,"gop_phase":0,"max_bitrate":600000,"vbv_bits":294912,"bitrate":400000,"qi":6,"qp":6,"qb":8,"aq":1,"aq_strength":1.5,"field_pred":1,"field_dct":1,"range2":8,"lambda":4,"field_bits":12,"smooth":1,"tpred":1,"intra_vlc":1,"alt_scan":-1,"capacity":1,"priority":0,"aspect":0,"profile":"h262","color":[],"min_rate":136664,"first_min":32032,"nmb":110,"mbh":10,"fps":29.970029970029969,"X":[0,556521.73913043481,208695.65217391305,146086.95652173914],"D":0.49152000000000001}
-{"k":"op","tick":-1,"op":"fill","dst":"ablk_d","byte":0,"n":886528,"st":"main"}
+{"k":"op","tick":-1,"op":"fill","dst":"ablk_d","byte":0,"n":889600,"st":"main"}
 {"k":"op","tick":-1,"op":"upload","dst":"d_T","src":"e->T","n":11596,"st":"main"}
 {"k":"op","tick":-1,"op":"wait","st":"main"}
 {"k":"op","tick":-1,"op":"wait","st":"main"}

@@ -47,6 +47,7 @@ static inline unsigned __dp4a(uint32_t a, uint32_t b, unsigned c) {   // c + dot
   return c;
 }
 static inline int __ffsll(long long v) { return __builtin_ffsll(v); }
+static inline int __popc(uint32_t v) { return __builtin_popcount(v); }
 static inline uint32_t __float_as_uint(float f) { uint32_t u; memcpy(&u, &f, 4); return u; }
 // One block runs on one host thread, so the atomics are plain operations.
 static inline uint32_t atomicOr(uint32_t *p, uint32_t v) { uint32_t o = *p; *p = o | v; return o; }

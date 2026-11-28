@@ -753,8 +753,8 @@ HD inline float n_act(int act, int avg, float s) { return fmaf(s, (float)act, (f
 // Block indexing used by the transform kernels and by the coefficient/level/nz/pred buffers:
 //   mbi = session * nmb + macroblock          (physical macroblock index, nmbtot = n * nmb of them)
 //   blk = b * nmbtot + mbi                    (b = 0..5: four luma blocks, Cb, Cr)
-//   coef, lev[(b * 64 + coded_position) * nmbtot + mbi]   int16, plane-major so that kernels with
-//                                                         one thread per macroblock or block coalesce
+//   coef, lev[lev_at(blk) + LEV_IDX(k)]       int16: the k-th stored value of the block in coded
+//                                             order (which positions: cmask, nzmask); common.h
 //   pred[(blk * 8 + row) * 8 + column]        uint8
 //   hist[blk * 2 + i]                         uint64, eight 8-bit counters each (NZ_BINS = 16 bins)
 // The transform kernels use 8 threads per 8x8 block and 32 blocks per CUDA block; the two
@@ -770,13 +770,24 @@ __device__ inline int blk_line(const BlkGeo &bg, int dct_type, int j) {
   if (bg.b < 4 && dct_type) return bg.y0 - (bg.b >> 1) * 8 + 2 * j + (bg.b >> 1);
   return bg.y0 + j;
 }
-__device__ inline BlkGeo blk_geo(const Geo &g, unsigned t, const int *list, int na) {
+// pairs: the luma blocks are enumerated two by two (blocks 0 and 1 of a macroblock, then of the
+// next; after all of those, blocks 2 and 3), so that neighbors in t are neighbors in the picture
+// row: the kernel with eight threads per block then reads 32 contiguous pixels per row and warp
+// instead of four pieces 16 pixels apart.
+__device__ inline BlkGeo blk_geo(const Geo &g, unsigned t, const int *list, int na, bool pairs = false) {
   BlkGeo r;
   unsigned nact = (unsigned)(na * g.nmb);   // 32-bit index arithmetic: 64-bit division is slow
   r.valid = t < nact * 6;
   if (!r.valid) { r.b = r.mbi = r.s = r.pw = r.ph = r.x0 = r.y0 = 0; r.blk = 0; return r; }
-  r.b = (int)(t / nact);
-  int rem = (int)(t % nact);
+  int rem;
+  if (pairs && t < nact * 4) {
+    unsigned idx = t % (nact * 2);
+    r.b = (int)(t / (nact * 2)) * 2 + (int)(idx & 1);
+    rem = (int)(idx >> 1);
+  } else {
+    r.b = (int)(t / nact);
+    rem = (int)(t % nact);
+  }
   r.s = list[rem / g.nmb];
   int mb = rem % g.nmb, mbx = mb % g.mbw, mby = mb / g.mbw;
   r.mbi = r.s * g.nmb + mb;
@@ -822,7 +833,7 @@ __global__ void k_xf(Geo g, const Tables *T, Bufs B, const SessPar *par, const i
                      const MbInfo *info, const uint16_t *act, int16_t *coef, uint8_t *predbuf, uint64_t *hist, uint64_t *cmask) {
   __shared__ float sm[XB][8][8];
   int lb = threadIdx.x >> 3, j = threadIdx.x & 7;
-  BlkGeo bg = blk_geo(g, blockIdx.x * XB + lb, list, na);
+  BlkGeo bg = blk_geo(g, blockIdx.x * XB + lb, list, na, true);
   int mode = MODE_INTRA;
   SessPar sp;
   if (bg.valid) {
@@ -875,9 +886,9 @@ __global__ void k_xf(Geo g, const Tables *T, Bufs B, const SessPar *par, const i
   }
   __syncthreads();
   int lv[8] = {0, 0, 0, 0, 0, 0, 0, 0}, kb = 0;   // this thread's eight coefficients; bit v: coefficient v is stored
+  uint32_t ppos[2] = {0, 0};                      // their coded positions, eight bits each
   uint32_t red[6] = {0, 0, 0, 0, 0, 0};   // to be combined over the block: mask (low, high), histogram (2 x low, high)
   const uint8_t *spos = T->scan_pos[bg.valid ? pic_alt_scan(g, sp) : 0];
-  size_t nmbtot = (size_t)g.n * g.nmb;
   if (bg.valid) {
     int u = j;
     float t[8], F[8];
@@ -911,6 +922,7 @@ __global__ void k_xf(Geo g, const Tables *T, Bufs B, const SessPar *par, const i
       if (keepit) {
         int p = spos[r];
         kb |= 1 << v;
+        ppos[v >> 2] |= (uint32_t)p << (8 * (v & 3));
         if (p < 32) red[0] |= 1u << p; else red[1] |= 1u << (p - 32);
       }
       if (m >= 1.0f) {
@@ -930,9 +942,16 @@ __global__ void k_xf(Geo g, const Tables *T, Bufs B, const SessPar *par, const i
     for (int i = 2; i < 6; i++) red[i] += __shfl_xor_sync(0xffffffffu, red[i], d);
   }
   if (bg.valid) {
-    int16_t *lp = coef + (size_t)bg.b * 64 * nmbtot + bg.mbi;
+    // dense: a coefficient goes to its rank among the block's stored positions (red[0], red[1]:
+    // the block's mask, known to all eight threads after the reduction)
+    int16_t *lp = coef + lev_at(bg.blk);
+    int nlo = __popc(red[0]);
     for (int v = 0; v < 8; v++)
-      if ((kb >> v) & 1) lp[(size_t)spos[v * 8 + j] * nmbtot] = (int16_t)lv[v];
+      if ((kb >> v) & 1) {
+        int p = (int)((ppos[v >> 2] >> (8 * (v & 3))) & 255);
+        int rk = p < 32 ? __popc(red[0] & ((1u << p) - 1)) : nlo + __popc(red[1] & ((1u << (p - 32)) - 1));
+        lp[LEV_IDX(rk)] = (int16_t)lv[v];
+      }
     if (j == 0) {
       cmask[bg.blk] = ((uint64_t)red[1] << 32) | red[0];
       hist[bg.blk * 2] = ((uint64_t)red[3] << 32) | red[2]; hist[bg.blk * 2 + 1] = ((uint64_t)red[5] << 32) | red[4];
@@ -990,8 +1009,8 @@ __global__ void k_rowstat(Geo g, const int *list, int na, const uint64_t *hist, 
 // Quantization (the inverse of 7.4.2.3) of the stored coefficients into levels, one thread per
 // block. rowq[session * mbh + row] is the row's base quantiser_scale_code; the session's `keep`
 // limits how many coefficients of a block survive (the last steps of the buffer ladder).
-// Only the coefficients that k_xf stored are read (cmask): the others are zero at any
-// quantizer the rate control may use for this picture. Only the non-zero levels are written;
+// Only the coefficients that k_xf stored are read (cmask, in sequence): the others are zero at any
+// quantizer the rate control may use for this picture. Only the non-zero levels are written, dense;
 // nzmask has one bit per coded position that holds one (bit 0 of an intra block is always
 // set: its DC level), nz says whether the block is coded.
 __global__ void k_quant(Geo g, const Tables *T, const SessPar *par, const int *list, int na, const uint8_t *rowq,
@@ -1007,23 +1026,23 @@ __global__ void k_quant(Geo g, const Tables *T, const SessPar *par, const int *l
   int code = mb_qcode(g, T, sp, rowq[(size_t)s * g.mbh + mb / g.mbw], act[mbi]);
   float q = (float)T->qscale[code];
   bool intra = info[mbi].mode == MODE_INTRA;
-  const int16_t *cp = coef + (size_t)b * 64 * nmbtot + mbi;
-  int16_t *lp = lev + (size_t)b * 64 * nmbtot + mbi;
+  const int16_t *cp = coef + lev_at((size_t)b * nmbtot + mbi);
+  int16_t *lp = lev + lev_at((size_t)b * nmbtot + mbi);
   const uint8_t *ras = T->scan_ras[pic_alt_scan(g, sp)];
   uint64_t mask = 0, cm = cmask[(size_t)b * nmbtot + mbi];
-  int keep = sp.keep;
+  int keep = sp.keep, kc = 0, kl = 0;   // values read from cp, levels written to lp
   if (intra) {
-    lp[0] = cp[0];
+    lp[0] = cp[0]; kc = kl = 1;
     mask = 1;
     cm &= ~1ull;
     while (cm) {
       int i = __ffsll((long long)cm) - 1;
       cm &= cm - 1;
       if (i >= keep) break;
-      int c = cp[(size_t)i * nmbtot];
+      int c = cp[LEV_IDX(kc)]; kc++;
       int a = (int)((float)iabs(c) * 4.0f / ((float)T->intra_q[ras[i]] * q) + 0.375f);
       if (a > 2047) a = 2047;
-      if (a) { lp[(size_t)i * nmbtot] = (int16_t)(c < 0 ? -a : a); mask |= 1ull << i; }
+      if (a) { lp[LEV_IDX(kl)] = (int16_t)(c < 0 ? -a : a); kl++; mask |= 1ull << i; }
     }
   } else {
     float inv = 0.25f / q;  // W = 16 (default non-intra matrix)
@@ -1031,10 +1050,10 @@ __global__ void k_quant(Geo g, const Tables *T, const SessPar *par, const int *l
       int i = __ffsll((long long)cm) - 1;
       cm &= cm - 1;
       if (i >= keep) break;
-      int c = cp[(size_t)i * nmbtot];
+      int c = cp[LEV_IDX(kc)]; kc++;
       int a = (int)((float)iabs(c) * inv);
       if (a > 2047) a = 2047;
-      if (a) { lp[(size_t)i * nmbtot] = (int16_t)(c < 0 ? -a : a); mask |= 1ull << i; }
+      if (a) { lp[LEV_IDX(kl)] = (int16_t)(c < 0 ? -a : a); kl++; mask |= 1ull << i; }
     }
   }
   nzmask[(size_t)b * nmbtot + mbi] = mask;
@@ -1065,15 +1084,15 @@ __global__ void k_recon(Geo g, const Tables *T, const SessPar *par, const int *l
     float G[64];
     for (int i = 0; i < 64; i++) G[i] = 0.0f;
     int q = T->qscale[mbq[bg.mbi]];
-    size_t nmbtot = (size_t)g.n * g.nmb;
     const uint8_t *ras = T->scan_ras[pic_alt_scan(g, par[bg.s])];
-    const int16_t *lp = lev + (size_t)bg.b * 64 * nmbtot + bg.mbi;
+    const int16_t *lp = lev + lev_at(bg.blk);
     uint64_t mask = nzmask[bg.blk];
-    int sum = 0, last = 0;
+    int sum = 0, last = 0, k = 0;
     while (mask) {
       int p = __ffsll((long long)mask) - 1;
       mask &= mask - 1;
-      int r = ras[p], l = lp[(size_t)p * nmbtot], val;
+      int r = ras[p], l = lp[LEV_IDX(k)], val;
+      k++;
       if (intra) val = r == 0 ? 8 * l : (2 * l * T->intra_q[r] * q) / 32;
       else val = l == 0 ? 0 : ((2 * l + (l > 0 ? 1 : -1)) * 16 * q) / 32;
       val = iclamp(val, -2048, 2047);
@@ -1175,10 +1194,10 @@ __global__ void k_ent_resolve(Geo g, const SessPar *par, const int *list, int na
     // 7.2.1: the predictors are reset by any macroblock that is not intra (skipped ones included)
     int dcpred[3] = {128, 128, 128};
     if (x > 0 && info[mbi - 1].mode == MODE_INTRA)
-      for (int cc = 0; cc < 3; cc++) dcpred[cc] = lev[(size_t)(3 + cc) * 64 * stride + mbi - 1];
+      for (int cc = 0; cc < 3; cc++) dcpred[cc] = lev[lev_at((size_t)(3 + cc) * stride + mbi - 1)];
     for (int b = 0; b < 6; b++) {
       int cc = b < 4 ? 0 : b - 3;
-      int dc = lev[(size_t)b * 64 * stride + mbi];
+      int dc = lev[lev_at((size_t)b * stride + mbi)];
       c.dc_diff[b] = (int16_t)(dc - dcpred[cc]);
       dcpred[cc] = dc;
     }
@@ -1255,7 +1274,7 @@ __global__ void k_ent_pack(Geo g, const Tables *T, const SessPar *par, const int
     c.addr_inc = (uint8_t)inc;
     c.quant = uses && mbq[mbi] != prev_q;
     c.qcode = (uint8_t)(uses ? mbq[mbi] : prev_q);
-    bits = encode_mb(T, g, pic_type, pic_field_tools(g, par[s]), c, mi, lev + mbi, nzmask + mbi, (size_t)g.n * g.nmb, scratch + mbi * MB_SCRATCH_WORDS, &tex);
+    bits = encode_mb(T, g, pic_type, pic_field_tools(g, par[s]), c, mi, lev, mbi, nzmask + mbi, (size_t)g.n * g.nmb, scratch + mbi * MB_SCRATCH_WORDS, &tex);
   }
   // H.262 8.2 (Table 8-6, p.110): a 4:2:0 macroblock takes at most 4608 bits, counted from the
   // first bit of macroblock_address_increment (the slice header in front of the first macroblock

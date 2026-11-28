@@ -61,19 +61,21 @@ HD inline int ctz64(uint64_t m) {
 }
 
 // 7.2.2: run/level coding of the non-zero coefficients of a block (coded order), then End of
-// Block. Bit i of mask says that position i holds a non-zero level, lev[i * stride]; other
-// positions are not read. An intra block starts after its DC coefficient (bit 0 is ignored).
-HD inline void put_block_coefs(BitW &w, const Tables *T, const int16_t *lev, size_t stride, uint64_t mask, bool intra,
+// Block. Bit i of mask says that position i holds a non-zero level; lev holds those levels one
+// after the other (LEV_IDX). An intra block starts after its DC coefficient (bit 0,
+// always set, and the first level are passed over).
+HD inline void put_block_coefs(BitW &w, const Tables *T, const int16_t *lev, uint64_t mask, bool intra,
                                int table1) {
   const VlcCode *tab = table1 ? T->dct1 : T->dct0;
-  int prev = -1;
-  if (intra) { mask &= ~1ull; prev = 0; }
+  int prev = -1, k = 0;
+  if (intra) { mask &= ~1ull; prev = 0; k = 1; }
   while (mask) {
     int i = ctz64(mask);
     mask &= mask - 1;
     int run = i - prev - 1;
     prev = i;
-    int l = lev[i * stride];
+    int l = lev[LEV_IDX(k)];
+    k++;
     int a = l < 0 ? -l : l;
     int s = l < 0;
     if (!intra && i == 0 && a == 1) {
@@ -89,14 +91,16 @@ HD inline void put_block_coefs(BitW &w, const Tables *T, const int16_t *lev, siz
   if (table1) bw_put(w, 6, 4); else bw_put(w, 2, 2);
 }
 
-// Pack one macroblock. The level of block b at coded position i is lev[(b * 64 + i) * stride],
-// the mask of its non-zero positions nzmask[b * stride].
+// Pack one macroblock (physical index mbi). The non-zero levels of its block b are those of
+// block b * stride + mbi in lev (lev_at), in coded order; the mask of their positions is
+// nzmask[b * stride].
 // Returns the number of bits written to scratch (0 for a skipped macroblock); *tex_bits gets
 // the run/level bits the rate model scales with the non-zero levels: without End of Block for
 // intra blocks, with it for the others (measured: neither uniform rule does better, see log).
 // field_tools: frame_pred_frame_dct of the picture is 0 (pic_field_tools).
 HD inline int encode_mb(const Tables *T, const Geo &g, int pic_type, int field_tools, const MbCode &c, const MbInfo &mi,
-                        const int16_t *lev, const uint64_t *nzmask, size_t stride, uint32_t *scratch, int *tex_bits) {
+                        const int16_t *lev, size_t mbi, const uint64_t *nzmask, size_t stride, uint32_t *scratch,
+                        int *tex_bits) {
   *tex_bits = 0;
   if (c.skipped) return 0;
   BitW w;
@@ -155,7 +159,7 @@ HD inline int encode_mb(const Tables *T, const Geo &g, int pic_type, int field_t
   }
   int tex = 0;
   for (int b = 0; b < 6; b++) {
-    const int16_t *l = lev + (size_t)b * 64 * stride;
+    const int16_t *l = lev + lev_at((size_t)b * stride + mbi);
     if (intra) {
       // 7.2.1: dct_dc_size + dct_dc_differential
       int d = c.dc_diff[b];
@@ -165,11 +169,11 @@ HD inline int encode_mb(const Tables *T, const Geo &g, int pic_type, int field_t
       put_vlc(w, b < 4 ? T->dc_lum[size] : T->dc_chr[size]);
       if (size) bw_put(w, (uint32_t)(d >= 0 ? d : d + (1 << size) - 1), size);
       int before = w.pos * 32 + w.nacc;
-      put_block_coefs(w, T, l, stride, nzmask[(size_t)b * stride], true, g.intra_vlc_format);
+      put_block_coefs(w, T, l, nzmask[(size_t)b * stride], true, g.intra_vlc_format);
       tex += w.pos * 32 + w.nacc - before - (g.intra_vlc_format ? 4 : 2);   // intra: no End of Block
     } else if (c.cbp & (32 >> b)) {
       int before = w.pos * 32 + w.nacc;
-      put_block_coefs(w, T, l, stride, nzmask[(size_t)b * stride], false, 0);
+      put_block_coefs(w, T, l, nzmask[(size_t)b * stride], false, 0);
       tex += w.pos * 32 + w.nacc - before;
     }
   }

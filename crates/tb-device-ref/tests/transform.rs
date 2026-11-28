@@ -26,7 +26,8 @@ mod common;
 use common::{BS, Bench, RECON_BS, Rng, geo, pods_of, tables};
 use tb_device::kernel::{BufsRef, Kernel, Quant, Recon, Xf};
 use tb_kernel_abi::{
-    Geo, MODE_BI, MODE_BWD, MODE_FWD, MODE_INTRA, MbInfo, SL_REC, SessPar, Tables, XB,
+    Geo, MODE_BI, MODE_BWD, MODE_FWD, MODE_INTRA, MbInfo, SL_REC, SessPar, Tables, XB, lev_at,
+    lev_idx, lev_len,
 };
 
 // ---- the kernels' arithmetic, ported (kernels.h: fdct8, idct8, n_act, mb_qcode) ----------
@@ -309,6 +310,7 @@ fn model_xf(c: &mut Case) {
                 thr += 1;
             }
             let (mut mask, mut h0, mut h1) = (0u64, 0u64, 0u64);
+            let mut kept: Vec<(usize, i16)> = Vec::new();
             for u in 0..8 {
                 let t: [f32; 8] = core::array::from_fn(|v| sm[v][u]);
                 let ff = fdct8(&t);
@@ -338,7 +340,7 @@ fn model_xf(c: &mut Case) {
                     if keep {
                         let p = usize::from(spos[r]);
                         mask |= 1 << p;
-                        c.coef[(b * 64 + p) * nmbtot + mbi] = l as i16;
+                        kept.push((p, l as i16));
                     }
                     if m >= 1.0 {
                         let e = ((m.to_bits() >> 22) as i32 - 254).min(15);
@@ -349,6 +351,11 @@ fn model_xf(c: &mut Case) {
                         }
                     }
                 }
+            }
+            // Dense: each stored coefficient at its rank among the block's coded positions.
+            kept.sort_unstable();
+            for (k, &(_, l)) in kept.iter().enumerate() {
+                c.coef[lev_at(blkn) + lev_idx(k)] = l;
             }
             c.cmask[blkn] = mask;
             c.hist[blkn * 2] = h0;
@@ -369,12 +376,15 @@ fn model_quant(c: &mut Case) {
             let code = mb_qcode(&g, &c.t, &sp, rowcode, i32::from(c.act[mbi]));
             let q = f32::from(c.t.qscale[code as usize]);
             let intra = c.info[mbi].mode == MODE_INTRA;
-            let at = |i: usize| (b * 64 + i) * nmbtot + mbi;
+            // The k-th stored value of the block, in coef and in lev alike.
+            let at = |k: usize| lev_at(b * nmbtot + mbi) + lev_idx(k);
             let ras = c.t.scan_ras[g.alt_scan as usize];
             let mut cm = c.cmask[b * nmbtot + mbi];
             let mut mask = 0u64;
+            let (mut kc, mut kl) = (0, 0);
             if intra {
                 c.lev[at(0)] = c.coef[at(0)];
+                (kc, kl) = (1, 1);
                 mask = 1;
                 cm &= !1;
             }
@@ -384,7 +394,8 @@ fn model_quant(c: &mut Case) {
                 if i >= usize::from(sp.keep) {
                     break;
                 }
-                let cf = i32::from(c.coef[at(i)]);
+                let cf = i32::from(c.coef[at(kc)]);
+                kc += 1;
                 let mut a = if intra {
                     (cf.abs() as f32 * 4.0 / (f32::from(c.t.intra_q[usize::from(ras[i])]) * q)
                         + 0.375) as i32
@@ -393,7 +404,8 @@ fn model_quant(c: &mut Case) {
                 };
                 a = a.min(2047);
                 if a != 0 {
-                    c.lev[at(i)] = (if cf < 0 { -a } else { a }) as i16;
+                    c.lev[at(kl)] = (if cf < 0 { -a } else { a }) as i16;
+                    kl += 1;
                     mask |= 1 << i;
                 }
             }
@@ -427,11 +439,13 @@ fn model_recon(c: &mut Case) {
                 let ras = c.t.scan_ras[g.alt_scan as usize];
                 let mut mask = c.nzmask[blkn];
                 let (mut sum, mut last) = (0i32, 0i32);
+                let mut k = 0;
                 while mask != 0 {
                     let p = mask.trailing_zeros() as usize;
                     mask &= mask - 1;
                     let r = usize::from(ras[p]);
-                    let l = i32::from(c.lev[(b * 64 + p) * nmbtot + mbi]);
+                    let l = i32::from(c.lev[lev_at(blkn) + lev_idx(k)]);
+                    k += 1;
                     let val = if intra {
                         if r == 0 {
                             8 * l
@@ -711,11 +725,11 @@ fn random_case(seed: u64, mbw: i32, mbh: i32, interlaced: bool, list: &[i32]) ->
         rowq: (0..n * mbh as usize)
             .map(|_| 1 + rng.below(31) as u8)
             .collect(),
-        coef: pods_of(&rng.bytes(6 * 64 * nmbtot * 2)),
+        coef: pods_of(&rng.bytes(lev_len(6 * nmbtot) * 2)),
         predbuf: rng.bytes(6 * 64 * nmbtot),
         hist: pods_of(&rng.bytes(6 * nmbtot * 16)),
         cmask: pods_of(&rng.bytes(6 * nmbtot * 8)),
-        lev: pods_of(&rng.bytes(6 * 64 * nmbtot * 2)),
+        lev: pods_of(&rng.bytes(lev_len(6 * nmbtot) * 2)),
         nzmask: pods_of(&rng.bytes(6 * nmbtot * 8)),
         nz: rng.bytes(6 * nmbtot),
         mbq: rng.bytes(nmbtot),
@@ -891,13 +905,13 @@ fn flat_intra_block_gives_dc_only_and_reconstructs_to_its_value() {
             let blkn = b * nmbtot;
             assert_eq!(d.cmask[blkn], 1, "v {v} block {b}: DC only");
             assert_eq!(
-                d.coef[b * 64 * nmbtot],
+                d.coef[lev_at(blkn)],
                 i16::from(v),
                 "the DC level is the value"
             );
             assert_eq!((d.hist[blkn * 2], d.hist[blkn * 2 + 1]), (0, 0));
             assert_eq!(d.nzmask[blkn], 1);
-            assert_eq!(d.lev[b * 64 * nmbtot], i16::from(v));
+            assert_eq!(d.lev[lev_at(blkn)], i16::from(v));
             assert!(d.predbuf[blkn * 64..blkn * 64 + 64].iter().all(|&p| p == 0));
         }
         let rec = usize::from(c.par[0].rec);

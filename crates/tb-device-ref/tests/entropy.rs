@@ -12,7 +12,7 @@ use common::{BS, Bench, geo, row_bs, tables};
 use tb_device::kernel::{EntPack, EntPicSum, EntResolve, EntRowSum, EntScatter, Kernel};
 use tb_kernel_abi::{
     Geo, MB_SCRATCH_WORDS, MODE_BI, MODE_BWD, MODE_FWD, MODE_INTRA, MbInfo, MbRes, PIC_B, PIC_I,
-    PIC_P, PicStat, SessPar,
+    PIC_P, PicStat, SessPar, lev_at, lev_idx, lev_len,
 };
 
 /// Session slots of the batch; only `S` is listed, slot 0 must stay untouched.
@@ -84,7 +84,7 @@ fn run_slice(mut g: Geo, pic_type: u8, mbs: &[Mb], want: &[Want]) {
 
     let mut info = vec![MbInfo::default(); stride];
     let mut nz = vec![0u8; 6 * stride];
-    let mut lev = vec![0i16; 6 * 64 * stride];
+    let mut lev = vec![0i16; lev_len(6 * stride)];
     let mut nzmask = vec![0u64; 6 * stride];
     let mut mbq = vec![0u8; stride];
     // Session 0 holds data too, which the kernels must not read: garbage records.
@@ -109,16 +109,25 @@ fn run_slice(mut g: Geo, pic_type: u8, mbs: &[Mb], want: &[Want]) {
         }
         info[mbi] = m;
         mbq[mbi] = mb.mbq;
+        // The levels of a block one after the other in coded order (`lev_at`), an intra
+        // block's DC level first.
+        let mut of_block: [Vec<(usize, i16)>; 6] = Default::default();
         if mb.mode == MODE_INTRA {
             for (b, dc) in mb.dc.iter().enumerate() {
-                lev[(b * 64) * stride + mbi] = *dc;
+                of_block[b].push((0, *dc));
                 nzmask[b * stride + mbi] |= 1;
             }
         }
         for &(b, p, l) in &mb.levels {
-            lev[(b * 64 + p) * stride + mbi] = l;
+            of_block[b].push((p, l));
             nzmask[b * stride + mbi] |= 1 << p;
             nz[b * stride + mbi] = 1;
+        }
+        for (b, levels) in of_block.iter_mut().enumerate() {
+            levels.sort_unstable();
+            for (k, &(_, l)) in levels.iter().enumerate() {
+                lev[lev_at(b * stride + mbi) + lev_idx(k)] = l;
+            }
         }
     }
     let par = [

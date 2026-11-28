@@ -68,6 +68,11 @@ struct MbCode {
 HD inline int pic_field_tools(const Geo &g, const SessPar &p) { return g.interlaced && !p.frame_only; }
 // alternate_scan of the picture (6.3.10): the batch's choice unless the host asks for the zigzag
 // scan (a frame-only picture of a session that left the choice to the format).
+// Where the stored values of a block are in coef and lev: value k of block blk is at
+// lev_at(blk) + LEV_IDX(k) (the layout and its reasons: lev_at in crates/tb-kernel-abi/src/lib.rs,
+// which these two repeat).
+#define LEV_IDX(k) ((size_t)((k) >> LEV_SH) * (LEV_GROUP << LEV_SH) + ((k) & ((1 << LEV_SH) - 1)))
+HD inline size_t lev_at(size_t blk) { return blk / LEV_GROUP * (64 * LEV_GROUP) + ((blk % LEV_GROUP) << LEV_SH); }
 HD inline int pic_alt_scan(const Geo &g, const SessPar &p) { return g.alt_scan && !p.zigzag; }
 
 // Lower edges of the histogram bins: a coefficient in bin i becomes zero when the base
