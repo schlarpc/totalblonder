@@ -20,6 +20,12 @@
 //! `max_step` per tick, and ignored below a hysteresis. A program on its slate is pinned to
 //! `Rmin`.
 //!
+//! **The pool can move** ([`Controller::request_pool`]): another stream of the carrier (an
+//! audio track whose coding mode follows its source) wants more or less of it. A larger pool
+//! applies at once. A smaller one is allocated against from the next tick, with no hysteresis
+//! on the decreases it needs, and becomes the pool ([`Controller::pool`]) only once the mux
+//! rates fit under it: until then the caller must not hand the difference to anyone.
+//!
 //! Pure: time is 27 MHz ticks passed in; rates are elementary-stream bit/s (the caller turns them
 //! into transport rates for the mux). The caller executes [`Command`]s and reports tickets and
 //! access units back.
@@ -118,6 +124,8 @@ struct Prog {
 pub struct Controller {
     cfg: Config,
     progs: Vec<Prog>,
+    /// A smaller pool asked for and not yet reached.
+    pending_pool: Option<u64>,
 }
 
 impl Controller {
@@ -161,6 +169,7 @@ impl Controller {
                     pending: None,
                 })
                 .collect(),
+            pending_pool: None,
         };
         let start = c.allocate(&vec![1.0; params.len()]);
         let mut cmds = Vec::new();
@@ -215,6 +224,45 @@ impl Controller {
         p.encoder = r;
         p.mux = r;
         Ok(r)
+    }
+
+    /// The pool now: what the mux rates are guaranteed to fit under.
+    pub fn pool(&self) -> u64 {
+        self.cfg.pool_bps
+    }
+
+    /// Asks for the pool to become `bps`. More applies at once. Less is worked toward (the
+    /// decreases needed are made from the next [`Controller::tick`], without hysteresis) and
+    /// becomes [`Controller::pool`] when [`Controller::committed`] fits under it; a later
+    /// request replaces an earlier one. Refused when the floors would not fit.
+    pub fn request_pool(&mut self, bps: u64) -> Result<(), ConfigError> {
+        let floors: u64 = self.progs.iter().map(|p| p.p.min_bps).sum();
+        if floors > bps {
+            return Err(ConfigError::Floors(floors, bps));
+        }
+        if bps >= self.cfg.pool_bps {
+            self.cfg.pool_bps = bps;
+            self.pending_pool = None;
+        } else {
+            self.pending_pool = Some(bps);
+            self.settle();
+        }
+        Ok(())
+    }
+
+    /// A smaller pool asked for becomes the pool once the mux rates fit under it.
+    fn settle(&mut self) {
+        if let Some(p) = self.pending_pool
+            && self.committed() <= p
+        {
+            self.cfg.pool_bps = p;
+            self.pending_pool = None;
+        }
+    }
+
+    /// The pool the allocation divides: a smaller one asked for, else the pool.
+    fn target_pool(&self) -> u64 {
+        self.pending_pool.unwrap_or(self.cfg.pool_bps)
     }
 
     /// The sum of the mux rates now: never above the pool.
@@ -297,6 +345,7 @@ impl Controller {
                 });
             }
         }
+        self.settle();
         out
     }
 
@@ -327,6 +376,12 @@ impl Controller {
             })
             .collect();
         let want = self.allocate(&weights);
+        // A smaller pool is on its way: every decrease it needs is made, however small.
+        let hysteresis = if self.pending_pool.is_some() {
+            0.0
+        } else {
+            self.cfg.hysteresis
+        };
         // Decreases first: they start the release of budget.
         for (i, &w) in want.iter().enumerate() {
             let p = &mut self.progs[i];
@@ -336,7 +391,7 @@ impl Controller {
             let cur = p.encoder;
             let floor = (cur as f64 * (1.0 - self.cfg.max_step)) as u64;
             let to = w.max(floor).max(p.p.min_bps);
-            if to < cur && (cur - to) as f64 > cur as f64 * self.cfg.hysteresis {
+            if to < cur && (cur - to) as f64 > cur as f64 * hysteresis {
                 p.encoder = to;
                 p.pending = Some(Pending::Lowering {
                     to,
@@ -349,8 +404,8 @@ impl Controller {
                 });
             }
         }
-        // Increases, from what is free now.
-        let mut free = self.cfg.pool_bps.saturating_sub(self.committed());
+        // Increases, from what is free now (under the smaller pool, if one is on its way).
+        let mut free = self.target_pool().saturating_sub(self.committed());
         for (i, &w) in want.iter().enumerate() {
             let p = &mut self.progs[i];
             if p.pending.is_some() || free == 0 {
@@ -383,7 +438,7 @@ impl Controller {
         let mut open: Vec<bool> = (0..n)
             .map(|i| self.progs[i].p.max_bps > self.progs[i].p.min_bps && weights[i] > 0.0)
             .collect();
-        let mut left = self.cfg.pool_bps.saturating_sub(r.iter().sum());
+        let mut left = self.target_pool().saturating_sub(r.iter().sum());
         for _ in 0..n {
             let total: f64 = (0..n).filter(|&i| open[i]).map(|i| weights[i]).sum();
             if left == 0 || total <= 0.0 {
@@ -469,6 +524,8 @@ mod tests {
     /// difficulty, checks the invariant at every step.
     struct Sim {
         c: Controller,
+        /// The pool after the last batch.
+        pool: u64,
         mux: Vec<u64>,
         enc: Vec<u64>,
         ticket: Vec<u32>,
@@ -476,7 +533,11 @@ mod tests {
     }
 
     impl Sim {
+        /// Executes one batch. Within it the mux may still hold the pool from before the
+        /// batch; after it, what fits the pool now (a smaller pool settles with the lowerings
+        /// that reach it, and is handed on only after the batch).
         fn apply(&mut self, cmds: Vec<Command>) {
+            let before = self.pool;
             for c in cmds {
                 match c {
                     Command::Mux { program, bps } => self.mux[program] = bps,
@@ -488,11 +549,13 @@ mod tests {
                     }
                 }
                 assert!(
-                    self.mux.iter().sum::<u64>() <= self.c.cfg.pool_bps,
+                    self.mux.iter().sum::<u64>() <= before.max(self.c.pool()),
                     "invariant broken"
                 );
             }
+            assert!(self.mux.iter().sum::<u64>() <= self.c.pool());
             assert_eq!(self.mux.iter().sum::<u64>(), self.c.committed());
+            self.pool = self.c.pool();
         }
     }
 
@@ -502,6 +565,7 @@ mod tests {
         let ps = [p(2_000_000, 15_000_000); 4];
         let (c, cmds) = Controller::new(cfg(pool), &ps).unwrap();
         let mut sim = Sim {
+            pool: c.pool(),
             c,
             mux: vec![0; 4],
             enc: vec![0; 4],
@@ -546,6 +610,63 @@ mod tests {
         );
         // Most of the pool is in use once things settle.
         assert!(sim.c.committed() > pool * 8 / 10, "{}", sim.c.committed());
+    }
+
+    /// The pool moves: a smaller pool is reached through ordinary lowerings (each after its
+    /// picture and D) and only then reported; a larger one applies at once. The mux never
+    /// holds more than the pool reported.
+    #[test]
+    fn the_pool_shrinks_only_once_the_mux_fits_and_grows_at_once() {
+        let pool = 30_000_000;
+        let ps = [p(2_000_000, 15_000_000); 2];
+        let (c, cmds) = Controller::new(cfg(pool), &ps).unwrap();
+        let mut sim = Sim {
+            pool: c.pool(),
+            c,
+            mux: vec![0; 2],
+            enc: vec![0; 2],
+            ticket: vec![0; 2],
+            next_ticket: 0,
+        };
+        sim.apply(cmds);
+        assert_eq!(sim.c.committed(), pool);
+        // An audio track wants 300 kbit/s more: 1 % of the pool, under the 3 % hysteresis.
+        let smaller = pool - 300_000;
+        sim.c.request_pool(smaller).unwrap();
+        assert_eq!(sim.c.pool(), pool, "not before the mux fits");
+        let frame = S / 30;
+        let mut seen = [0u32; 2];
+        let mut reached = None;
+        for k in 0..300u64 {
+            let t = k * frame;
+            for i in 0..2 {
+                let tk = if seen[i] != sim.ticket[i] {
+                    seen[i] = sim.ticket[i];
+                    sim.ticket[i]
+                } else {
+                    0
+                };
+                sim.c
+                    .access_unit(i, sim.enc[i] / 30, 4.0, frame, t + S / 2, tk);
+            }
+            let cmds = if k % 15 == 14 {
+                sim.c.tick(t)
+            } else {
+                sim.c.poll(t)
+            };
+            sim.apply(cmds);
+            if reached.is_none() && sim.c.pool() == smaller {
+                reached = Some(t);
+            }
+        }
+        let at = reached.expect("the smaller pool was reached");
+        // A tick, then the picture and D: within about a second and a half.
+        assert!(at <= S * 3 / 2, "{:.2} s", at as f64 / S as f64);
+        assert!(sim.c.committed() <= smaller);
+        // Floors that would not fit are refused; a larger pool applies at once.
+        assert!(sim.c.request_pool(3_000_000).is_err());
+        sim.c.request_pool(pool).unwrap();
+        assert_eq!(sim.c.pool(), pool);
     }
 
     #[test]
