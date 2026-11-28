@@ -1,8 +1,12 @@
 //! From FLV tags to [`InputEvent`]s: which streams a publisher has, and its packets.
 //!
-//! An RTMP publisher has at most one video and one audio track. Their stream indices are fixed:
-//! video is [`VIDEO`] (0) and audio is [`AUDIO`] (1), whether or not the other exists, so an
-//! index never changes meaning within a connection.
+//! An RTMP publisher has one video track and one or more audio tracks (Enhanced RTMP v2
+//! multitrack audio: `audioTrackId` 0, the default, and others). Their stream indices are
+//! fixed: video is [`VIDEO`] (0), audio track `k` is `1 + k` ([`audio_index`]; track 0 is
+//! [`AUDIO`]), whether or not the others exist, so an index never changes meaning within a
+//! connection. Only video and audio track 0 are waited for before `Streams`; another audio
+//! track joins when its configuration arrives (a new `Streams`). The tracks carry no language,
+//! so a program's audio tracks take them in id order.
 //!
 //! **When `Streams` is emitted.** A track is *known* once its configuration is: the sequence
 //! header for AVC, HEVC, AV1, VP9, AAC and Opus; the first frame for MP3, PCM, AC-3 and E-AC-3,
@@ -42,8 +46,13 @@ use crate::unwrap::MsUnwrapper;
 
 /// The stream index of the video track.
 pub const VIDEO: StreamIndex = StreamIndex(0);
-/// The stream index of the audio track.
+/// The stream index of the default audio track (`audioTrackId` 0).
 pub const AUDIO: StreamIndex = StreamIndex(1);
+
+/// The stream index of audio track `id`.
+pub fn audio_index(id: u8) -> StreamIndex {
+    StreamIndex(1 + u16::from(id))
+}
 
 /// What a held packet counts beyond its payload (its struct and queue slot, rounded up).
 pub const PACKET_OVERHEAD: usize = 128;
@@ -168,7 +177,8 @@ struct Track {
 pub struct Assembler {
     config: MediaConfig,
     video: Track,
-    audio: Track,
+    /// By `audioTrackId`; track 0 is always there.
+    audio: std::collections::BTreeMap<u8, Track>,
     meta: Metadata,
     announced: bool,
     gave_up_waiting: bool,
@@ -186,7 +196,7 @@ impl Assembler {
         Self {
             config,
             video: Track::default(),
-            audio: Track::default(),
+            audio: [(0, Track::default())].into(),
             meta: Metadata::default(),
             announced: false,
             gave_up_waiting: false,
@@ -276,16 +286,29 @@ impl Assembler {
     ) {
         let dts = self.unwrap.unwrap(ts);
         self.first_wall.get_or_insert(now);
-        match flv::parse_audio(payload) {
+        match flv::parse_audio_tracks(payload) {
             Err(_) => self.stats.malformed += 1,
-            Ok(AudioTag::Unsupported { .. }) => {
-                self.stats.unsupported += 1;
-                if self.audio.config.is_none() {
-                    self.audio.unsupported = true;
+            Ok(tracks) => {
+                for (id, tag) in tracks {
+                    self.on_audio_tag(id, dts, tag, out);
                 }
             }
-            Ok(AudioTag::Info) => {}
-            Ok(AudioTag::SequenceStart { codec, config }) => {
+        }
+        self.maybe_announce(now, out);
+    }
+
+    fn on_audio_tag(&mut self, id: u8, dts: i64, tag: AudioTag, out: &mut Vec<InputEvent>) {
+        let index = audio_index(id);
+        let track = self.audio.entry(id).or_default();
+        match tag {
+            AudioTag::Unsupported { .. } => {
+                self.stats.unsupported += 1;
+                if track.config.is_none() {
+                    track.unsupported = true;
+                }
+            }
+            AudioTag::Info => {}
+            AudioTag::SequenceStart { codec, config } => {
                 let (rate, ch) = match codec {
                     CodecId::Aac => flv::audio_specific_config(&config),
                     CodecId::Opus => flv::opus_head(&config),
@@ -300,15 +323,15 @@ impl Assembler {
                         channels: (ch > 0).then_some(ch),
                     },
                 };
-                self.set_config(AUDIO, c, out);
+                self.set_config(index, c, out);
             }
-            Ok(AudioTag::Frame {
+            AudioTag::Frame {
                 codec,
                 header,
                 data,
-            }) => {
+            } => {
                 let needs_config = matches!(codec, CodecId::Aac | CodecId::Opus);
-                let current = self.audio.config.as_ref().map(|c| c.codec);
+                let current = track.config.as_ref().map(|c| c.codec);
                 if current != Some(codec) && !needs_config {
                     // Codecs with no sequence header are configured by their first frame.
                     let hint = if header.rate > 0 {
@@ -324,13 +347,13 @@ impl Assembler {
                         extradata: Vec::new(),
                         audio: hint,
                     };
-                    self.set_config(AUDIO, c, out);
+                    self.set_config(index, c, out);
                 }
-                if self.audio.config.as_ref().map(|c| c.codec) != Some(codec) {
+                if self.track(index).config.as_ref().map(|c| c.codec) != Some(codec) {
                     self.stats.dropped_before_config += 1;
                 } else {
                     let p = Packet {
-                        stream: AUDIO,
+                        stream: index,
                         pts: Some(dts),
                         dts: Some(dts),
                         duration: None,
@@ -341,7 +364,6 @@ impl Assembler {
                 }
             }
         }
-        self.maybe_announce(now, out);
     }
 
     /// Time passes (wall-clock wait for a missing track).
@@ -352,7 +374,9 @@ impl Assembler {
     /// The session is ending: announce whatever is known and release held packets, so that
     /// nothing received is lost before `End`.
     pub fn finish(&mut self, out: &mut Vec<InputEvent>) {
-        if !self.announced && (self.video.config.is_some() || self.audio.config.is_some()) {
+        if !self.announced
+            && (self.video.config.is_some() || self.audio.values().any(|t| t.config.is_some()))
+        {
             self.announce(out);
         }
     }
@@ -361,7 +385,8 @@ impl Assembler {
         if index == VIDEO {
             &mut self.video
         } else {
-            &mut self.audio
+            let id = u8::try_from(index.0.saturating_sub(1)).unwrap_or(u8::MAX);
+            self.audio.entry(id).or_default()
         }
     }
 
@@ -418,7 +443,9 @@ impl Assembler {
             self.gave_up_waiting = true;
         }
         let v = &self.video;
-        let a = &self.audio;
+        let Some(a) = self.audio.get(&0) else {
+            return;
+        };
         if v.config.is_none() && a.config.is_none() {
             return;
         }
@@ -443,13 +470,19 @@ impl Assembler {
                 language: None,
             });
         }
-        if let Some(c) = &self.audio.config {
-            let audio = AudioHint {
-                sample_rate: c.audio.sample_rate.or(self.meta.audio.sample_rate),
-                channels: c.audio.channels.or(self.meta.audio.channels),
+        for (&id, t) in &self.audio {
+            let Some(c) = &t.config else { continue };
+            // onMetaData's audio fields describe the default track (Enhanced RTMP v2).
+            let audio = if id == 0 {
+                AudioHint {
+                    sample_rate: c.audio.sample_rate.or(self.meta.audio.sample_rate),
+                    channels: c.audio.channels.or(self.meta.audio.channels),
+                }
+            } else {
+                c.audio
             };
             streams.push(StreamInfo {
-                index: AUDIO,
+                index: audio_index(id),
                 codec: c.codec,
                 time_base: Rational::MILLIS,
                 extradata: c.extradata.clone(),
@@ -514,6 +547,68 @@ mod tests {
             panic!()
         };
         assert_eq!((p.dts, p.pts, p.keyframe), (Some(0), Some(66), true));
+    }
+
+    /// An Enhanced RTMP v2 audio Multitrack message (ManyTracks, one FourCC): `tracks` are
+    /// `(id, body)`.
+    fn multitrack(packet_type: u8, fourcc: &[u8; 4], tracks: &[(u8, &[u8])]) -> Vec<u8> {
+        let mut m = vec![0x95, (1 << 4) | packet_type];
+        m.extend_from_slice(fourcc);
+        for (id, body) in tracks {
+            m.push(*id);
+            let n = body.len() as u32;
+            m.extend_from_slice(&[(n >> 16) as u8, (n >> 8) as u8, n as u8]);
+            m.extend_from_slice(body);
+        }
+        m
+    }
+
+    /// Two AAC tracks in one stream of messages: the default one is waited for, both are
+    /// announced (track 1 as stream 2), and each frame lands on its own stream.
+    #[test]
+    fn multitrack_audio_becomes_one_stream_per_track() {
+        let mut a = Assembler::new(MediaConfig::default());
+        let mut ev = Vec::new();
+        let t = Duration::ZERO;
+        a.on_video(t, RtmpTime(0), AVC_SEQ, &mut ev);
+        let asc: &[u8] = &[0x12, 0x10];
+        a.on_audio(
+            t,
+            RtmpTime(0),
+            &multitrack(0, b"mp4a", &[(0, asc), (1, asc)]),
+            &mut ev,
+        );
+        assert_eq!(
+            streams(&ev),
+            [vec![CodecId::H264, CodecId::Aac, CodecId::Aac]]
+        );
+        let InputEvent::Streams(s) = &ev[0] else {
+            panic!()
+        };
+        assert_eq!(
+            s.iter().map(|s| s.index).collect::<Vec<_>>(),
+            [VIDEO, AUDIO, audio_index(1)]
+        );
+        ev.clear();
+        a.on_audio(
+            t,
+            RtmpTime(21),
+            &multitrack(1, b"mp4a", &[(0, &[1, 2]), (1, &[3, 4, 5])]),
+            &mut ev,
+        );
+        let got: Vec<(StreamIndex, Vec<u8>)> = ev
+            .iter()
+            .filter_map(|e| match e {
+                InputEvent::Packet(p) => Some((p.stream, p.data.clone())),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(got, [(AUDIO, vec![1, 2]), (audio_index(1), vec![3, 4, 5])]);
+        // A truncated track is malformed, not a crash.
+        let mut bad = multitrack(1, b"mp4a", &[(0, &[1, 2, 3])]);
+        bad.truncate(bad.len() - 1);
+        a.on_audio(t, RtmpTime(42), &bad, &mut ev);
+        assert_eq!(a.stats().malformed, 1);
     }
 
     #[test]

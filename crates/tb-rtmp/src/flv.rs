@@ -17,8 +17,14 @@
 //! - Enhanced audio (Enhanced RTMP v2): `SoundFormat` 9 = ExHeader, `AudioPacketType` (low
 //!   4 bits: SequenceStart 0, CodedFrames 1, SequenceEnd 2, MultichannelConfig 4,
 //!   Multitrack 5, ModEx 7), FourCC `mp4a`, `Opus`, `.mp3`, `ac-3`, `ec-3`.
+//! - Enhanced audio **multitrack** (v2, [`parse_audio_tracks`]): `AvMultitrackType` (4 bits:
+//!   OneTrack 0, ManyTracks 1, ManyTracksManyCodecs 2) and the tracks' `AudioPacketType` (4
+//!   bits, never Multitrack), then the FourCC unless each track has its own; per track (its
+//!   FourCC for ManyTracksManyCodecs), `audioTrackId` (UI8) and, unless OneTrack, the track's
+//!   size (UI24); the message holds tracks until it is used up. Track 0 is the default track.
+//!   The tracks carry no language: they are told apart by id only.
 //!
-//! Everything else (Sorenson, VP6, Speex, Nellymoser, G.711, multitrack) is reported as
+//! Everything else (Sorenson, VP6, Speex, Nellymoser, G.711, multitrack video) is reported as
 //! [`VideoTag::Unsupported`] / [`AudioTag::Unsupported`] so the session can ignore the track.
 
 use tb_media::CodecId;
@@ -311,16 +317,78 @@ pub fn parse_audio(p: &[u8]) -> Result<AudioTag, FlvError> {
     }
 }
 
+/// Parse an audio message body into its tracks: `(audioTrackId, tag)`. Everything that is not
+/// Enhanced RTMP multitrack is one tag of track 0.
+pub fn parse_audio_tracks(p: &[u8]) -> Result<Vec<(u8, AudioTag)>, FlvError> {
+    if p.first().is_some_and(|b| b >> 4 == 9) {
+        let (packet_type, rest) = skip_mod_ex(p[0] & 0x0F, &p[1..], aerr)?;
+        if packet_type == 5 {
+            return parse_audio_multitrack(rest);
+        }
+    }
+    Ok(vec![(0, parse_audio(p)?)])
+}
+
+/// The body of an audio Multitrack message (after its packet type).
+fn parse_audio_multitrack(rest: &[u8]) -> Result<Vec<(u8, AudioTag)>, FlvError> {
+    let (&b, mut rest) = rest
+        .split_first()
+        .ok_or(aerr("Multitrack header truncated"))?;
+    let (kind, packet_type) = (b >> 4, b & 0x0F);
+    if packet_type == 5 {
+        return Err(aerr("Multitrack inside Multitrack"));
+    }
+    if kind > 2 {
+        return Err(aerr("unknown AvMultitrackType"));
+    }
+    let mut shared = None;
+    if kind != 2 {
+        shared = Some(rest.get(..4).ok_or(aerr("FourCC truncated"))?);
+        rest = &rest[4..];
+    }
+    let mut out = Vec::new();
+    while !rest.is_empty() {
+        let fourcc = match shared {
+            Some(f) => f,
+            None => {
+                let f = rest.get(..4).ok_or(aerr("FourCC truncated"))?;
+                rest = &rest[4..];
+                f
+            }
+        };
+        let (&id, r) = rest.split_first().ok_or(aerr("audioTrackId truncated"))?;
+        rest = r;
+        let body = if kind == 0 {
+            std::mem::take(&mut rest)
+        } else {
+            let n = rest.get(..3).ok_or(aerr("track size truncated"))?;
+            let n = usize::try_from(be24(n)).unwrap_or(usize::MAX);
+            let body = rest.get(3..3 + n).ok_or(aerr("track truncated"))?;
+            rest = &rest[3 + n..];
+            body
+        };
+        out.push((id, audio_ex_body(packet_type, fourcc, body)?));
+        if kind == 0 {
+            break;
+        }
+    }
+    Ok(out)
+}
+
 fn parse_audio_ex(p: &[u8]) -> Result<AudioTag, FlvError> {
     let (packet_type, rest) = skip_mod_ex(p[0] & 0x0F, &p[1..], aerr)?;
     // Audio's Multitrack is 5 and its ModEx 7 (Enhanced RTMP v2 AudioPacketType).
     if packet_type == 5 {
         return Ok(AudioTag::Unsupported {
-            what: "Enhanced RTMP multitrack audio".into(),
+            what: "Enhanced RTMP multitrack audio (use parse_audio_tracks)".into(),
         });
     }
     let fourcc = rest.get(..4).ok_or(aerr("FourCC truncated"))?;
-    let rest = &rest[4..];
+    audio_ex_body(packet_type, fourcc, &rest[4..])
+}
+
+/// One enhanced audio packet of `packet_type` for `fourcc`.
+fn audio_ex_body(packet_type: u8, fourcc: &[u8], rest: &[u8]) -> Result<AudioTag, FlvError> {
     let codec = match fourcc {
         b"mp4a" => CodecId::Aac,
         b"Opus" => CodecId::Opus,
