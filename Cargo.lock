@@ -1854,6 +1854,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tb-hls"
+version = "0.0.0"
+dependencies = [
+ "tb-media",
+ "thiserror 2.0.21",
+ "url",
+]
+
+[[package]]
 name = "tb-kernel-abi"
 version = "0.0.0"
 dependencies = [
@@ -2235,6 +2244,8 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "futures-util",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "signal-hook",
@@ -2248,6 +2259,7 @@ dependencies = [
  "tb-device-ref",
  "tb-engine",
  "tb-eqam",
+ "tb-hls",
  "tb-m2v-encoder",
  "tb-m2v-syntax",
  "tb-media",
@@ -2266,6 +2278,7 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
+ "url",
 ]
 
 [[package]]

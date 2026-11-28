@@ -26,6 +26,7 @@ pub mod carrier;
 pub mod config;
 pub mod control;
 pub mod device;
+pub mod hls_input;
 pub mod ingest;
 pub mod live;
 pub mod metrics;

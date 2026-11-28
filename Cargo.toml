@@ -33,6 +33,7 @@ tb-output = { path = "crates/tb-output" }
 totalblonder = { path = "crates/totalblonder" }
 tb-rtmp = { path = "crates/tb-rtmp" }
 tb-tsin = { path = "crates/tb-tsin" }
+tb-hls = { path = "crates/tb-hls" }
 tb-eqam = { path = "crates/tb-eqam" }
 tb-audio = { path = "crates/tb-audio" }
 tb-ac3 = { path = "crates/tb-ac3" }

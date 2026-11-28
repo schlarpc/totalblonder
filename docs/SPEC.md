@@ -891,10 +891,24 @@ because a connected RTMP sink counts as demand there.
 - The listener binds to a configured address. There is no authentication in RTMP as used
   here; the bind address and the host firewall are the access control. **[proposed]**
 
-### 9.2 LL-HLS pull (later) **[decided: later]**
+### 9.2 LL-HLS pull **[built 2026-11-28]**
 
-A small client using `reqwest` and `m3u8-rs`, with our own handling of `EXT-X-PART` and
-`PRELOAD-HINT`, feeding fragmented MP4 to libav through a custom AVIO context. libav's own
+`kind = "hls"` with a `url` (multivariant or media playlist; `max_kbps` caps the variant
+taken). Built as the other inputs are: the playlist parser (with `EXT-X-PART`,
+`EXT-X-PRELOAD-HINT`, `EXT-X-SERVER-CONTROL`, `EXT-X-PART-INF`), a fragmented-MP4 demuxer and
+the fetch planner are pure Rust in `tb-hls`; MPEG-TS segments go through `tb-tsin`; the HTTP
+client is `reqwest` (blocking, rustls on ring) in `totalblonder::hls_input`; decoding stays in
+the worker. (The earlier plan, fMP4 into libav through a custom AVIO context, would have put
+container parsing in the server's libav, which the isolation rule excludes.) The planner
+starts `PART-HOLD-BACK` before the live edge at an independent part, fetches part after part,
+takes the preload hint when it is the next part, otherwise makes a blocking reload for it,
+and falls back to whole segments when the parts are gone. The variant with the highest
+bandwidth is taken with every audio rendition of its group; each rendition's `LANGUAGE`
+labels its audio, so a program's second audio track takes it. Packets are paced by their time
+stamps. A discontinuity, an ended playlist or a failure ends the session; the input starts
+again after two seconds. Checked on nixark against a simulated live LL-HLS origin (0.5 s parts,
+blocking reloads, preload hints, a separate Spanish rendition): picture and both languages
+continuous. libav's own
 `hls` demuxer treats LL-HLS as ordinary HLS (software-survey §1). The producer stamps
 `PROGRAM-DATE-TIME` at push time, not capture time, so
 it is not a better clock than arrival time. An HLS request also counts as demand for 30 s.

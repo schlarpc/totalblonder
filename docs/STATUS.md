@@ -72,6 +72,7 @@ frame clock and fallback selector are used by the server (`source.rs`).
 
 | Crate | What | Evidence |
 |---|---|---|
+| `tb-hls` | HLS and LL-HLS pull: playlists with parts and preload hints, an fMP4 demuxer, the fetch planner (blocking reloads, live-edge start, whole-segment fallback) | unit tests; nixark against a simulated live LL-HLS origin with a separate audio rendition |
 | `tb-rtmp` | RTMP server for publishers (handshake, chunks, AMF0, publish flow, FLV and Enhanced RTMP v2: H.264, HEVC, AV1, VP9, AAC, Opus, MP3, AC-3, E-AC-3, multitrack audio as one stream per track) | ffmpeg, GStreamer and librtmp publishers; multitrack audio by unit tests (no local producer sends it) |
 | `tb-tsin` | MPEG-TS over UDP or RTP: reordering, PAT/PMT/PES demux | ffmpeg streams checked against ffprobe |
 | `tb-sandbox`, `tb-decoder-proto`, `tb-avworker`, `tb-decoder-client` | libavcodec in a confined child process (user, mount, PID, network, IPC, UTS namespaces; Landlock; seccomp in kill mode; rlimits), shared-memory rings, supervision, restarts and a circuit breaker; scaling and resampling inside the worker; NVDEC inside the sandbox | 13 of 13 layers on bagel and nixark; H.264/AAC bit-exact against ffmpeg; every injected fault classified |

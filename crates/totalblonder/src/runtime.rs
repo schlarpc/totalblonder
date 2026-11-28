@@ -312,6 +312,15 @@ fn start_live(
                             ist,
                             &clock,
                         ),
+                        crate::config::InputPlan::Hls {
+                            url, max_bandwidth, ..
+                        } => crate::hls_input::run_hls(
+                            url,
+                            max_bandwidth,
+                            Box::new(SessionReporter::new(sink)),
+                            ist,
+                            &clock,
+                        ),
                         crate::config::InputPlan::File { path, .. } => crate::ingest::run_ts_file(
                             path,
                             Box::new(SessionReporter::new(sink)),

@@ -424,8 +424,10 @@ struct InputFile {
     passphrase: Option<String>,
     /// SRT: the receive latency, ms (default 200).
     latency_ms: Option<u64>,
-    /// LL-HLS: the playlist URL.
+    /// HLS: the playlist URL.
     url: Option<String>,
+    /// HLS: the highest variant `BANDWIDTH` to take, kbit/s (default: the highest there is).
+    max_kbps: Option<u64>,
 }
 
 // ------------------------------------------------------------------ the validated model
@@ -776,6 +778,15 @@ pub enum InputPlan {
         /// The receive latency.
         latency: std::time::Duration,
     },
+    /// An HLS or Low-Latency HLS pull.
+    Hls {
+        /// The input's id.
+        id: String,
+        /// The multivariant or media playlist.
+        url: url::Url,
+        /// The highest variant bandwidth to take, bit/s.
+        max_bandwidth: Option<u64>,
+    },
     /// A file, looped (for tests and standby).
     File {
         /// The input's id.
@@ -792,6 +803,7 @@ impl InputPlan {
             InputPlan::Rtmp { .. } => "rtmp",
             InputPlan::TsUdp { .. } => "ts_udp",
             InputPlan::Srt { .. } => "srt",
+            InputPlan::Hls { .. } => "hls",
             InputPlan::File { .. } => "file",
         }
     }
@@ -802,6 +814,7 @@ impl InputPlan {
             InputPlan::Rtmp { id, .. }
             | InputPlan::TsUdp { id, .. }
             | InputPlan::Srt { id, .. }
+            | InputPlan::Hls { id, .. }
             | InputPlan::File { id, .. } => id,
         }
     }
@@ -1159,6 +1172,23 @@ pub fn load(text: &str) -> Result<Plant, ConfigError> {
                     bind: need_bind()?,
                     passphrase: i.passphrase.clone(),
                     latency: std::time::Duration::from_millis(ms),
+                }
+            }
+            "hls" => {
+                let raw = i
+                    .url
+                    .as_deref()
+                    .ok_or_else(|| rule(format!("hls input {:?} needs url", i.id)))?;
+                let url = url::Url::parse(raw)
+                    .ok()
+                    .filter(|u| matches!(u.scheme(), "http" | "https"))
+                    .ok_or_else(|| {
+                        rule(format!("hls input {:?}: url {raw:?} is not http(s)", i.id))
+                    })?;
+                InputPlan::Hls {
+                    id: i.id.clone(),
+                    url,
+                    max_bandwidth: i.max_kbps.map(|k| k * 1000),
                 }
             }
             x => {

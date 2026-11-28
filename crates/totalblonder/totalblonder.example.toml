@@ -149,10 +149,23 @@ path = "/srv/totalblonder/standby.ts"
 
 [[input]]
 id = "studio"
-kind = "rtmp"                 # rtmp | ts_udp | file
+kind = "rtmp"                 # rtmp | ts_udp | srt | hls | file
 bind = "127.0.0.1:1935"
 app = "live"
 key = "wall"
+
+# [[input]]
+# id = "field"
+# kind = "srt"                # MPEG-TS over SRT, one caller at a time
+# bind = "0.0.0.0:9000"
+# passphrase = "at least ten characters"   # optional, AES-128
+# latency_ms = 200
+#
+# [[input]]
+# id = "web"
+# kind = "hls"                # HLS or Low-Latency HLS pull; audio renditions keep their LANGUAGE
+# url = "https://example.com/live/master.m3u8"
+# max_kbps = 8000             # optional: the highest variant bandwidth to take
 
 # A rating system of our own (SPEC §7.7), sent as a Rating Region Table. Receivers list it
 # among their parental controls ("downloadable" or "open V-chip" ratings); schedule events rate
