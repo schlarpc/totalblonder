@@ -75,12 +75,18 @@
 /// cbindgen does not evaluate products in array lengths).
 #define VLC_DCT_CODES 1312
 
-/// 8x8 blocks per CUDA block in the transform kernel (`k_xf` runs `XB * 8` threads per block):
-/// two warps. The kernel's two passes meet at a barrier, and with eight warps per block (32
-/// blocks, the value before) 7 % of its warp samples waited there for the block's slowest
-/// warp. Measured on the RTX 2000 Ada against 32: 16 is 1.5 to 2.7 % faster, 8 is 2.2 to 3.3 %
-/// faster, 4 is slower than 32 (one warp per block: the limit of blocks per SM binds).
+/// 8x8 blocks per thread block in the transform kernel (`k_xf` runs eight threads per 8x8
+/// block) in the NVIDIA image and the reference build: two warps. The kernel's two passes meet
+/// at a barrier, and with eight warps per block (32 blocks) 7 % of its warp samples waited
+/// there for the block's slowest warp. Measured on the RTX 2000 Ada against 32: 16 is 1.5 to
+/// 2.7 % faster, 8 is 2.2 to 3.3 % faster, 4 is slower than 32 (one warp per block: the limit
+/// of blocks per SM binds). The host launches the kernel with the value of the image it runs
+/// (`EncoderOptions::xf_blocks`, set from the device); the image sizes its shared memory by it.
 #define XB 8
+
+/// [`XB`] of the AMD image. The same change runs the other way on the RX 7900 XTX (median
+/// tick, free-running, against 32): 8 is 17 to 22 % slower, 64 is 2 to 3 % faster.
+#define XB_HIP 64
 
 /// Blocks of one group of the coefficient and level buffers ([`lev_at`]): a warp.
 #define LEV_GROUP 32

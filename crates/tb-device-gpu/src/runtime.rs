@@ -52,6 +52,9 @@ pub trait Runtime: sys::Api + 'static {
     const NAME: &'static str;
     /// The device image this crate was built with for this runtime.
     const IMAGE: KernelImage;
+    /// 8x8 blocks per thread block of the transform kernel in that image (`tb_kernel_abi::XB`
+    /// for the NVIDIA image, `XB_HIP` for the AMD one).
+    const XF_BLOCKS: u32;
     /// The status that reads "not finished yet" from a stream or event query.
     const NOT_READY: Status;
     /// The status `restore` records while the context is being made again.

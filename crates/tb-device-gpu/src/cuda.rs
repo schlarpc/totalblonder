@@ -243,6 +243,7 @@ impl Runtime for Cuda {
         image: include_bytes!(env!("TB_KERNEL_IMAGE_CUDA")),
         symbols: include_str!(env!("TB_KERNEL_SYMBOLS_CUDA")),
     };
+    const XF_BLOCKS: u32 = tb_kernel_abi::XB as u32;
     const NOT_READY: Status = CUDA_ERROR_NOT_READY;
     const CONTEXT_IS_DESTROYED: Status = CUDA_ERROR_CONTEXT_IS_DESTROYED;
     fn context_lost(s: Status) -> bool {

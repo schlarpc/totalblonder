@@ -12,6 +12,11 @@ pub trait TickDevice: Device {
     /// Queue a plan whose wait is accounted under `class` (`Encoder::wait_class`): a plan of
     /// one class takes about as long from tick to tick, which the hybrid wait relies on.
     fn submit_class(&mut self, plan: &Plan, class: u8) -> Result<Ticket, DeviceError>;
+    /// 8x8 blocks per thread block of the transform kernel in this device's image
+    /// (`EncoderOptions::xf_blocks`).
+    fn xf_blocks(&self) -> u32 {
+        tb_m2v_encoder::EncoderOptions::default().xf_blocks
+    }
     /// Block in the driver at once instead of the hybrid wait.
     fn set_blocking(&mut self, _blocking: bool) {}
     /// Measure the device-side duration of every plan from now on.
@@ -31,6 +36,9 @@ pub trait TickDevice: Device {
 impl<R: Runtime> TickDevice for GpuDevice<R> {
     fn submit_class(&mut self, plan: &Plan, class: u8) -> Result<Ticket, DeviceError> {
         GpuDevice::submit_class(self, plan, class)
+    }
+    fn xf_blocks(&self) -> u32 {
+        R::XF_BLOCKS
     }
     fn set_blocking(&mut self, blocking: bool) {
         self.set_wait_mode(if blocking {
@@ -148,6 +156,9 @@ impl<D: TickDevice> TickDevice for Guarded<D> {
         let ticket = self.inner.submit_class(plan, class)?;
         self.track(ticket, plan);
         Ok(ticket)
+    }
+    fn xf_blocks(&self) -> u32 {
+        self.inner.xf_blocks()
     }
     fn set_blocking(&mut self, blocking: bool) {
         self.inner.set_blocking(blocking);

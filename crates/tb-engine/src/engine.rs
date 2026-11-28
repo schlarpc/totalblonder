@@ -100,7 +100,9 @@ pub struct Engine<D> {
 
 impl<D: TickDevice> Engine<D> {
     /// An encoder on this device.
-    pub fn new(dev: D, opt: EncoderOptions, device_timeout: f64) -> Self {
+    pub fn new(dev: D, mut opt: EncoderOptions, device_timeout: f64) -> Self {
+        // The transform kernel is launched in the blocks its image was built for.
+        opt.xf_blocks = dev.xf_blocks();
         let enc = Encoder::new(opt, dev.arenas());
         Self {
             dev,

@@ -7,6 +7,7 @@
 #   ./golden/generate.sh --device cuda --check DIR    # the same cases on the card (nixark):
 #       every stream and every record must be the reference adapter's, except the records
 #       that hold measured times (tick_end, shed_hist, shed_budget: the card's clock is real),
+#       the shape of the k_xf launches (the kernel image's own),
 #       the command line in the first record, and the case `deadline`, whose decisions follow
 #       the device's clock (nix run .#gate-golden)
 #
@@ -119,12 +120,17 @@ case_ film60 qcif --size 176x144 --fps 60000/1001 --gop 30 --bframes 2 --bitrate
 
 if [ -n "$check" ]; then
   status=0
-  # on the card: the records without the measured ones and without the command line
+  # on the card: the records without the measured ones and without the command line, and
+  # the k_xf launches without their grid and block, which are the kernel image's own
+  # (tb_kernel_abi: XB for the NVIDIA image and the reference build, XB_HIP for the AMD one)
+  records() {
+    grep -v '"k":"golden"\|"k":"tick_end"\|"k":"shed_hist"\|"k":"shed_budget"' "$1" |
+      sed -E 's/("kernel":"k_xf"),"grid":[0-9]+,"block":[0-9]+/\1/'
+  }
   same() {
     if [ "$device" = ref ]; then cmp -s "$1" "$2"; return; fi
     case $1 in
-      *.jsonl) cmp -s <(grep -v '"k":"golden"\|"k":"tick_end"\|"k":"shed_hist"\|"k":"shed_budget"' "$1") \
-                      <(grep -v '"k":"golden"\|"k":"tick_end"\|"k":"shed_hist"\|"k":"shed_budget"' "$2") ;;
+      *.jsonl) cmp -s <(records "$1") <(records "$2") ;;
       *) cmp -s "$1" "$2" ;;
     esac
   }

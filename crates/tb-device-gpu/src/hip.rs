@@ -206,6 +206,7 @@ impl Runtime for Hip {
         image: include_bytes!(env!("TB_KERNEL_IMAGE_HIP")),
         symbols: include_str!(env!("TB_KERNEL_SYMBOLS_HIP")),
     };
+    const XF_BLOCKS: u32 = tb_kernel_abi::XB_HIP as u32;
     const NOT_READY: Status = hipErrorNotReady;
     const CONTEXT_IS_DESTROYED: Status = hipErrorContextIsDestroyed;
     fn context_lost(s: Status) -> bool {

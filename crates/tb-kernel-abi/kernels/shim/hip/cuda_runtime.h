@@ -25,6 +25,8 @@
 #ifndef __CUDACC__
 #define __CUDACC__ 1
 #endif
+// 8x8 blocks per thread block of k_xf in this image (tb_kernel_abi.h; the host launches by it).
+#define XF_BLOCKS XB_HIP
 
 // Sum of absolute differences of the four bytes (v_sad_u8).
 __device__ static inline unsigned __vsadu4(uint32_t a, uint32_t b) {

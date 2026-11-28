@@ -163,6 +163,9 @@ pub struct EncoderOptions {
     /// tick's kernel stream waits for the event (docs/ARCHITECTURE.md 4.2). One host wait
     /// fewer per tick; off by default, as the golden operation records have the host wait.
     pub frames_event: bool,
+    /// 8x8 blocks per thread block of the transform kernel: what the device's kernel image
+    /// was built with (`tb_kernel_abi::XB`, `XB_HIP`). The engine sets it from its device.
+    pub xf_blocks: u32,
 }
 
 impl Default for EncoderOptions {
@@ -177,6 +180,7 @@ impl Default for EncoderOptions {
             force_shed: None,
             split_plans: false,
             frames_event: false,
+            xf_blocks: tb_kernel_abi::XB as u32,
         }
     }
 }

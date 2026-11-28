@@ -968,6 +968,7 @@ impl Encoder {
             (dev_off, lay.dev_bytes),
             (host_off, host_len),
             alt,
+            self.opt.xf_blocks.max(1),
         ));
         Ok(self.batches.len() - 1)
     }

@@ -252,7 +252,8 @@ struct TickFrames {
 
 /// Lays out the plan of one clip: two ticks, each the first phase, the transform and four
 /// sets of row quantizers through `k_quant` and `k_recon`.
-fn layout(c: &Clip) -> (Layout, Vec<Geo>) {
+/// `xb`: 8x8 blocks per thread block of `k_xf` in the image of the device that runs the plans.
+fn layout(c: &Clip, xb: usize) -> (Layout, Vec<Geo>) {
     let t = tables();
     let mut l = Layout::default();
     let ticks = [
@@ -478,8 +479,8 @@ fn layout(c: &Clip) -> (Layout, Vec<Geo>) {
                 hist,
                 cmask,
             }),
-            grid: nblk.div_ceil(XB) as u32,
-            block: (XB * 8) as u32,
+            grid: nblk.div_ceil(xb) as u32,
+            block: (xb * 8) as u32,
         });
         l.launches.push(Launch {
             kernel: Kernel::RowStat(RowStat {
@@ -600,14 +601,16 @@ pub fn float_kernels_on_the_card_equal_the_reference_adapter<R: Runtime>() {
     let _card = card();
     let (mut failures, mut field_dct) = (Vec::new(), 0);
     for clip in clips() {
-        let (l, geos) = layout(&clip);
+        // The same buffers at the same places; only the shape of the k_xf launch differs.
+        let (l, geos) = layout(&clip, R::XF_BLOCKS as usize);
+        let (lref, _) = layout(&clip, XB);
         let size = (l.image.len() as u64 + 4095) & !4095;
         let arenas = ArenaSizes {
             device: size,
             host: size,
         };
         let card_out = run(&mut GpuDevice::<R>::new(0, arenas, &R::IMAGE).unwrap(), &l);
-        let ref_out = run(&mut RefDevice::new(arenas).unwrap(), &l);
+        let ref_out = run(&mut RefDevice::new(arenas).unwrap(), &lref);
         let mut differing = Vec::new();
         for (name, kernel, b) in &l.bufs {
             let (x, y) = (b.off as usize, b.end() as usize);

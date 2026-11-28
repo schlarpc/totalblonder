@@ -13,7 +13,7 @@ use tb_device::kernel::{
 use tb_device::{DevBuf, HostBuf, Kernel, Launch, Op, Plan, StreamId};
 use tb_kernel_abi::{
     Geo, MODE_FWD, MODE_INTRA, PIC_B, PIC_I, PIC_P, PicStat, RowStat, SL_CUR, SL_REC, SL_ZERO,
-    SessPar, XB,
+    SessPar,
 };
 use tb_m2v_rate::control::{Pass, PicCtx};
 use tb_m2v_syntax::PicType;
@@ -57,6 +57,8 @@ pub(crate) struct PhaseCount {
 #[derive(Debug)]
 pub(crate) struct Batch {
     pub id: u32,
+    /// 8x8 blocks per thread block of the transform kernel (`EncoderOptions::xf_blocks`).
+    pub xf_blocks: u32,
     /// The configuration the batch was made for.
     pub fmt: SessionConfig,
     /// Every buffer, at its place in the arenas.
@@ -141,11 +143,13 @@ impl Batch {
         dev_block: (u64, u64),
         host_block: (u64, u64),
         h_frames_alt: Option<HostBuf>,
+        xf_blocks: u32,
     ) -> Self {
         let n = lay.geo.n.unsigned_abs() as usize;
         let mbh = lay.geo.mbh.unsigned_abs() as usize;
         Self {
             id,
+            xf_blocks,
             fmt: *fmt,
             lay,
             dev_block,
@@ -714,8 +718,8 @@ impl Batch {
         let nblocks = na as u64 * u64::from(self.nmb()) * 6;
         plan.main(Op::Launch(Launch {
             kernel: k,
-            grid: u32::try_from(nblocks.div_ceil(XB as u64)).unwrap_or(u32::MAX),
-            block: (XB * 8) as u32,
+            grid: u32::try_from(nblocks.div_ceil(u64::from(self.xf_blocks))).unwrap_or(u32::MAX),
+            block: self.xf_blocks * 8,
         }));
     }
 

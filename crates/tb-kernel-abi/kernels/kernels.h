@@ -760,7 +760,11 @@ HD inline float n_act(int act, int avg, float s) { return fmaf(s, (float)act, (f
 // The transform kernels use 8 threads per 8x8 block and 32 blocks per CUDA block; the two
 // passes of the separable transform exchange data through shared memory. Threads enumerate
 // the blocks of the listed sessions only: t = b * (na * nmb) + k * nmb + macroblock.
-// XB (8x8 blocks per CUDA block) is in tb_kernel_abi.h.
+// XF_BLOCKS (8x8 blocks per thread block) is XB of tb_kernel_abi.h, or what the image's shim says
+// (XB_HIP in the AMD image): the host launches the kernel with the image's value.
+#ifndef XF_BLOCKS
+#define XF_BLOCKS XB
+#endif
 
 struct BlkGeo { int b, mbi, s, pw, ph, x0, y0; size_t blk; bool valid; };
 
@@ -831,9 +835,9 @@ __device__ inline int mb_qcode(const Geo &g, const Tables *T, const SessPar &sp,
 // which is what the rate control needs to choose quantizers before any entropy coding.
 __global__ void k_xf(Geo g, const Tables *T, Bufs B, const SessPar *par, const int *list, int na,
                      const MbInfo *info, const uint16_t *act, int16_t *coef, uint8_t *predbuf, uint64_t *hist, uint64_t *cmask) {
-  __shared__ float sm[XB][8][8];
+  __shared__ float sm[XF_BLOCKS][8][8];
   int lb = threadIdx.x >> 3, j = threadIdx.x & 7;
-  BlkGeo bg = blk_geo(g, blockIdx.x * XB + lb, list, na, true);
+  BlkGeo bg = blk_geo(g, blockIdx.x * XF_BLOCKS + lb, list, na, true);
   int mode = MODE_INTRA;
   SessPar sp;
   if (bg.valid) {
