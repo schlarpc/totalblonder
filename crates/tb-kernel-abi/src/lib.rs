@@ -72,8 +72,12 @@ pub const VLC_DCT_MAXLEV: usize = 41;
 /// cbindgen does not evaluate products in array lengths).
 pub const VLC_DCT_CODES: usize = 1312;
 const _: () = assert!(VLC_DCT_CODES == VLC_DCT_MAXRUN * VLC_DCT_MAXLEV);
-/// 8x8 blocks per CUDA block in the transform kernel (`k_xf` runs `XB * 8` threads per block).
-pub const XB: usize = 32;
+/// 8x8 blocks per CUDA block in the transform kernel (`k_xf` runs `XB * 8` threads per block):
+/// two warps. The kernel's two passes meet at a barrier, and with eight warps per block (32
+/// blocks, the value before) 7 % of its warp samples waited there for the block's slowest
+/// warp. Measured on the RTX 2000 Ada against 32: 16 is 1.5 to 2.7 % faster, 8 is 2.2 to 3.3 %
+/// faster, 4 is slower than 32 (one warp per block: the limit of blocks per SM binds).
+pub const XB: usize = 8;
 /// Blocks of one group of the coefficient and level buffers ([`lev_at`]): a warp.
 pub const LEV_GROUP: usize = 32;
 /// log2 of how many stored values of a block lie together in the coefficient and level buffers

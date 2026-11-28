@@ -174,7 +174,7 @@ fn fixedq_plans_and_phases() {
             ("launch", "k_me", 2, 64, 0),
             ("launch", "k_mvsmooth", 1, 256, 0),
             ("launch", "k_mbstat", 1, 256, 0),
-            ("launch", "k_xf", 21, 256, 0),
+            ("launch", "k_xf", 81, 64, 0),
             ("launch", "k_rowstat", 9, 32, 0),
             ("download", "", 0, 0, 720),
         ]

@@ -785,7 +785,7 @@ fn transform_chain_interlaced_equals_the_f32_port() {
 }
 
 /// Exact against the f32 port (host build only): more blocks than one CUDA block of `k_xf`
-/// holds (XB = 32 blocks of 8 threads), so the blocks of a macroblock span CUDA blocks.
+/// holds (`XB` blocks of 8 threads), so the blocks of a macroblock span CUDA blocks.
 #[test]
 fn transform_chain_spanning_cuda_blocks_equals_the_f32_port() {
     chain(&random_case(20, 5, 3, false, &[1, 2, 0]), "large");
