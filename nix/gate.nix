@@ -72,6 +72,18 @@ let
     meta.mainProgram = "gpucomp";
   };
 
+  # The desktop probe (tools/gate/gfxprobe.py): Python with moderngl, EGL through libglvnd and the
+  # machine's driver. On a card that serves a desktop the capacity bench runs it beside every
+  # run (M2V_GFXPROBE, set below).
+  gfxprobe = pkgs.writeShellApplication {
+    name = "gate-gfxprobe";
+    text = ''
+      [ -f tools/gate/gfxprobe.py ] || { echo "run from the repository root" >&2; exit 2; }
+      export LD_LIBRARY_PATH=${pkgs.libglvnd}/lib:/run/opengl-driver/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+      exec ${pkgs.python3.withPackages (p: [ p.moderngl ])}/bin/python3 -I tools/gate/gfxprobe.py "$@"
+    '';
+  };
+
   script =
     name: text:
     pkgs.writeShellApplication {
@@ -87,6 +99,7 @@ let
     export M2V_MEDIA
     export M2V_VERIFY=${verify}
     export M2VENC=${enc} M2VPIPE=${pipe} GPUCOMP=${lib.getExe gpucomp}
+    export M2V_GFXPROBE=''${M2V_GFXPROBE-${lib.getExe gfxprobe}}
     export LD_LIBRARY_PATH=/run/opengl-driver/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
   '';
   scripts = lib.mapAttrs script {
@@ -207,11 +220,14 @@ in
     type = "app";
     program = lib.getExe drv;
     meta.description = name;
-  }) scripts;
+  }) (scripts // { gate-gfxprobe = gfxprobe; });
   inherit gpucomp;
   # All of them in one store path (to copy to the machine with the card and run from there).
   tools = pkgs.symlinkJoin {
     name = "gate-tools";
-    paths = lib.attrValues scripts ++ [ gpucomp ];
+    paths = lib.attrValues scripts ++ [
+      gpucomp
+      gfxprobe
+    ];
   };
 }

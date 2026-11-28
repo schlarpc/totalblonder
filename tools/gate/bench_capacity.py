@@ -28,7 +28,9 @@ Modes:
           largest count with >= 99 % (cap99) and with >= 99.9 % (cap999) of ticks on time,
           searched in steps of the format (1; 4 for 480i) within --span steps of the point.
 Results: printed, and $M2V_RESULTS/bench/<label>.json with every run (the discarded ones too).
-Needs the gate's environment (M2V_MEDIA) and nvidia-smi; run through the capped wrapper.
+Needs the gate's environment (M2V_MEDIA); run through the capped wrapper. With nvidia-smi it
+watches the card as described; without it the card is the AMD one of a desktop (bench.AmdSampler):
+binaries run with `--device hip`, no run is discarded, and the desktop probe runs beside each.
 """
 import argparse
 import json
@@ -67,7 +69,10 @@ def parse_pmon(text):
 
 
 def others_busy():
-    """Other processes using the card right now."""
+    """Other processes using the card right now (none are counted on a card without NVIDIA's
+    tools: it serves a desktop, see bench.AmdSampler)."""
+    if not B.NVIDIA:
+        return {}
     return parse_pmon(subprocess.run(["nvidia-smi", "pmon", "-c", "1", "-s", "u"], stdout=subprocess.PIPE, text=True).stdout)
 
 
@@ -76,11 +81,14 @@ class Watch(B.Sampler):
     at 1 s that tells use from presence."""
 
     def __enter__(self):
-        self.mine = subprocess.Popen(["nvidia-smi", "pmon", "-s", "u", "-d", "1"], stdout=subprocess.PIPE, text=True)
+        if B.NVIDIA:
+            self.mine = subprocess.Popen(["nvidia-smi", "pmon", "-s", "u", "-d", "1"], stdout=subprocess.PIPE, text=True)
         return super().__enter__()
 
     def __exit__(self, *a):
         super().__exit__(*a)
+        if not B.NVIDIA:
+            return
         self.mine.terminate()
         self.others = parse_pmon(self.mine.communicate()[0])
         # the card's decoder and encoder are never ours in these runs
@@ -114,6 +122,8 @@ def command(binary, fmt, n, frames, paced):
         cmd = F.enc_args(fmt, "crowd_run") + ["--sessions", str(n), "--frames", str(frames)] + EXTRA
     # a binary may carry options of its own: NAME="PATH --option ..."
     binary, *own = binary.split()
+    if not B.NVIDIA and "--device" not in own:
+        own += ["--device", "hip"]   # no NVIDIA tools on this machine: its card is the AMD one
     cmd = [binary] + cmd[1:] + ["--write", "0", "--max-in-frames", str(B.MAX_IN), "--json", jpath] + own
     if paced:
         cmd += ["--paced", "--warmup", str(int(B.WARM_S * B.fmt_fps(fmt)))]
@@ -150,6 +160,13 @@ class Runner:
         return j
 
 
+def desk(g):
+    """What the run did to a desktop frame, when the probe ran (bench.AmdSampler)."""
+    if "desk_p99_ms" not in g:
+        return ""
+    return f" | desktop frame p99 {g['desk_p99_ms']:.2f} max {g['desk_max_ms']:.2f} ms, {g['desk_over8']} over 8 ms"
+
+
 def stats(v):
     m = sum(v) / len(v)
     sd = math.sqrt(sum((x - m) ** 2 for x in v) / (len(v) - 1)) if len(v) > 1 else 0.0
@@ -173,7 +190,7 @@ def free(r, bins, fmts, out):
                             f" wait {j['host_wait_ms']:.3f} ms")
                 g = j["gpu"]
                 print(f"{fmt:6} {who:7} {j['mb_per_s'] / 1e6:7.3f} Mmb/s tick {j['tick_mean_ms']:.3f}/{j['tick_p99_ms']:.3f} ms cpu "
-                      f"{j['cpu_cores']:.3f} {g.get('temp_start')}C {g.get('watts_mean')}W{' CONTAMINATED' if j['contaminated'] else ''}{more}",
+                      f"{j['cpu_cores']:.3f} {g.get('temp_start')}C {g.get('watts_mean')}W{' CONTAMINATED' if j['contaminated'] else ''}{desk(g)}{more}",
                       flush=True)
         res = {}
         for who, rs in runs.items():
@@ -205,6 +222,15 @@ def free(r, bins, fmts, out):
                 res[w]["paired"] = dict(median=med, min=q[0], max=q[-1], rounds=len(q), clean_rounds=sum(1 for _, c in pairs if c))
                 line += f"; by round: median {med:.4f}, {q[0]:.4f} to {q[-1]:.4f}, {len(q)} rounds ({res[w]['paired']['clean_rounds']} clean)"
             print(line, flush=True)
+            # The median tick of a run does not move with a few long ticks (on the AMD card a
+            # run has one or two of 100 ms, when the driver evicts the process's queues): the
+            # ratio of the medians over the rounds is the figure to trust there.
+            p50 = lambda who: sorted(j["tick_p50_ms"] for j in runs[who] if "tick_p50_ms" in j)  # noqa: E731
+            a50, b50 = p50(names[0]), p50(w)
+            if a50 and b50:
+                ma, mb = a50[len(a50) // 2], b50[len(b50) // 2]
+                res[w]["tick_p50_ratio"] = ma / mb
+                print(f"{fmt:6} {w} / {names[0]}: by median tick {ma / mb:.4f} ({mb:.3f} against {ma:.3f} ms)", flush=True)
         out.setdefault("free", {})[fmt] = res
 
 
@@ -229,7 +255,7 @@ def paced(r, bins, fmts, points, out):
                 g = j["gpu"]
                 print(f"{fmt:6} {who:7} x {n:4} on time {100 * j['ontime_frac']:7.3f} % tick {j['tick_mean_ms']:.3f}/"
                       f"{j['tick_p99_ms']:.3f} ms cpu {j['cpu_cores']:.3f} {g.get('temp_start')}-{g.get('temp_max')}C "
-                      f"{g.get('watts_mean')}W{' CONTAMINATED' if j['contaminated'] else ''}", flush=True)
+                      f"{g.get('watts_mean')}W{' CONTAMINATED' if j['contaminated'] else ''}{desk(g)}", flush=True)
 
         def ok(who, n, frac):
             return tested[who].get(n, {}).get("ontime_frac", 0.0) >= frac
@@ -284,8 +310,11 @@ def main():
     bins = dict(b.split("=", 1) for b in a.bin)
     fmts = a.formats.split(",")
     points = {k: int(v) for k, v in (x.split("=") for x in a.points.split(",") if x)}
-    print(subprocess.run(["nvidia-smi", "--query-gpu=name,temperature.gpu,power.draw,power.limit,utilization.gpu", "--format=csv,noheader"],
-                         stdout=subprocess.PIPE, text=True).stdout.strip(), "| others:", others_busy(), flush=True)
+    if B.NVIDIA:
+        print(subprocess.run(["nvidia-smi", "--query-gpu=name,temperature.gpu,power.draw,power.limit,utilization.gpu", "--format=csv,noheader"],
+                             stdout=subprocess.PIPE, text=True).stdout.strip(), "| others:", others_busy(), flush=True)
+    else:
+        print("card:", B.amd_card(), "| desktop probe:", os.environ.get("M2V_GFXPROBE") or "off", flush=True)
     r = Runner(a)
     out = dict(bins=bins, args=vars(a))
     try:

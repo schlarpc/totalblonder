@@ -31,11 +31,16 @@ Output: $M2V_RESULTS/bench/<label>.json (everything) and <label>.csv (one row pe
 """
 import argparse
 import csv
+import glob
 import json
 import os
+import re
+import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -77,7 +82,71 @@ def sh(cmd):
     return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout
 
 
-class Sampler:
+def amd_card():
+    """The sysfs directory of the first amdgpu card, or None."""
+    for d in sorted(glob.glob("/sys/class/drm/card[0-9]*/device")):
+        if os.path.exists(os.path.join(d, "gpu_busy_percent")):
+            return d
+    return None
+
+
+class AmdSampler:
+    """The card of a machine without nvidia-smi (amdgpu's sysfs: busy share, watts, temperature,
+    clock), sampled every 100 ms for the length of one run, and beside it the desktop probe
+    (tools/gate/gfxprobe.py, when M2V_GFXPROBE names its command): such a card serves a desktop,
+    so no run is ever alone on it and none is discarded; what the run does to a desktop frame is
+    recorded instead (`desk_p99_ms`, `desk_max_ms`, `desk_over8`)."""
+
+    def _read(self, name):
+        try:
+            return float(open(name).read().split()[0])
+        except (OSError, ValueError, IndexError):
+            return None
+
+    def _loop(self):
+        hw = (glob.glob(os.path.join(self.dev, "hwmon/hwmon*")) or [""])[0]
+        while not self.stop.wait(0.1):
+            self.rows.append(dict(sm=self._read(os.path.join(self.dev, "gpu_busy_percent")),
+                                  pwr=(self._read(os.path.join(hw, "power1_average")) or 0) / 1e6,
+                                  gtemp=(self._read(os.path.join(hw, "temp1_input")) or 0) / 1e3,
+                                  pclk=(self._read(os.path.join(hw, "freq1_input")) or 0) / 1e6))
+
+    def __enter__(self):
+        self.dev, self.rows, self.stop = amd_card(), [], threading.Event()
+        self.load0 = os.getloadavg()[0]
+        self.probe = None
+        if os.environ.get("M2V_GFXPROBE"):
+            self.probe = subprocess.Popen(os.environ["M2V_GFXPROBE"].split() + ["3600", "120"], stdout=subprocess.PIPE,
+                                          stderr=subprocess.DEVNULL, text=True)
+            self.probe.stdout.readline()   # the renderer line: the probe's context is up
+        self.t = threading.Thread(target=self._loop, daemon=True)
+        if self.dev:
+            self.t.start()
+        return self
+
+    def __exit__(self, *a):
+        self.stop.set()
+        if self.dev:
+            self.t.join()
+        rows = self.rows
+        busy = [r for r in rows if (r["sm"] or 0) > 0] or rows
+        def stat(k, f):
+            v = [r[k] for r in busy if r.get(k) is not None]
+            return round(f(v), 1) if v else None
+        mean = lambda v: sum(v) / len(v)  # noqa: E731
+        self.gpu = dict(samples=len(busy), sm_mean=stat("sm", mean), sm_max=stat("sm", max), watts_mean=stat("pwr", mean),
+                        watts_max=stat("pwr", max), temp_start=rows[0]["gtemp"] if rows else None, temp_max=stat("gtemp", max),
+                        pclk_min=stat("pclk", min), pclk_max=stat("pclk", max), other_processes={}, contaminated=False,
+                        load_before=round(self.load0, 2), load_after=round(os.getloadavg()[0], 2))
+        if self.probe:
+            self.probe.send_signal(signal.SIGINT)
+            out = self.probe.communicate()[0]
+            m = re.search(r"p99 ([0-9.]+)  max ([0-9.]+) ms  >4ms (\d+)  >8ms (\d+)", out)
+            if m:
+                self.gpu.update(desk_p99_ms=float(m.group(1)), desk_max_ms=float(m.group(2)), desk_over8=int(m.group(4)))
+
+
+class NvSampler:
     """nvidia-smi dmon and pmon in the background for the length of one run."""
 
     def __enter__(self):
@@ -126,6 +195,11 @@ class Sampler:
                                         or (self.gpu["dec_max"] or 0) > 0)
         self.gpu["load_before"] = round(self.load0, 2)
         self.gpu["load_after"] = round(os.getloadavg()[0], 2)
+
+
+# The card's sampler: NVIDIA's tools where they are, amdgpu's sysfs otherwise.
+NVIDIA = shutil.which("nvidia-smi") is not None
+Sampler = NvSampler if NVIDIA else AmdSampler
 
 
 def encode(fmt, clip, n, frames, extra, paced=False, profile=False):
