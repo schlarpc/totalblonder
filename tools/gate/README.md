@@ -22,6 +22,6 @@ otherwise.
 | `contend.sh`, `contend_report.py`, `contend_late.py`, `contend_shed.py`, `contend_table.py`, `gpucomp.cu`, `fmt.sh` | `gate-contend` | The encoder next to other users of the card (decoders, transcodes, `gpucomp`: a trivial-kernel context built by Nix) |
 | `prep_media.sh`, `derive_media.py`, `prep_inputs.sh`, `prep_film.sh` | `gate-prep` | The corpus: raw clips from the Xiph collection, derived clips, compressed pipeline inputs; `prep_film.sh` (`gate-prep film`): the film material of the film gate, derived from the corpus into `$M2V_FILM` (film frames at 704x480 and 1280x720, 23.976 / 24 / 25 / 29.97 Hz inputs, a 23.976 Hz input with captions) |
 | `qdiff.py` | | Quality of a `check.py` run against the baseline |
-| `nsys_profile.sh`, `nsys_pipe.sh`, `nsys_tick.py`, `contend_nsys.sh`, `ncu_profile.sh`, `ncu_summary.py` | | Nsight Systems and Compute around any binary (`nix build .#nsys`, `.#ncu`; `ncu` needs root for the counters) |
+| `nsys_profile.sh`, `nsys_pipe.sh`, `nsys_tick.py`, `contend_nsys.sh`, `ncu_profile.sh`, `ncu_summary.py`, `ncu_lines.py` | | Nsight Systems and Compute around any binary (`nix build .#nsys`, `.#ncu`; `ncu` needs root for the counters, and holds the card while it profiles: other processes on it miss deadlines); `ncu_lines.py`: a kernel's warp samples and memory sectors per source line (`.#nvdisasm`) |
 | `baselines/` | | `baseline.json` (stored quality per case of `check.py`; `--update-baseline`), `ref.json` (cached ffmpeg reference encodes) |
 

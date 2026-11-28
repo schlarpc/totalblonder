@@ -175,6 +175,8 @@
         # Nsight Systems and Compute of the pinned toolkit (tools/gate/nsys_*.sh, tools/gate/ncu_profile.sh)
         nsys = kernels.cuda.nsight_systems;
         ncu = kernels.cuda.nsight_compute;
+        # The disassembler, for the line table of the device image (tools/gate/ncu_lines.py)
+        nvdisasm = kernels.cuda.cuda_nvdisasm;
       };
 
       apps.${system} = repo.flake.apps // gate.apps // verify.apps // {
