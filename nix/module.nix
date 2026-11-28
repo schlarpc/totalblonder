@@ -162,7 +162,7 @@ in
       default = false;
       description = ''
         Open the firewall for the inputs in `settings`: the TCP port of each `rtmp` input and
-        the UDP port of each `ts_udp` input. The control API is never opened: it has no
+        the UDP port of each `ts_udp` and `srt` input (`hls` inputs pull, and need none). The control API is never opened: it has no
         authentication.
       '';
     };
@@ -171,7 +171,7 @@ in
   config = lib.mkIf cfg.enable {
     networking.firewall = lib.mkIf cfg.openFirewall {
       allowedTCPPorts = portsOf "rtmp";
-      allowedUDPPorts = portsOf "ts_udp";
+      allowedUDPPorts = portsOf "ts_udp" ++ portsOf "srt";
     };
     systemd.services.totalblonder = {
       description = "totalblonder MPTS server";
