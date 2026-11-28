@@ -470,6 +470,12 @@ impl Ord for Held {
     }
 }
 
+/// Date ranges shorter than this, seconds, are not guide events (bumpers, promos).
+const GUIDE_MIN: f64 = 60.0;
+
+/// A gap between guide events up to this long, seconds, is closed by the event before it.
+const GUIDE_BRIDGE: f64 = 300.0;
+
 /// Where an HLS input's date ranges go: the guide of the services it feeds.
 pub struct GuideTarget {
     /// The shared guide events.
@@ -482,7 +488,9 @@ pub struct GuideTarget {
 
 impl GuideTarget {
     /// The date ranges with an `X-TITLE` that end after six hours ago and start within 16
-    /// days, as guide events of every service.
+    /// days, as guide events of every service. Left out: ranges marked `X-GUIDE="NO"` and
+    /// anything shorter than [`GUIDE_MIN`] (bumpers, promos). An event is stretched to the
+    /// next one across a gap of up to [`GUIDE_BRIDGE`], so a skipped bumper leaves no hole.
     fn publish(&self, ranges: &[tb_hls::playlist::DateRange]) {
         let now = unix_now();
         let mut entries = Vec::new();
@@ -490,6 +498,12 @@ impl GuideTarget {
             let (Some(title), Some(d)) = (r.attr("X-TITLE"), r.duration) else {
                 continue;
             };
+            if r.attr("X-GUIDE")
+                .is_some_and(|g| g.eq_ignore_ascii_case("no"))
+                || d < GUIDE_MIN
+            {
+                continue;
+            }
             if r.start + d < now - 6.0 * 3600.0 || r.start > now + 16.0 * 86_400.0 {
                 continue;
             }
@@ -521,6 +535,15 @@ impl GuideTarget {
                     }
                 }
                 _ => kept.push(e),
+            }
+        }
+        // Bridge short gaps (what was skipped): the event before runs on to the next.
+        for i in 1..kept.len() {
+            let next = kept[i].event.start.0;
+            let prev = &mut kept[i - 1].event;
+            let end = prev.start.0.saturating_add(prev.length);
+            if end < next && f64::from(next - end) <= GUIDE_BRIDGE {
+                prev.length = next - prev.start.0;
             }
         }
         let entries = kept;
@@ -739,24 +762,47 @@ mod tests {
             r("c", now + 600.0, 600.0, &[("X-TITLE", "overlaps a")]),
             r("d", now + 1320.0, 1320.0, &[("X-TITLE", "Outlaw Star")]),
             r("e", now - 86_400.0, 1320.0, &[("X-TITLE", "yesterday")]),
-            // a 20-second bumper in the same minute as the episode after it
+            // a 20-second bumper: too short for the guide, whatever it is marked
             r("f", now + 2640.0, 20.0, &[("X-TITLE", "bumper")]),
             r("g", now + 2660.0, 1320.0, &[("X-TITLE", "Gundam Wing")]),
+            // a 90-second promo, long enough but marked out of the guide
+            r(
+                "h",
+                now + 3980.0,
+                90.0,
+                &[("X-TITLE", "promo"), ("X-GUIDE", "no")],
+            ),
+            r("i", now + 4070.0, 1320.0, &[("X-TITLE", "Tenchi Muyo")]),
+            // after a ten-minute hole: not bridged
+            r("j", now + 6000.0, 1320.0, &[("X-TITLE", "Dragon Ball Z")]),
         ]);
         let f = g.feeds.lock().unwrap();
         let titles: Vec<String> = f["toonami"]
             .iter()
             .map(|e| format!("{:?}", e.event.title))
             .collect();
-        assert_eq!(titles.len(), 3, "{titles:?}");
-        assert!(titles[0].contains("Cowboy Bebop") && titles[1].contains("Outlaw Star"));
-        assert!(titles[2].contains("Gundam Wing"), "the longer one stays");
-        assert!(f["toonami"][0].rating.is_some());
-        assert_eq!(f["toonami"][0].event.length, 1320);
-        assert_eq!(f["toonami-hd"].len(), 3);
-        let mut minutes: Vec<u32> = f["toonami"].iter().map(|e| e.event.start.0 / 60).collect();
+        assert_eq!(titles.len(), 5, "{titles:?}");
+        for (t, want) in titles.iter().zip([
+            "Cowboy Bebop",
+            "Outlaw Star",
+            "Gundam Wing",
+            "Tenchi Muyo",
+            "Dragon Ball Z",
+        ]) {
+            assert!(t.contains(want), "{titles:?}");
+        }
+        let ev = &f["toonami"];
+        assert!(ev[0].rating.is_some());
+        assert_eq!(ev[0].event.length, 1320);
+        // the bumper's 20 s and the promo's 90 s are bridged by the episode before them
+        assert_eq!(ev[1].event.length, 1340);
+        assert_eq!(ev[2].event.length, 1410);
+        // the ten-minute hole is left
+        assert_eq!(ev[3].event.length, 1320);
+        assert_eq!(f["toonami-hd"].len(), 5);
+        let mut minutes: Vec<u32> = ev.iter().map(|e| e.event.start.0 / 60).collect();
         minutes.dedup();
-        assert_eq!(minutes.len(), 3, "one event per start minute");
+        assert_eq!(minutes.len(), 5, "one event per start minute");
     }
 
     #[test]

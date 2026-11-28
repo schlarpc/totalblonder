@@ -919,7 +919,9 @@ segment and after each discontinuity), so episodes follow each other without a t
 session break; packets already past are dropped and video then waits for a key frame. The
 variant playlist's `EXT-X-DATERANGE`s with an `X-TITLE` (and `X-DESCRIPTION`, `X-RATING`)
 become the guide of every service airing the input, at most one event per start minute (event
-ids come from the minute: the longer of a bumper and an episode stays). Checked on nixark:
+ids come from the minute: the longer of two stays). Bumpers and promos stay out: a range marked
+`X-GUIDE="NO"` or shorter than a minute is skipped, and the event before a gap of up to five
+minutes runs on to the next, so the skipped spans leave no hole. Checked on nixark:
 joined 15 s into one episode, the next (a separate encode after `EXT-X-DISCONTINUITY`) began on
 its air time with only the content's own 20 ms of encoder priming between them; the titles
 were in the guide and the checker found nothing. libav's own
